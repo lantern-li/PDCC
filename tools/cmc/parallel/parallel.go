@@ -184,17 +184,22 @@ func ParallelCMD() *cobra.Command {
 			}
 
 			nodeNum = len(hosts)
+			var (
+				bytes []byte
+				err   error
+			)
 			if len(pairsFile) != 0 {
-				bytes, err := ioutil.ReadFile(pairsFile)
+				bytes, err = ioutil.ReadFile(pairsFile)
 				if err != nil {
 					panic(err)
 				}
 				pairsString = string(bytes)
-				globalPairs, err = getPairInfos()
-				if err != nil {
-					panic(err)
-				}
 			}
+			globalPairs, err = getPairInfos()
+			if err != nil {
+				panic(err)
+			}
+
 			fmt.Println("tx content: ", pairsString)
 		},
 	}
