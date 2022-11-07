@@ -227,10 +227,10 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	}
 
 	// if the block is not empty, append the charging gas tx
-	if enableOptimizeChargeGas && snapshot.GetSnapshotSize() > 0 {
-		ts.log.Debug("append charge gas tx to block ...")
-		ts.appendChargeGasTx(block, snapshot, senderCollection)
-	}
+	//if enableOptimizeChargeGas && snapshot.GetSnapshotSize() > 0 {
+	//	ts.log.Debug("append charge gas tx to block ...")
+	//	ts.appendChargeGasTx(block, snapshot, senderCollection)
+	//}
 
 	timeCostB := time.Since(startTime)
 	ts.log.Infof("schedule tx batch finished, block %d, success %d, txs execution cost %v, "+
@@ -370,9 +370,9 @@ func (ts *TxScheduler) handleApplyResult(enableConflictsBitWindow bool, enableSe
 }
 
 func (ts *TxScheduler) getTxRWSetTable(snapshot protocol.Snapshot, block *commonPb.Block) map[string]*commonPb.TxRWSet {
+	txRWSetMap := make(map[string]*commonPb.TxRWSet)
 	block.Txs = snapshot.GetTxTable()
 	txRWSetTable := snapshot.GetTxRWSetTable()
-	txRWSetMap := make(map[string]*commonPb.TxRWSet, len(txRWSetTable))
 	for _, txRWSet := range txRWSetTable {
 		if txRWSet != nil {
 			txRWSetMap[txRWSet.TxId] = txRWSet
@@ -1023,57 +1023,57 @@ func (ts *TxScheduler) dispatchTxsInSenderCollection(
 			addr, txCollection.accountBalance, len(txCollection.txs)))
 	}
 
-	for addr, txCollection := range senderCollection.txsMap {
-		balance := txCollection.accountBalance
+	for _, txCollection := range senderCollection.txsMap {
+		//balance := txCollection.accountBalance
 		for _, tx := range txCollection.txs {
-			ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("dispatch sender collection tx => %s", tx.Payload))
-			var gasLimit int64
-			limit := tx.Payload.Limit
-			txNeedChargeGas := ts.checkNativeFilter(tx.GetPayload().ContractName, tx.GetPayload().Method)
-			ts.log.Debugf("tx need charge gas => %v", txNeedChargeGas)
-			if limit == nil && txNeedChargeGas {
-				// tx需要扣费，但是limit没有设置
-				tx.Result = &commonPb.Result{
-					Code: commonPb.TxStatusCode_GAS_LIMIT_NOT_SET,
-					ContractResult: &commonPb.ContractResult{
-						Code:    uint32(1),
-						Result:  nil,
-						Message: ErrMsgOfGasLimitNotSet,
-						GasUsed: uint64(0),
-					},
-					RwSetHash: nil,
-					Message:   ErrMsgOfGasLimitNotSet,
-				}
-
-				runningTxC <- tx
-				continue
-			} else if !txNeedChargeGas {
-				// tx 不需要扣费
-				gasLimit = int64(0)
-			} else {
-				// tx 需要扣费，limit 正常设置
-				gasLimit = int64(limit.GasLimit)
-			}
-
-			// if the balance less than gas limit, set the result ahead, working goroutine will never runVM for it.
-			if balance-gasLimit < 0 {
-				pkStr, _ := txCollection.publicKey.String()
-				ts.log.Debugf("balance is too low to execute tx. address = %v, public key = %s", addr, pkStr)
-				errMsg := fmt.Sprintf("`%s` has no enough balance to execute tx.", addr)
-				tx.Result = &commonPb.Result{
-					Code: commonPb.TxStatusCode_GAS_BALANCE_NOT_ENOUGH_FAILED,
-					ContractResult: &commonPb.ContractResult{
-						Code:    uint32(1),
-						Result:  nil,
-						Message: errMsg,
-						GasUsed: uint64(0),
-					},
-					RwSetHash: nil,
-					Message:   errMsg,
-				}
-			} else {
-				balance = balance - gasLimit
-			}
+		//	ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("dispatch sender collection tx => %s", tx.Payload))
+		//	var gasLimit int64
+		//	limit := tx.Payload.Limit
+		//	txNeedChargeGas := ts.checkNativeFilter(tx.GetPayload().ContractName, tx.GetPayload().Method)
+		//	ts.log.Debugf("tx need charge gas => %v", txNeedChargeGas)
+		//	if limit == nil && txNeedChargeGas {
+		//		// tx需要扣费，但是limit没有设置
+		//		tx.Result = &commonPb.Result{
+		//			Code: commonPb.TxStatusCode_GAS_LIMIT_NOT_SET,
+		//			ContractResult: &commonPb.ContractResult{
+		//				Code:    uint32(1),
+		//				Result:  nil,
+		//				Message: ErrMsgOfGasLimitNotSet,
+		//				GasUsed: uint64(0),
+		//			},
+		//			RwSetHash: nil,
+		//			Message:   ErrMsgOfGasLimitNotSet,
+		//		}
+		//
+		//		runningTxC <- tx
+		//		continue
+		//	} else if !txNeedChargeGas {
+		//		// tx 不需要扣费
+		//		gasLimit = int64(0)
+		//	} else {
+		//		// tx 需要扣费，limit 正常设置
+		//		gasLimit = int64(limit.GasLimit)
+		//	}
+		//
+		//	// if the balance less than gas limit, set the result ahead, working goroutine will never runVM for it.
+		//	if balance-gasLimit < 0 {
+		//		pkStr, _ := txCollection.publicKey.String()
+		//		ts.log.Debugf("balance is too low to execute tx. address = %v, public key = %s", addr, pkStr)
+		//		errMsg := fmt.Sprintf("`%s` has no enough balance to execute tx.", addr)
+		//		tx.Result = &commonPb.Result{
+		//			Code: commonPb.TxStatusCode_GAS_BALANCE_NOT_ENOUGH_FAILED,
+		//			ContractResult: &commonPb.ContractResult{
+		//				Code:    uint32(1),
+		//				Result:  nil,
+		//				Message: errMsg,
+		//				GasUsed: uint64(0),
+		//			},
+		//			RwSetHash: nil,
+		//			Message:   errMsg,
+		//		}
+		//	} else {
+		//		balance = balance - gasLimit
+		//	}
 
 			runningTxC <- tx
 		}
@@ -1443,11 +1443,11 @@ func (ts *TxScheduler) verifyExecOrderTxType(block *commonPb.Block,
 			txExecOrderChargeGasCount++
 		}
 	}
-	if (IsOptimizeChargeGasEnabled(ts.chainConf) && txExecOrderChargeGasCount != 1) ||
-		(!IsOptimizeChargeGasEnabled(ts.chainConf) && txExecOrderChargeGasCount != 0) {
-		return txExecOrderNormalCount, txExecOrderIteratorCount, txExecOrderChargeGasCount,
-			fmt.Errorf("charge gas enabled but charge gas tx is not 1")
-	}
+	//if (IsOptimizeChargeGasEnabled(ts.chainConf) && txExecOrderChargeGasCount != 1) ||
+	//	(!IsOptimizeChargeGasEnabled(ts.chainConf) && txExecOrderChargeGasCount != 0) {
+	//	return txExecOrderNormalCount, txExecOrderIteratorCount, txExecOrderChargeGasCount,
+	//		fmt.Errorf("charge gas enabled but charge gas tx is not 1")
+	//}
 	// check type are all correct
 	for i, tx := range block.Txs {
 		t, ok := txExecOrderTypeMap[tx.Payload.GetTxId()]
@@ -1461,9 +1461,9 @@ func (ts *TxScheduler) verifyExecOrderTxType(block *commonPb.Block,
 		} else {
 			typeShouldBe = protocol.ExecOrderTxTypeIterator
 		}
-		if IsOptimizeChargeGasEnabled(ts.chainConf) && uint32(i+1) == uint32(len(block.Txs)) {
-			typeShouldBe = protocol.ExecOrderTxTypeChargeGas
-		}
+		//if IsOptimizeChargeGasEnabled(ts.chainConf) && uint32(i+1) == uint32(len(block.Txs)) {
+		//	typeShouldBe = protocol.ExecOrderTxTypeChargeGas
+		//}
 		if t != typeShouldBe {
 			return txExecOrderNormalCount, txExecOrderIteratorCount, txExecOrderChargeGasCount,
 				fmt.Errorf("tx type mismatch, txId:%s, index:%d", tx.Payload.GetTxId(), i)
@@ -1500,9 +1500,9 @@ func (ts *TxScheduler) compareDag(block *commonPb.Block, snapshot protocol.Snaps
 		appendSpecialTxsToDag(dag, txExecOrderIteratorCount)
 	}
 	// snapshot.GetSnapshotSize() > 0 prevent snapshot.GetSnapshotSize() - 1 overflow
-	if IsOptimizeChargeGasEnabled(ts.chainConf) && snapshot.GetSnapshotSize() > 0 {
-		ts.appendChargeGasTxToDAG(dag, snapshot)
-	}
+	//if IsOptimizeChargeGasEnabled(ts.chainConf) && snapshot.GetSnapshotSize() > 0 {
+	//	ts.appendChargeGasTxToDAG(dag, snapshot)
+	//}
 	equal, err := utils.IsDagEqual(block.Dag, dag)
 	if err != nil {
 		return err

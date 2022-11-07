@@ -55,14 +55,14 @@ func getSenderTxCollection(
 		// get the public key from tx
 		pk, err2 := getPkFromTx(tx, snapshot)
 		if err2 != nil {
-			log.Errorf("getPkFromTx failed: err = %v", err)
+			log.Errorf("getPkFromTx failed: err = %v", err2)
 			continue
 		}
 
 		// convert the public key to `ZX` or `CM` or `EVM` address
 		address, err2 := publicKeyToAddress(pk, chainCfg)
 		if err2 != nil {
-			log.Error("publicKeyToAddress failed: err = %v", err)
+			log.Error("publicKeyToAddress failed: err = %v", err2)
 			continue
 		}
 

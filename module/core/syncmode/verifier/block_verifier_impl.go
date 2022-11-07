@@ -12,8 +12,6 @@ import (
 
 	"chainmaker.org/chainmaker/protocol/v2"
 
-	"chainmaker.org/chainmaker-go/module/core/common/scheduler"
-
 	batch "chainmaker.org/chainmaker/txpool-batch/v2"
 
 	"github.com/gogo/protobuf/proto"
@@ -202,12 +200,12 @@ func (v *BlockVerifierImpl) VerifyBlock(block *commonpb.Block, mode protocol.Ver
 		return err
 	}
 
-	snapshot := v.snapshotManager.GetSnapshot(lastBlock, block)
-	if scheduler.IsOptimizeChargeGasEnabled(v.chainConf) {
-		if err = scheduler.VerifyOptimizeChargeGasTx(block, snapshot); err != nil {
-			return err
-		}
-	}
+	//snapshot := v.snapshotManager.GetSnapshot(lastBlock, block)
+	//if scheduler.IsOptimizeChargeGasEnabled(v.chainConf) {
+	//	if err = scheduler.VerifyOptimizeChargeGasTx(block, snapshot); err != nil {
+	//		return err
+	//	}
+	//}
 
 	// sync mode, need to verify consensus vote signature
 	beginConsensCheck := utils.CurrentTimeMillisSeconds()
@@ -405,11 +403,14 @@ func (v *BlockVerifierImpl) validateBlock(block, lastBlock *commonpb.Block, mode
 	timeLasts := make(map[string]int64)
 	var err error
 	var txCapacity uint32
-	if scheduler.IsOptimizeChargeGasEnabled(v.chainConf) {
-		txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity + 1
-	} else {
-		txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity
-	}
+
+	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity
+
+	//if scheduler.IsOptimizeChargeGasEnabled(v.chainConf) {
+	//	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity + 1
+	//} else {
+	//	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity
+	//}
 	if block.Header.TxCount > txCapacity {
 		return nil, nil, timeLasts, nil, fmt.Errorf("txcapacity expect <= %d, got %d)", txCapacity, block.Header.TxCount)
 	}
@@ -437,11 +438,14 @@ func (v *BlockVerifierImpl) validateBlockWithRWSets(block, lastBlock *commonpb.B
 	timeLasts := make(map[string]int64)
 	var err error
 	var txCapacity uint32
-	if scheduler.IsOptimizeChargeGasEnabled(v.chainConf) {
-		txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity + 1
-	} else {
-		txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity
-	}
+
+	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity + 1
+
+	//if scheduler.IsOptimizeChargeGasEnabled(v.chainConf) {
+	//	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity + 1
+	//} else {
+	//	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity
+	//}
 	if block.Header.TxCount > txCapacity {
 		return nil, timeLasts, nil, fmt.Errorf("txcapacity expect <= %d, got %d)", txCapacity, block.Header.TxCount)
 	}
