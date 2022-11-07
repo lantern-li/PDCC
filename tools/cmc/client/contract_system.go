@@ -64,6 +64,9 @@ func systemContractCMD() *cobra.Command {
 	// system contract multi sign
 	systemContractCmd.AddCommand(systemContractMultiSignCMD())
 
+	// test
+	systemContractCmd.AddCommand(systemTestTxCMD())
+
 	// DPoS-stake contract
 	return systemContractCmd
 }
