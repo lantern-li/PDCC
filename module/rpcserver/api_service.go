@@ -12,6 +12,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"chainmaker.org/chainmaker-go/module/blockchain"
 	"chainmaker.org/chainmaker-go/module/snapshot"
@@ -107,10 +109,17 @@ func (s *ApiService) SendRequest(ctx context.Context, req *commonPb.TxRequest) (
 		Endorsers: req.Endorsers,
 		Result:    nil}, protocol.RPC)
 
-	// audit log format: ip:port|orgId|chainId|TxType|TxId|Timestamp|ContractName|Method|retCode|retCodeMsg|retMsg
-	s.logBrief.Infof("|%s|%s|%s|%s|%s|%d|%s|%s|%d|%s|%s", GetClientAddr(ctx), req.Sender.Signer.OrgId,
-		req.Payload.ChainId, req.Payload.TxType, req.Payload.TxId, req.Payload.Timestamp, req.Payload.ContractName,
-		req.Payload.Method, resp.Code, resp.Code, resp.Message)
+	if req.Payload.ContractName != "QUERY_CONTRACT" && req.Payload.Method != "GET_TX_BY_TX_ID" {
+		// audit log format: ip:port|orgId|chainId|TxType|TxId|Timestamp|ContractName|Method|retCode|retCodeMsg|retMsg
+		s.logBrief.Infof("|%s|%s|%s|%s|%s|%d|%s|%s|%d|%s|%s", GetClientAddr(ctx), req.Sender.Signer.OrgId,
+			req.Payload.ChainId, req.Payload.TxType, req.Payload.TxId, req.Payload.Timestamp, req.Payload.ContractName,
+			req.Payload.Method, resp.Code, resp.Code, resp.Message)
+	} else {
+		// audit log format: ip:port|orgId|chainId|TxType|TxId|Timestamp|ContractName|Method|retCode|retCodeMsg|retMsg
+		s.logBrief.Infof("|%s|%s|%s|%s|%s|%d|%s|%s|%d|%s|%s", GetClientAddr(ctx), req.Sender.Signer.OrgId,
+			req.Payload.ChainId, req.Payload.TxType, string(req.Payload.Parameters[0].Value), req.Payload.Timestamp,
+			req.Payload.ContractName, req.Payload.Method, resp.Code, resp.Code, resp.Message)
+	}
 
 	return resp, nil
 }
@@ -161,6 +170,24 @@ func (s *ApiService) validate(tx *commonPb.Transaction) (errCode commonErr.ErrCo
 
 func (s *ApiService) getErrMsg(errCode commonErr.ErrCode, err error) string {
 	return fmt.Sprintf("%s, %s", errCode.String(), err.Error())
+}
+
+func (s *ApiService) errorResultByCode(c codes.Code, code commonErr.ErrCode, err error) error {
+	errMsg := s.getErrMsg(code, err)
+	s.log.Error(errMsg)
+	return status.Error(c, errMsg)
+}
+
+func (s *ApiService) errorResultByMessage(c codes.Code, format string, args ...interface{}) error {
+	message := fmt.Sprintf(format, args...)
+	s.log.Error(message)
+	return status.Error(c, message)
+}
+
+func (s *ApiService) errorResultByError(c codes.Code, err error) error {
+	message := err.Error()
+	s.log.Error(message)
+	return status.Error(c, message)
 }
 
 // invoke contract according to TxType

@@ -68,6 +68,8 @@ func (s *ApiService) Subscribe(req *commonPb.TxRequest, server apiPb.RpcNode_Sub
 		return s.dealTxSubscription(tx, server)
 	case syscontract.SubscribeFunction_SUBSCRIBE_CONTRACT_EVENT.String():
 		return s.dealContractEventSubscription(tx, server)
+	case syscontract.SubscribeFunction_SUBSCRIBE_BLOCK_WITH_RULE.String():
+		return s.dealBlockSubscription(tx, server)
 	}
 
 	return nil
@@ -78,27 +80,19 @@ func (s *ApiService) checkAndGetLastBlockHeight(store protocol.BlockchainStore,
 
 	var (
 		err             error
-		errMsg          string
-		errCode         commonErr.ErrCode
 		lastBlock       *commonPb.Block
 		lastBlockHeight uint64
 	)
 
 	if lastBlock, err = store.GetLastBlock(); err != nil {
-		errCode = commonErr.ERR_CODE_GET_LAST_BLOCK
-		errMsg = s.getErrMsg(errCode, err)
-		s.log.Error(errMsg)
-		return -1, status.Error(codes.Internal, errMsg)
+		return -1, s.errorResultByCode(codes.Internal, commonErr.ERR_CODE_GET_LAST_BLOCK, err)
 	}
 
 	lastBlockHeight = lastBlock.Header.BlockHeight
 
 	if int64(lastBlockHeight) < payloadStartBlockHeight {
-		errMsg = fmt.Sprintf("payload start block height:%d > last block height:%d",
-			payloadStartBlockHeight, lastBlockHeight)
-
-		s.log.Error(errMsg)
-		return -1, status.Error(codes.InvalidArgument, errMsg)
+		return -1, s.errorResultByMessage(codes.InvalidArgument, "payload start block height:%d >  last block "+
+			"height:%d", payloadStartBlockHeight, lastBlockHeight)
 	}
 
 	return int64(lastBlock.Header.BlockHeight), nil
@@ -130,10 +124,7 @@ func (s *ApiService) checkSubscribeBlockHeight(startBlockHeight, endBlockHeight 
 func (s *ApiService) getRoleFromTx(tx *commonPb.Transaction) (protocol.Role, error) {
 	bc, err := s.chainMakerServer.GetBlockchain(tx.Payload.ChainId)
 	if err != nil {
-		errCode := commonErr.ERR_CODE_GET_BLOCKCHAIN
-		errMsg := s.getErrMsg(errCode, err)
-		s.log.Error(errMsg)
-		return "", err
+		return "", s.errorResultByCode(codes.Internal, commonErr.ERR_CODE_GET_BLOCKCHAIN, err)
 	}
 
 	ac := bc.GetAccessControl()

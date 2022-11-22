@@ -40,10 +40,10 @@ chainmaker.org/chainmaker/net-liquid v1.1.0/go.mod h1:A1fjmgLv7ejD1eFh320+ZxGB4O
 chainmaker.org/chainmaker/pb-go/v2 v2.3.0/go.mod h1:MB2+suualBWOKvd6FRQD/XcZzlav7APiSa7uzdDLkY8=
 chainmaker.org/chainmaker/pb-go/v2 v2.3.1-0.20221020020235-feef3c9ed047/go.mod h1:MB2+suualBWOKvd6FRQD/XcZzlav7APiSa7uzdDLkY8=
 chainmaker.org/chainmaker/pb-go/v2 v2.3.2-0.20221025031424-180bc65c9681/go.mod h1:MB2+suualBWOKvd6FRQD/XcZzlav7APiSa7uzdDLkY8=
-chainmaker.org/chainmaker/pb-go/v2 v2.3.2-0.20221026034011-ffac3626d220/go.mod h1:MB2+suualBWOKvd6FRQD/XcZzlav7APiSa7uzdDLkY8=
 chainmaker.org/chainmaker/pb-go/v2 v2.3.2-0.20221101031204-599dc62493a5/go.mod h1:MB2+suualBWOKvd6FRQD/XcZzlav7APiSa7uzdDLkY8=
-chainmaker.org/chainmaker/pb-go/v2 v2.3.2-0.20221102022821-b8ab8397a114 h1:G1JxzLkMhQZ9WuoZjDp0Ae4En5tbx0PBTCMbFKYa+wg=
 chainmaker.org/chainmaker/pb-go/v2 v2.3.2-0.20221102022821-b8ab8397a114/go.mod h1:MB2+suualBWOKvd6FRQD/XcZzlav7APiSa7uzdDLkY8=
+chainmaker.org/chainmaker/pb-go/v2 v2.3.2-0.20221122133546-6c0d11394fd9 h1:aYhTqw6crIVNRD/A0U1FLcEoPXu+V5sPetJ7hEFZBwE=
+chainmaker.org/chainmaker/pb-go/v2 v2.3.2-0.20221122133546-6c0d11394fd9/go.mod h1:MB2+suualBWOKvd6FRQD/XcZzlav7APiSa7uzdDLkY8=
 chainmaker.org/chainmaker/protocol/v2 v2.3.0/go.mod h1:l3EfuaCdGG1FKcCItDbGeIJ4YmYnMjSUIoXQ5GElARY=
 chainmaker.org/chainmaker/protocol/v2 v2.3.1/go.mod h1:l3EfuaCdGG1FKcCItDbGeIJ4YmYnMjSUIoXQ5GElARY=
 chainmaker.org/chainmaker/protocol/v2 v2.3.2-0.20221024093623-fc7569579a3f/go.mod h1:l3EfuaCdGG1FKcCItDbGeIJ4YmYnMjSUIoXQ5GElARY=
@@ -52,8 +52,8 @@ chainmaker.org/chainmaker/protocol/v2 v2.3.2-0.20221101070008-37c2e5712b67 h1:RI
 chainmaker.org/chainmaker/protocol/v2 v2.3.2-0.20221101070008-37c2e5712b67/go.mod h1:l3EfuaCdGG1FKcCItDbGeIJ4YmYnMjSUIoXQ5GElARY=
 chainmaker.org/chainmaker/raftwal/v2 v2.1.0 h1:8TNEw1XtWBZkjqoNgcc9qoD/0xFkSb0SDXyzM2rQxjo=
 chainmaker.org/chainmaker/raftwal/v2 v2.1.0/go.mod h1:19ulESU/EH/OxbMpo1PJMsRoJDM91BPrvXCyQhkHWpk=
-chainmaker.org/chainmaker/sdk-go/v2 v2.3.2-0.20221111080157-29efdd3af9b7 h1:cwZ8/Qijs6Xm13KE96ptZFp1mPFfRx2lWKD7YLrsA6E=
-chainmaker.org/chainmaker/sdk-go/v2 v2.3.2-0.20221111080157-29efdd3af9b7/go.mod h1:5nBLJ3inu63Erga/kF9SaAbsskubEZVit3DHlz1Wtjg=
+chainmaker.org/chainmaker/sdk-go/v2 v2.3.2-0.20221122142750-dcc4c69646dc h1:Hz7bFACDeHFPP288GO/Kmj4rUmNyCZGINmzTlfk1aPs=
+chainmaker.org/chainmaker/sdk-go/v2 v2.3.2-0.20221122142750-dcc4c69646dc/go.mod h1:HSTcHuGT6wlviJEw1pxGcVu3t/AbzuP4rA5vinrHOps=
 chainmaker.org/chainmaker/store-badgerdb/v2 v2.3.0 h1:Q5tNXukq+B+9asB/PJxOd/d7HltJDyw2scVT008deBQ=
 chainmaker.org/chainmaker/store-badgerdb/v2 v2.3.0/go.mod h1:8uuLFeyjEs1jHK2jEvLJBRhfoV6KymFw49PowTduimY=
 chainmaker.org/chainmaker/store-leveldb/v2 v2.3.1 h1:rd6CDjhqaZfGXRTfA+M0cN8ijucphB0d51Ss+Ksc1Mc=
@@ -87,8 +87,8 @@ chainmaker.org/chainmaker/vm-gasm/v2 v2.3.2-0.20221028065828-e6a027d54d7c/go.mod
 chainmaker.org/chainmaker/vm-native/v2 v2.3.0/go.mod h1:4pJrMVuqt5C/cordDjC1xSqjxGTawdFDkJMOfIRSfT0=
 chainmaker.org/chainmaker/vm-native/v2 v2.3.2-0.20221024124606-c4c3e73fea7b/go.mod h1:c8O2rT3mnYt9sXxcWgLQE9nLOgXgUU+ERiPkVW1+F7E=
 chainmaker.org/chainmaker/vm-native/v2 v2.3.2-0.20221101031355-ce20a793904b/go.mod h1:OC3OHtnzI3pu3QPsp6CxCZaFXfxamPr2F2t+yJu3bfE=
-chainmaker.org/chainmaker/vm-native/v2 v2.3.2-0.20221121045141-20923908c7b6 h1:wOcSX7+M8fUEit8BmZSagOSsEpHQhkKzjPb51Tf+r98=
-chainmaker.org/chainmaker/vm-native/v2 v2.3.2-0.20221121045141-20923908c7b6/go.mod h1:VAViKHi/cvjCWRGVAG5+N/6ephHAzfhfbC29avBDFJ0=
+chainmaker.org/chainmaker/vm-native/v2 v2.3.2-0.20221122143330-82d42c2628cd h1:FJL53w5ZoO/Fljv9kdeB6ysshJ6IB9MZ6rGYK4FpuoQ=
+chainmaker.org/chainmaker/vm-native/v2 v2.3.2-0.20221122143330-82d42c2628cd/go.mod h1:js6EQ4AJIhSdbB3i1DKEWdkPzu1Dd2NxARrXHvuKZDg=
 chainmaker.org/chainmaker/vm-wasmer/v2 v2.3.2-0.20221121061121-d88f996f1669 h1:Cys0yn+S+bTiAZKBLC8aK3Jp2Gjv9+qsJ9hgobDQ4JM=
 chainmaker.org/chainmaker/vm-wasmer/v2 v2.3.2-0.20221121061121-d88f996f1669/go.mod h1:NwNiGshdIEaFtedcS2GviRAi3y7SbWoSZqyLtUOO13U=
 chainmaker.org/chainmaker/vm-wxvm/v2 v2.3.2-0.20221027124616-c0fb426ec231 h1:HuJ1XaBJuVNOD1nB7QoNr4FhbmjRz0zu6qgekhM42sI=

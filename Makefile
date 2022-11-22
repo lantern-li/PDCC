@@ -28,8 +28,39 @@ chainmaker:
 		@rm -rf go.sum && cd main && go mod tidy && go build -ldflags '${GOLDFLAGS}' -o ../bin/chainmaker
     endif
 
-chainmaker-vendor:
-	@cd main && go build -mod=vendor -o ../bin/chainmaker
+vtar-scp: gen-clib-vendor tar scp
+
+tar:
+	@cd .. ; tar -czvf chainmaker-go.tar.gz --exclude=chainmaker-go/.git  --exclude=chainmaker-go/test  --exclude=chainmaker-go/bin  --exclude=chainmaker-go/build  --exclude=chainmaker-go/data  --exclude=chainmaker-go/tools/cmc1  --exclude=chainmaker-go/log chainmaker-go
+
+scp:
+	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.5:/home/sz/code/chainmaker
+	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.6:/home/sz/code/chainmaker
+	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.7:/home/sz/code/chainmaker
+	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.8:/home/sz/code/chainmaker
+	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.9:/home/sz/code/chainmaker
+
+vendor-build:
+	@cd main && go build -mod=vendor -ldflags '${GOLDFLAGS}' -o ../bin/chainmaker
+
+gen-clib-vendor:
+	@sudo rm -rf vendor
+	@go mod vendor
+	# 注意：执行此方法前需要切换common项目到对应分支或commit
+	# 密码学 gmssl 相关
+	@cp -a ../common/opencrypto/gmssl/gmssl/include ./vendor/chainmaker.org/chainmaker/common/v2/opencrypto/gmssl/gmssl/
+	@cp -a ../common/opencrypto/gmssl/gmssl/lib ./vendor/chainmaker.org/chainmaker/common/v2/opencrypto/gmssl/gmssl/lib/
+	# 密码学 tencentsm 相关
+	@cp -a ../common/opencrypto/tencentsm/tencentsm/include ./vendor/chainmaker.org/chainmaker/common/v2/opencrypto/tencentsm/tencentsm/
+	@cp -a ../common/opencrypto/tencentsm/tencentsm/lib ./vendor/chainmaker.org/chainmaker/common/v2/opencrypto/tencentsm/tencentsm/
+	# 密码学 bulletproofs 相关
+	@cp -a ../common/crypto/bulletproofs/bulletproofs_cgo/c_include ./vendor/chainmaker.org/chainmaker/common/v2/crypto/bulletproofs/bulletproofs_cgo/c_include/
+	@cp -a ../common/crypto/bulletproofs/bulletproofs_cgo/c_lib ./vendor/chainmaker.org/chainmaker/common/v2/crypto/bulletproofs/bulletproofs_cgo/c_lib/
+	# 虚拟机 wasmer-go 相关
+	@mkdir -p ./vendor/chainmaker.org/chainmaker/vm-wasmer/v2/wasmer-go/
+	@cp -a ${GOPATH}/pkg/mod/chainmaker.org/chainmaker/vm-wasmer/v2@v2.3.1/wasmer-go ./vendor/chainmaker.org/chainmaker/vm-wasmer/v2/wasmer-go/
+#	@cp -a ../common/crypto/bulletproofs/bulletproofs_cgo/c_lib ./vendor/chainmaker.org/chainmaker/common/v2/crypto/bulletproofs/bulletproofs_cgo
+#	@cp -a ../chainmaker/common/crypto/bulletproofs/bulletproofs_cgo/c_lib/libbulletproofs.a /usr/lib/
 
 package:
 	@cd main && go mod tidy && GOPATH=${GOPATH} go build -ldflags '${GOLDFLAGS}' -o ../bin/chainmaker

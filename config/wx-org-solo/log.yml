@@ -32,6 +32,7 @@ log:
       net: INFO
       vm: INFO
       storage: INFO
+      rpc: DEBUG
     file_path: ../log/org/system.log
     log_by_chain: true
     max_age: 365                  # 日志最长保存时间，单位：天

@@ -25,7 +25,7 @@ crypto_engine: tjfoc #support gmssl, tencentsm and tjfoc
 
 # Chains the node currently joined in
 blockchain:
-  # chain id and its genesis block file path.
+# chain id and its genesis block file path.
 #  - chainId: chain1
 #    genesis: ../config/{org_path1}/chainconfig/bc1.yml
 #  - chainId: chain2
@@ -173,7 +173,7 @@ txpool:
   # Interval of creating a transaction batch, for normal and batch tx_pool, in millisecond(ms).
   batch_create_timeout: 50
 
- # RPC service setting
+# RPC service setting
 rpc:
   # RPC type, can only be grpc now
   provider: grpc  # [*]

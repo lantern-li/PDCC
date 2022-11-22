@@ -8,6 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 package rpcserver
 
 import (
+	"chainmaker.org/chainmaker-go/module/rpcserver/id"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -93,12 +94,13 @@ func NewRPCServer(chainMakerServer *blockchain.ChainMakerServer) (*RPCServer, er
 			[]float64{0.005, 0.01, 0.015, 0.05, 0.1, 1, 10},
 			"grpc_service", "grpc_method")
 	}
-
+	log := logger.GetLogger(logger.MODULE_RPC)
+	id.InitIdentityMatch(log)
 	return &RPCServer{
 		grpcServer:       grpcServer,
 		mixServer:        mixServer,
 		chainMakerServer: chainMakerServer,
-		log:              logger.GetLogger(logger.MODULE_RPC),
+		log:              log,
 	}, nil
 }
 
