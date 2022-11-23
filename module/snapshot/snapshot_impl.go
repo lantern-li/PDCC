@@ -348,13 +348,19 @@ func (s *SnapshotImpl) ApplyTxSimContext(txSimContext protocol.TxSimContext, spe
 	var txRWSet *commonPb.TxRWSet
 	var txResult *commonPb.Result
 
+	txRWSet = &commonPb.TxRWSet{
+		TxId:     txSimContext.GetTx().Payload.TxId,
+		TxReads:  []*commonPb.TxRead{},
+		TxWrites: []*commonPb.TxWrite{},
+	}
 	if !applySpecialTx && specialTxType == protocol.ExecOrderTxTypeIterator {
 		s.specialTxTable = append(s.specialTxTable, tx)
 		return true, len(s.txTable) + len(s.specialTxTable)
 	}
 
 	// Only when the virtual machine is running normally can the read-write set be saved, or write fake conflicted key
-	txRWSet = txSimContext.GetTxRWSet(runVmSuccess)
+	// TODO disable getting read/write sets from txSimContext
+	//txRWSet = txSimContext.GetTxRWSet(runVmSuccess)
 	txResult = txSimContext.GetTxResult()
 
 	if specialTxType == protocol.ExecOrderTxTypeIterator || txExecSeq >= len(s.txTable) {
