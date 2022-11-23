@@ -19,6 +19,11 @@ type ManagerImpl struct {
 	log       protocol.Logger
 }
 
+var (
+	SZContractList = map[string]struct{}{
+		"REAL_ESTATE": {}, "RECEPIT": {}, "DECLARATION": {},"EXPORT_REBATE": {},"SOCIAL_SECURITY": {},"ENDORSEMENT": {}}
+)
+
 func (m *ManagerImpl) storeAndLinkSnapshotImpl(snapshotImpl *SnapshotImpl,
 	prevFingerPrint *utils.BlockFingerPrint, fingerPrint *utils.BlockFingerPrint) {
 	// 存储当前指纹的snapshot
