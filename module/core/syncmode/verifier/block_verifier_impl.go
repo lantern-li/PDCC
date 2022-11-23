@@ -211,13 +211,14 @@ func (v *BlockVerifierImpl) VerifyBlock(block *commonpb.Block, mode protocol.Ver
 
 	// sync mode, need to verify consensus vote signature
 	beginConsensCheck := utils.CurrentTimeMillisSeconds()
-	if protocol.SYNC_VERIFY == mode {
-		if err = v.verifyVoteSig(newBlock); err != nil {
-			v.log.Warnf("verify failed [%d](%x), votesig %s",
-				newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
-			return err
-		}
-	}
+	// TODO disable vote sig
+	//if protocol.SYNC_VERIFY == mode {
+	//	if err = v.verifyVoteSig(newBlock); err != nil {
+	//		v.log.Warnf("verify failed [%d](%x), votesig %s",
+	//			newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
+	//		return err
+	//	}
+	//}
 	consensusCheckUsed := utils.CurrentTimeMillisSeconds() - beginConsensCheck
 
 	// verify success, cache block and read write set
@@ -319,13 +320,14 @@ func (v *BlockVerifierImpl) VerifyBlockWithRwSets(block *commonpb.Block,
 
 	// sync mode, need to verify consensus vote signature
 	beginConsensCheck := utils.CurrentTimeMillisSeconds()
-	if protocol.SYNC_VERIFY == mode {
-		if err = v.verifyVoteSig(newBlock); err != nil {
-			v.log.Warnf("verify failed [%d](%x), votesig %s",
-				newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
-			return err
-		}
-	}
+	// TODO disable vote sig
+	//if protocol.SYNC_VERIFY == mode {
+	//	if err = v.verifyVoteSig(newBlock); err != nil {
+	//		v.log.Warnf("verify failed [%d](%x), votesig %s",
+	//			newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
+	//		return err
+	//	}
+	//}
 	consensusCheckUsed := utils.CurrentTimeMillisSeconds() - beginConsensCheck
 
 	// verify success, cache block and read write set
