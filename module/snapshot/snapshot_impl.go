@@ -422,6 +422,29 @@ func (s *SnapshotImpl) Seal() {
 
 // BuildDAG build the block dag according to the read-write table
 func (s *SnapshotImpl) BuildDAG(isSql bool, txRWSetTable []*commonPb.TxRWSet) *commonPb.DAG {
+	txs := s.GetTxTable()
+	for _, tx := range txs {
+		if _, ok := SZContractList[tx.Payload.ContractName]; ok {
+			return s.buildNormalDag(isSql, txRWSetTable)
+		}
+	}
+
+	return genDefaultDag(len(txs))
+}
+
+func genDefaultDag(txCount int) *commonPb.DAG {
+	vertexes := make([]*commonPb.DAG_Neighbor, txCount)
+	for i := 0; i < txCount; i++ {
+		vertexes[i] = &commonPb.DAG_Neighbor{
+			Neighbors: make([]uint32, 0, 1),
+		}
+	}
+	return &commonPb.DAG{
+		Vertexes: vertexes,
+	}
+}
+
+func (s *SnapshotImpl)buildNormalDag(isSql bool, txRWSetTable []*commonPb.TxRWSet) *commonPb.DAG {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
