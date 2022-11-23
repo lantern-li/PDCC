@@ -1366,8 +1366,8 @@ func recoverBlockByBatch(
 			newTxs = append(newTxs, tx...)
 		}
 
-		logger.Infof(fmt.Sprintf("get add txs by batchIds,height:%d, batchIds:%v, num:%d",
-			block.Header.BlockHeight, batchIds, len(newTxs)))
+		logger.Infof(fmt.Sprintf("get add txs by batchIds,height:%d, batchIds:%d, num:%d",
+			block.Header.BlockHeight, len(batchIds), len(newTxs)))
 
 		if len(newTxs) != int(block.Header.TxCount) {
 			return nil, nil,
