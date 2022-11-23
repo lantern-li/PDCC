@@ -8,6 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 package scheduler
 
 import (
+	"chainmaker.org/chainmaker-go/module/txfilter/filtercommon"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -102,7 +103,7 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 
 	var goRoutinePool *ants.Pool
 	poolCapacity := ts.StoreHelper.GetPoolCapacity()
-	ts.log.Debugf("GetPoolCapacity() => %v", poolCapacity)
+	ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("GetPoolCapacity() => %v", poolCapacity))
 	if goRoutinePool, err = ants.NewPool(poolCapacity, ants.WithPreAlloc(false)); err != nil {
 		return nil, nil, err
 	}
@@ -120,13 +121,13 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	var senderGroup *SenderGroup
 	var senderCollection *SenderCollection
 	if enableOptimizeChargeGas {
-		ts.log.Debugf("before prepare `SenderCollection` ")
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("before prepare `SenderCollection` "))
 		senderCollection = NewSenderCollection(txBatch, snapshot, ts.log)
-		ts.log.Debugf("end prepare `SenderCollection` ")
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("end prepare `SenderCollection` "))
 	} else if enableSenderGroup {
-		ts.log.Debugf("before prepare `SenderGroup` ")
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("before prepare `SenderGroup` "))
 		senderGroup = NewSenderGroup(txBatch)
-		ts.log.Debugf("end prepare `SenderGroup` ")
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("end prepare `SenderGroup` "))
 	}
 
 	blockFingerPrint := string(utils.CalcBlockFingerPrintWithoutTx(block))
@@ -159,7 +160,7 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 		for {
 			select {
 			case tx := <-runningTxC:
-				ts.log.Debugf("prepare to submit running task for tx id:%s", tx.Payload.GetTxId())
+				ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("prepare to submit running task for tx id:%s", tx.Payload.GetTxId()))
 
 				err := goRoutinePool.Submit(func() {
 					handleTx(block, snapshot, ts, tx, runningTxC, finishC, goRoutinePool, txBatchSize,
@@ -170,7 +171,7 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 						tx.Payload.GetTxId(), err)
 				}
 			case <-timeoutC:
-				ts.log.Debugf("Schedule(...) timeout ...")
+				ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("Schedule(...) timeout ..."))
 				ts.scheduleFinishC <- true
 				if !enableOptimizeChargeGas && enableSenderGroup {
 					senderGroup.doneTxKeyC <- [32]byte{}
@@ -178,7 +179,7 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 				ts.log.Warnf("block [%d] schedule reached time limit", block.Header.BlockHeight)
 				return
 			case <-finishC:
-				ts.log.Debugf("Schedule(...) finish ...")
+				ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("Schedule(...) finish ..."))
 				ts.scheduleFinishC <- true
 				if !enableOptimizeChargeGas && enableSenderGroup {
 					senderGroup.doneTxKeyC <- [32]byte{}
@@ -186,7 +187,7 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 				return
 			}
 			counter++
-			ts.log.Debugf("schedule tx run %d times ... ", counter)
+			ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("schedule tx run %d times ... ", counter))
 		}
 	}()
 
@@ -443,7 +444,7 @@ func (ts *TxScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.
 			select {
 			case txIndex := <-runningTxC:
 				tx := txMapping[txIndex]
-				ts.log.Debugf("simulate with dag, prepare to submit running task for tx id:%s", tx.Payload.GetTxId())
+				ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("simulate with dag, prepare to submit running task for tx id:%s", tx.Payload.GetTxId()))
 				err = goRoutinePool.Submit(func() {
 					handleTxInSimulateWithDag(block, snapshot, ts, tx, txIndex, doneTxC, finishC, txExecOrderTypeC, txBatchSize)
 				})
@@ -453,13 +454,13 @@ func (ts *TxScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.
 				}
 			case doneTxIndex := <-doneTxC:
 				txIndexBatchAfterShrink := ts.shrinkDag(doneTxIndex, dagRemain, reverseDagRemain)
-				ts.log.Debugf("block [%d] simulate with dag, pop next tx index batch size:%d, dagRemain size:%d",
-					block.Header.BlockHeight, len(txIndexBatchAfterShrink), len(dagRemain))
+				ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("block [%d] simulate with dag, pop next tx index batch size:%d, dagRemain size:%d",
+					block.Header.BlockHeight, len(txIndexBatchAfterShrink), len(dagRemain)))
 				for _, tx := range txIndexBatchAfterShrink {
 					runningTxC <- tx
 				}
 			case <-finishC:
-				ts.log.Debugf("block [%d] simulate with dag finish", block.Header.BlockHeight)
+				ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("block [%d] simulate with dag finish", block.Header.BlockHeight))
 				ts.scheduleFinishC <- true
 				return
 			case <-timeoutC:
@@ -606,7 +607,7 @@ func (ts *TxScheduler) executeTx(
 	var err error
 	var specialTxType protocol.ExecOrderTxType
 
-	ts.log.Debugf("run vm start for tx:%s", tx.Payload.GetTxId())
+	ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("run vm start for tx:%s", tx.Payload.GetTxId()))
 	if blockVersion >= 2300 {
 		if txResult, specialTxType, err = ts.runVM2300(tx, txSimContext, enableOptimizeChargeGas); err != nil {
 			runVmSuccess = false
@@ -626,7 +627,7 @@ func (ts *TxScheduler) executeTx(
 				tx.Payload.GetTxId(), tx.Payload.ContractName, txResult, err)
 		}
 	}
-	ts.log.Debugf("run vm finished for tx:%s, runVmSuccess:%v, txResult = %v ", tx.Payload.TxId, runVmSuccess, txResult)
+	ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("run vm finished for tx:%s, runVmSuccess:%v, txResult = %v ", tx.Payload.TxId, runVmSuccess, txResult))
 	txSimContext.SetTxResult(txResult)
 	return txSimContext, specialTxType, runVmSuccess
 }
@@ -655,7 +656,7 @@ func (ts *TxScheduler) simulateSpecialTxs(dag *commonPb.DAG, snapshot protocol.S
 				// apply tx
 				applyResult, applySize := snapshot.ApplyTxSimContext(txSimContext, specialTxType, runVmSuccess, true)
 				if !applyResult {
-					ts.log.Debugf("failed to apply according to dag with tx %s ", tx.Payload.TxId)
+					ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("failed to apply according to dag with tx %s ", tx.Payload.TxId))
 					runningTxC <- tx
 					continue
 				}
@@ -676,8 +677,8 @@ func (ts *TxScheduler) simulateSpecialTxs(dag *commonPb.DAG, snapshot protocol.S
 					dag.Vertexes = append(dag.Vertexes, dagNeighbors)
 				}
 				if applySize >= txBatchSize {
-					ts.log.Debugf("block [%d] schedule special txs finished, apply size:%d, len of txs:%d, "+
-						"len of special txs:%d", block.Header.BlockHeight, applySize, txBatchSize, specialTxsLen)
+					ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("block [%d] schedule special txs finished, apply size:%d, len of txs:%d, "+
+						"len of special txs:%d", block.Header.BlockHeight, applySize, txBatchSize, specialTxsLen))
 					scheduleFinishC <- true
 					return
 				}
@@ -824,7 +825,7 @@ func (ts *TxScheduler) refundGas(accountMangerContract *commonPb.Contract, tx *c
 		}
 
 		refundGas := limit - contractResultPayload.GasUsed
-		ts.log.Debugf("refund gas [%d], gas used [%d]", refundGas, contractResultPayload.GasUsed)
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("refund gas [%d], gas used [%d]", refundGas, contractResultPayload.GasUsed))
 
 		if refundGas == 0 {
 			return result, nil
@@ -851,8 +852,8 @@ func (ts *TxScheduler) getAccountMgrContractAndPk(txSimContext protocol.TxSimCon
 	contractName, method string) (accountMangerContract *commonPb.Contract, pk []byte, err error) {
 	if ts.checkGasEnable() && ts.checkNativeFilter(contractName, method) &&
 		tx.Payload.TxType == commonPb.TxType_INVOKE_CONTRACT {
-		ts.log.Debugf("getAccountMgrContractAndPk => txSimContext.GetContractByName(`%s`)",
-			syscontract.SystemContract_ACCOUNT_MANAGER.String())
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("getAccountMgrContractAndPk => txSimContext.GetContractByName(`%s`)",
+			syscontract.SystemContract_ACCOUNT_MANAGER.String()))
 		accountMangerContract, err = txSimContext.GetContractByName(syscontract.SystemContract_ACCOUNT_MANAGER.String())
 		if err != nil {
 			ts.log.Error(err.Error())
@@ -871,7 +872,7 @@ func (ts *TxScheduler) getAccountMgrContractAndPk(txSimContext protocol.TxSimCon
 
 func (ts *TxScheduler) checkGasEnable() bool {
 	if ts.chainConf.ChainConfig() != nil && ts.chainConf.ChainConfig().AccountConfig != nil {
-		ts.log.Debugf("chain config account config enable gas is:%v", ts.chainConf.ChainConfig().AccountConfig.EnableGas)
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("chain config account config enable gas is:%v", ts.chainConf.ChainConfig().AccountConfig.EnableGas))
 		return ts.chainConf.ChainConfig().AccountConfig.EnableGas
 	}
 	return false
@@ -946,25 +947,25 @@ func (ts *TxScheduler) dispatchTxs(
 	enableConflictsBitWindow bool,
 	conflictsBitWindow *ConflictsBitWindow) {
 	if enableOptimizeChargeGas {
-		ts.log.Debugf("before `SenderCollection` dispatch => ")
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("before `SenderCollection` dispatch => "))
 		ts.dispatchTxsInSenderCollection(senderCollection, runningTxC)
-		ts.log.Debugf("end `SenderCollection` dispatch => ")
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("end `SenderCollection` dispatch => "))
 
 	} else if enableSenderGroup {
-		ts.log.Debugf("before `SenderGroup` dispatch => ")
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("before `SenderGroup` dispatch => "))
 		if enableConflictsBitWindow {
 			conflictsBitWindow.setMaxPoolCapacity(len(senderGroup.txsMap))
 		}
 		goRoutinePool.Tune(len(senderGroup.txsMap))
 		ts.sendTxBySenderGroup(conflictsBitWindow, senderGroup, runningTxC, enableConflictsBitWindow)
-		ts.log.Debugf("end `SenderGroup` dispatch => ")
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("end `SenderGroup` dispatch => "))
 
 	} else {
-		ts.log.Debugf("before `Normal` dispatch => ")
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("before `Normal` dispatch => "))
 		for _, tx := range txBatch {
 			runningTxC <- tx
 		}
-		ts.log.Debugf("end `Normal` dispatch => ")
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("end `Normal` dispatch => "))
 	}
 }
 
@@ -972,16 +973,16 @@ func (ts *TxScheduler) dispatchTxs(
 // if the balance less than gas limit, set the result of tx and dispatch this tx.
 func (ts *TxScheduler) dispatchTxsInSenderCollection(
 	senderCollection *SenderCollection, runningTxC chan *commonPb.Transaction) {
-	ts.log.Debugf("begin dispatchTxsInSenderCollection(...)")
+	ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("begin dispatchTxsInSenderCollection(...)"))
 	for addr, txCollection := range senderCollection.txsMap {
-		ts.log.Debugf("%v => {balance: %v, tx size: %v}",
-			addr, txCollection.accountBalance, len(txCollection.txs))
+		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("%v => {balance: %v, tx size: %v}",
+			addr, txCollection.accountBalance, len(txCollection.txs)))
 	}
 
 	for addr, txCollection := range senderCollection.txsMap {
 		balance := txCollection.accountBalance
 		for _, tx := range txCollection.txs {
-			ts.log.Debugf("dispatch sender collection tx => %s", tx.Payload)
+			ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("dispatch sender collection tx => %s", tx.Payload))
 			var gasLimit int64
 			limit := tx.Payload.Limit
 			txNeedChargeGas := ts.checkNativeFilter(tx.GetPayload().ContractName, tx.GetPayload().Method)
@@ -1144,7 +1145,7 @@ func (ts *TxScheduler) executeChargeGasTx(
 	snapshot protocol.Snapshot) protocol.TxSimContext {
 
 	txSimContext := vm.NewTxSimContext(ts.VmManager, snapshot, tx, block.Header.BlockVersion, ts.log)
-	ts.log.Debugf("new tx for charging gas, id = %s", tx.Payload.GetTxId())
+	ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("new tx for charging gas, id = %s", tx.Payload.GetTxId()))
 
 	result := &commonPb.Result{
 		Code: commonPb.TxStatusCode_SUCCESS,
@@ -1156,7 +1157,7 @@ func (ts *TxScheduler) executeChargeGasTx(
 		RwSetHash: nil,
 	}
 
-	ts.log.Debugf("executeChargeGasTx => txSimContext.GetContractByName(`%s`)", tx.Payload.ContractName)
+	ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("executeChargeGasTx => txSimContext.GetContractByName(`%s`)", tx.Payload.ContractName))
 	contract, err := txSimContext.GetContractByName(tx.Payload.ContractName)
 	if err != nil {
 		ts.log.Errorf("Get contract info by name[%s] error:%s", tx.Payload.ContractName, err)
@@ -1182,7 +1183,7 @@ func (ts *TxScheduler) executeChargeGasTx(
 	}
 	result.Code = txStatusCode
 	result.ContractResult = contractResultPayload
-	ts.log.Debugf("finished tx for charging gas, id = :%s, txStatusCode = %v", tx.Payload.TxId, txStatusCode)
+	ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("finished tx for charging gas, id = :%s, txStatusCode = %v", tx.Payload.TxId, txStatusCode))
 
 	txSimContext.SetTxResult(result)
 	snapshot.ApplyTxSimContext(
