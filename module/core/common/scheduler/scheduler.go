@@ -504,10 +504,11 @@ func (ts *TxScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.
 		t := <-txExecOrderTypeC
 		txExecOrderTypeMap[t.string] = t.ExecOrderTxType
 	}
-	err = ts.compareDag(block, snapshot, txRWSetMap, txExecOrderTypeMap)
-	if err != nil {
-		return nil, nil, err
-	}
+	// TODO disable compare dag
+	//err = ts.compareDag(block, snapshot, txRWSetMap, txExecOrderTypeMap)
+	//if err != nil {
+	//	return nil, nil, err
+	//}
 	if localconf.ChainMakerConfig.SchedulerConfig.RWSetLog {
 		result, _ := prettyjson.Marshal(txRWSetMap)
 		ts.log.Infof("simulate with dag rwset :%s, dag: %+v", result, block.Dag)
