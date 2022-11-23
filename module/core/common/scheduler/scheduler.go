@@ -195,7 +195,9 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	// Build DAG from read-write table
 	snapshot.Seal()
 	timeCostA := time.Since(startTime)
-	block.Dag = snapshot.BuildDAG(ts.chainConf.ChainConfig().Contract.EnableSqlSupport, nil)
+	// TODO disable build dag
+	//block.Dag = snapshot.BuildDAG(ts.chainConf.ChainConfig().Contract.EnableSqlSupport, nil)
+	block.Dag = genDefaultDag(len(snapshot.GetTxTable()))
 
 	// Execute special tx sequentially, and add to dag
 	if len(snapshot.GetSpecialTxTable()) > 0 {
@@ -217,6 +219,18 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	contractEventMap := ts.getContractEventMap(block)
 
 	return txRWSetMap, contractEventMap, nil
+}
+
+func genDefaultDag(txCount int) *commonPb.DAG {
+	vertexes := make([]*commonPb.DAG_Neighbor, txCount)
+	for i := 0; i < txCount; i++ {
+		vertexes[i] = &commonPb.DAG_Neighbor{
+			Neighbors: make([]uint32, 0, 1),
+		}
+	}
+	return &commonPb.DAG{
+		Vertexes: vertexes,
+	}
 }
 
 // handleTx: run tx and apply tx sim context to snapshot
