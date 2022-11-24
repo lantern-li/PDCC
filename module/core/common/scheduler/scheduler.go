@@ -120,6 +120,28 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	enableConflictsBitWindow, conflictsBitWindow := ts.initOptimizeTools(txBatch)
 	var senderGroup *SenderGroup
 	var senderCollection *SenderCollection
+
+	if localconf.ChainMakerConfig.CoreConfig.SchedulerType == 1 {
+		txRWSetMap := make(map[string]*commonPb.TxRWSet, len(txBatch))
+		contractEventMap := make(map[string][]*commonPb.ContractEvent, 0)
+		createTime := time.Since(startTime)
+		for _, tx := range txBatch {
+			txId := tx.Payload.TxId
+			tx.Result = genDefaultTxResult()
+			txRWSetMap[txId] = genDefaultTxRWSet(txId)
+			//event := tx.Result.ContractResult.ContractEvent
+			//contractEventMap[txId] = event
+		}
+		putMapTime := time.Since(startTime)
+		block.Txs = txBatch
+		block.Dag = genDefaultDag(len(txBatch))
+		entTime := time.Since(startTime)
+		ts.log.Infof("schedule tx batch finished, block:%d, serial, save, success %d, time[create:%v, put:%v, dag:%v, total:%v]",
+			block.Header.BlockHeight, len(txBatch),
+			createTime, putMapTime-createTime, entTime-putMapTime, entTime)
+		return txRWSetMap, contractEventMap, nil
+	}
+
 	if enableOptimizeChargeGas {
 		ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("before prepare `SenderCollection` "))
 		senderCollection = NewSenderCollection(txBatch, snapshot, ts.log)
@@ -398,6 +420,26 @@ func (ts *TxScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.
 		return txRWSetMap, snapshot.GetTxResultMap(), nil
 	}
 	ts.log.Infof("simulate with dag start, size %d", len(block.Txs))
+
+	if localconf.ChainMakerConfig.CoreConfig.SchedulerType == 1 {
+		txBatch := block.Txs
+		txResultMap := make(map[string]*commonPb.Result, len(txBatch))
+		createTime := time.Since(startTime)
+		for _, tx := range txBatch {
+			txId := tx.Payload.TxId
+			txResultMap[txId] = genDefaultTxResult()
+			txRWSetMap[txId] = genDefaultTxRWSet(txId)
+		}
+		putMapTime := time.Since(startTime)
+		block.Txs = txBatch
+		block.Dag = genDefaultDag(len(txBatch))
+		endTime := time.Since(startTime)
+		ts.log.Infof("simulate with dag finished, block:%d, txs:%d, serial, time[create:%v, put:%v, dag:%v, total:%v]",
+			block.Header.BlockHeight, len(txBatch),
+			createTime, putMapTime-createTime, endTime-putMapTime, endTime)
+		return txRWSetMap, txResultMap, nil
+	}
+
 	txMapping := make(map[int]*commonPb.Transaction)
 	for index, tx := range block.Txs {
 		txMapping[index] = tx
@@ -1502,5 +1544,37 @@ func appendSpecialTxsToDag(dag *commonPb.DAG, txExecOrderSpecialCount uint32) {
 		// this special tx (txExecOrderNormalCount+i) only depend on previous special tx (txExecOrderNormalCount+i-1)
 		dagNeighbors.Neighbors = append(dagNeighbors.Neighbors, txExecOrderNormalCount+i-1)
 		dag.Vertexes = append(dag.Vertexes, dagNeighbors)
+	}
+}
+
+func genDefaultTxResult() *commonPb.Result {
+	return &commonPb.Result{
+		Code: commonPb.TxStatusCode_SUCCESS,
+		ContractResult: &commonPb.ContractResult{
+			Code:    uint32(0),
+			Result:  nil,
+			Message: "",
+		},
+		RwSetHash: nil,
+	}
+}
+
+func genDefaultTxRWSet(txId string) *commonPb.TxRWSet {
+	return &commonPb.TxRWSet{
+		TxId:     txId,
+		TxReads:  nil,
+		TxWrites: nil,
+	}
+}
+
+func genDefaultDag(txCount int) *commonPb.DAG {
+	vertexes := make([]*commonPb.DAG_Neighbor, txCount)
+	for i := 0; i < txCount; i++ {
+		vertexes[i] = &commonPb.DAG_Neighbor{
+			Neighbors: make([]uint32, 0, 1),
+		}
+	}
+	return &commonPb.DAG{
+		Vertexes: vertexes,
 	}
 }
