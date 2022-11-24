@@ -424,7 +424,7 @@ func (s *SnapshotImpl) Seal() {
 func (s *SnapshotImpl) BuildDAG(isSql bool, txRWSetTable []*commonPb.TxRWSet) *commonPb.DAG {
 	txs := s.GetTxTable()
 	for _, tx := range txs {
-		if _, ok := SZContractList[tx.Payload.ContractName]; ok {
+		if _, ok := SZContractList[tx.Payload.ContractName]; !ok {
 			return s.buildNormalDag(isSql, txRWSetTable)
 		}
 	}
@@ -595,6 +595,7 @@ func (s *SnapshotImpl) GetBlockFingerprint() string {
 
 func (s *SnapshotImpl) dealNormalTx(txSimContext protocol.TxSimContext, specialTxType protocol.ExecOrderTxType,
 	runVmSuccess, applySpecialTx bool, tx *commonPb.Transaction) (bool, int) {
+	s.log.Infof("what??? deal normal Tx, contractName: %s", tx.Payload.ContractName)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	// it is necessary to check sealed secondly
@@ -637,8 +638,8 @@ func (s *SnapshotImpl) dealNormalTx(txSimContext protocol.TxSimContext, specialT
 
 func (s *SnapshotImpl) dealSZTx(txSimContext protocol.TxSimContext, specialTxType protocol.ExecOrderTxType,
 	runVmSuccess, applySpecialTx bool, tx *commonPb.Transaction) (bool, int) {
-	//s.lock.Lock()
-	//defer s.lock.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	// it is necessary to check sealed secondly
 	if !applySpecialTx && s.IsSealed() {
 		return false, len(s.txTable)
@@ -648,11 +649,11 @@ func (s *SnapshotImpl) dealSZTx(txSimContext protocol.TxSimContext, specialTxTyp
 	var txRWSet *commonPb.TxRWSet
 	var txResult *commonPb.Result
 
-	//txRWSet = &commonPb.TxRWSet{
-	//	TxId:     txSimContext.GetTx().Payload.TxId,
-	//	TxReads:  []*commonPb.TxRead{},
-	//	TxWrites: []*commonPb.TxWrite{},
-	//}
+	txRWSet = &commonPb.TxRWSet{
+		TxId:     txSimContext.GetTx().Payload.TxId,
+		TxReads:  []*commonPb.TxRead{},
+		TxWrites: []*commonPb.TxWrite{},
+	}
 	if !applySpecialTx && specialTxType == protocol.ExecOrderTxTypeIterator {
 		s.specialTxTable = append(s.specialTxTable, tx)
 		return true, len(s.txTable) + len(s.specialTxTable)
@@ -660,7 +661,7 @@ func (s *SnapshotImpl) dealSZTx(txSimContext protocol.TxSimContext, specialTxTyp
 
 	// Only when the virtual machine is running normally can the read-write set be saved, or write fake conflicted key
 	// TODO disable getting read/write sets from txSimContext
-	txRWSet = txSimContext.GetTxRWSet(runVmSuccess)
+	//txRWSet = txSimContext.GetTxRWSet(runVmSuccess)
 	txResult = txSimContext.GetTxResult()
 
 	if specialTxType == protocol.ExecOrderTxTypeIterator || txExecSeq >= len(s.txTable) {
