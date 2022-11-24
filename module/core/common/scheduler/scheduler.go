@@ -1561,7 +1561,7 @@ func genDefaultTxResult() *commonPb.Result {
 		ContractResult: &commonPb.ContractResult{
 			Code:    uint32(0),
 			Result:  nil,
-			Message: "",
+			Message: "OK",
 		},
 		RwSetHash: nil,
 	}
