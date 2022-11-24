@@ -39,6 +39,10 @@ blockchain:
 #  - chainId: chain4
 #    genesis: ../config/{org_path4}/chainconfig/bc4.yml
 
+core:
+  # 1 quick schedule
+  schedule_type: 1
+
 # Blockchain node settings
 node:
   # Organization id is the node belongs to.
