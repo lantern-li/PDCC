@@ -34,6 +34,7 @@ tar:
 	@cd .. ; tar -czvf chainmaker-go.tar.gz --exclude=chainmaker-go/.git  --exclude=chainmaker-go/test  --exclude=chainmaker-go/bin  --exclude=chainmaker-go/build  --exclude=chainmaker-go/data  --exclude=chainmaker-go/tools/cmc1  --exclude=chainmaker-go/log chainmaker-go
 
 scp:
+	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.1:/home/sz/code/chainmaker
 	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.5:/home/sz/code/chainmaker
 	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.6:/home/sz/code/chainmaker
 	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.7:/home/sz/code/chainmaker
