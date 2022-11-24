@@ -52,6 +52,11 @@ const (
 	ErrMsgOfGasLimitNotSet = "field `GasLimit` must be set in payload."
 )
 
+var (
+	SZContractList = map[string]struct{}{
+		"REAL_ESTATE": {}, "RECEPIT": {}, "DECLARATION": {},"EXPORT_REBATE": {},"SOCIAL_SECURITY": {},"ENDORSEMENT": {}}
+)
+
 // TxScheduler transaction scheduler structure
 type TxScheduler struct {
 	lock            sync.Mutex
@@ -121,7 +126,9 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	var senderGroup *SenderGroup
 	var senderCollection *SenderCollection
 
-	if localconf.ChainMakerConfig.CoreConfig.SchedulerType == 1 {
+	if localconf.ChainMakerConfig.CoreConfig.SchedulerType == 1 &&
+		canUseQuickSchedule(txBatch) {
+
 		txRWSetMap := make(map[string]*commonPb.TxRWSet, len(txBatch))
 		contractEventMap := make(map[string][]*commonPb.ContractEvent, 0)
 		createTime := time.Since(startTime)
@@ -421,7 +428,8 @@ func (ts *TxScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.
 	}
 	ts.log.Infof("simulate with dag start, size %d", len(block.Txs))
 
-	if localconf.ChainMakerConfig.CoreConfig.SchedulerType == 1 {
+	if localconf.ChainMakerConfig.CoreConfig.SchedulerType == 1  &&
+		canUseQuickSchedule(block.Txs) {
 		txBatch := block.Txs
 		txResultMap := make(map[string]*commonPb.Result, len(txBatch))
 		createTime := time.Since(startTime)
@@ -1577,4 +1585,13 @@ func genDefaultDag(txCount int) *commonPb.DAG {
 	return &commonPb.DAG{
 		Vertexes: vertexes,
 	}
+}
+
+func canUseQuickSchedule(txs []*commonPb.Transaction) bool {
+	for _, tx := range txs {
+		if _, ok := SZContractList[tx.Payload.ContractName]; !ok {
+			return false
+		}
+	}
+	return true
 }
