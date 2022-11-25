@@ -69,7 +69,7 @@ block:
   block_size: 10
 
   # The interval of block proposing attempts, in millisecond
-  block_interval: 10
+  block_interval: 400
 
 # Core settings
 core:
@@ -144,6 +144,10 @@ consensus:
   ext_config:
     # - key: aa
     #   value: chain01_ext11
+    - key: "TBFT_blocks_per_proposer"
+      value: "100000000"
+    - key: "WAL_write_mode"
+      value: "2"      #sync: 0  async: 1 none: 2
 
 # Trust roots is used to specify the organizations' root certificates in permessionedWithCert mode.
 # When in permessionedWithKey mode or public mode, it represents the admin users.

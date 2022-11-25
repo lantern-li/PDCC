@@ -165,7 +165,7 @@ resource_policies:
   - resource_name: CHAIN_CONFIG-NODE_ID_UPDATE
     policy:
       # Rule can be Any, All, Majority, Self...
-      rule: ANY
+      rule: SELF
       # The org id list, all organizations are need if here is null.
       org_list:
       # The role list
@@ -173,19 +173,19 @@ resource_policies:
         - admin
   - resource_name: CHAIN_CONFIG-TRUST_ROOT_ADD
     policy:
-      rule: ANY
+      rule: SELF
       org_list:
       role_list:
         - admin
   - resource_name: CHAIN_CONFIG-CERTS_FREEZE
     policy:
-      rule: ANY
+      rule: SELF
       org_list:
       role_list:
         - admin
   - resource_name: CONTRACT_MANAGE-INIT_CONTRACT
     policy:
-      rule: ANY
+      rule: SELF
       org_list:
       role_list:
 
