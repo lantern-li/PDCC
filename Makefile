@@ -34,7 +34,10 @@ chainmaker:
 		@rm -rf go.sum && cd main && go mod tidy && go build -ldflags '${GOLDFLAGS}' -o ../bin/chainmaker
     endif
 
-vtar-scp: gen-clib-vendor tar-source-code scp-source-code
+autodeploy: vtar-scp deploy-4-node-binary
+
+# 1.vendor ; 2.tar ; 3.scp ; 4.build ;
+vtar-scp: gen-clib-vendor tar-source-code scp-source-code build-remote
 
 deploy-4-node-binary:
 	# stop node1
@@ -66,7 +69,7 @@ deploy-4-node-binary:
 	@ssh $(DEPLOP_4_SERVER) "cd /home/sz/node4/bin; ./start.sh"
 
 
-build:
+build-remote:
 	#删除历史源码
 	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker; rm -rf chainmaker-go"
 	#更新源代码
@@ -87,7 +90,7 @@ vendor-build:
 	@cd main && go build -mod=vendor -ldflags '${GOLDFLAGS}' -o ../bin/chainmaker
 
 gen-clib-vendor:
-	@sudo rm -rf vendor
+	@sudo -S rm -rf vendor
 	@go mod vendor
 	# 注意：执行此方法前需要切换common项目到对应分支或commit
 	# 密码学 gmssl 相关
