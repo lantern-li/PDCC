@@ -19,6 +19,12 @@ GOLDFLAGS += -X "${LOCALCONF_HOME}.BuildDateTime=${DATETIME}"
 GOLDFLAGS += -X "${LOCALCONF_HOME}.GitBranch=${GIT_BRANCH}"
 GOLDFLAGS += -X "${LOCALCONF_HOME}.GitCommit=${GIT_COMMIT}"
 
+BUILD_SERVER=root@192.168.1.5
+DEPLOP_1_SERVER=root@192.168.1.5
+DEPLOP_2_SERVER=root@192.168.1.6
+DEPLOP_3_SERVER=root@192.168.1.7
+DEPLOP_4_SERVER=root@192.168.1.8
+
 chainmaker:
     ifeq ($(PLATFORM),"Windows")
 		@echo "build for windows"
@@ -28,17 +34,53 @@ chainmaker:
 		@rm -rf go.sum && cd main && go mod tidy && go build -ldflags '${GOLDFLAGS}' -o ../bin/chainmaker
     endif
 
-vtar-scp: gen-clib-vendor tar scp
+vtar-scp: gen-clib-vendor tar-source-code scp-source-code
 
-tar:
+deploy-4-node-binary:
+	# stop node1
+	@ssh $(DEPLOP_1_SERVER) "cd /home/sz/node1/bin; ./stop.sh;sleep 2"
+	# scp node1 ...
+	@ssh $(BUILD_SERVER) "scp -r /home/sz/code/chainmaker/chainmaker-go/bin/chainmaker $(DEPLOP_1_SERVER):/home/sz/node1/bin"
+	# start node1
+	@ssh $(DEPLOP_1_SERVER) "cd /home/sz/node1/bin; ./start.sh"
+
+	# stop node2
+	@ssh $(DEPLOP_2_SERVER) "cd /home/sz/node2/bin; ./stop.sh;sleep 2"
+	# scp node2 ...
+	@ssh $(BUILD_SERVER) "scp -r /home/sz/code/chainmaker/chainmaker-go/bin/chainmaker $(DEPLOP_2_SERVER):/home/sz/node2/bin"
+	# start node2
+	@ssh $(DEPLOP_2_SERVER) "cd /home/sz/node2/bin; ./start.sh"
+
+	# stop node3
+	@ssh $(DEPLOP_3_SERVER) "cd /home/sz/node3/bin; ./stop.sh;sleep 2"
+	# scp node3 ...
+	@ssh $(BUILD_SERVER) "scp -r /home/sz/code/chainmaker/chainmaker-go/bin/chainmaker $(DEPLOP_3_SERVER):/home/sz/node3/bin"
+	# start node3
+	@ssh $(DEPLOP_3_SERVER) "cd /home/sz/node3/bin; ./start.sh"
+
+	# stop node4
+	@ssh $(DEPLOP_4_SERVER) "cd /home/sz/node4/bin; ./stop.sh;sleep 2"
+	# scp node4 ...
+	@ssh $(BUILD_SERVER) "scp -r /home/sz/code/chainmaker/chainmaker-go/bin/chainmaker $(DEPLOP_4_SERVER):/home/sz/node4/bin"
+	# start node4
+	@ssh $(DEPLOP_4_SERVER) "cd /home/sz/node4/bin; ./start.sh"
+
+
+build:
+	#删除历史源码
+	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker; rm -rf chainmaker-go"
+	#更新源代码
+	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker; tar -xf chainmaker-go.tar.gz"
+	#编译
+	@ssh $(BUILD_SERVER) "source /etc/profile; cd /home/sz/code/chainmaker/chainmaker-go; make vendor-build"
+	#编译编译完成
+
+tar-source-code:
 	@cd .. ; tar -czvf chainmaker-go.tar.gz --exclude=chainmaker-go/.git  --exclude=chainmaker-go/test  --exclude=chainmaker-go/bin  --exclude=chainmaker-go/build  --exclude=chainmaker-go/data  --exclude=chainmaker-go/tools/cmc1  --exclude=chainmaker-go/log chainmaker-go
 
-scp:
+scp-source-code:
 	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.1:/home/sz/code/chainmaker
-	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.5:/home/sz/code/chainmaker
-	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.6:/home/sz/code/chainmaker
-	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.7:/home/sz/code/chainmaker
-	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.8:/home/sz/code/chainmaker
+	@cd .. ; scp -r chainmaker-go.tar.gz $(BUILD_SERVER):/home/sz/code/chainmaker
 	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.9:/home/sz/code/chainmaker
 
 vendor-build:
