@@ -11,6 +11,7 @@ import (
 	"chainmaker.org/chainmaker-go/module/txfilter/filtercommon"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -81,6 +82,11 @@ type TxIdAndExecOrderType struct {
 	protocol.ExecOrderTxType
 }
 
+type value struct {
+	TxId  string
+	Nonce int
+}
+
 // Schedule according to a batch of transactions,
 // and generating DAG according to the conflict relationship
 func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Transaction,
@@ -132,10 +138,12 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 		txRWSetMap := make(map[string]*commonPb.TxRWSet, len(txBatch))
 		contractEventMap := make(map[string][]*commonPb.ContractEvent, 0)
 		createTime := time.Since(startTime)
+		paramMap := make(map[string][]byte)
+
 		for _, tx := range txBatch {
-			txId := tx.Payload.TxId
-			tx.Result = genDefaultTxResult()
-			txRWSetMap[txId] = genDefaultTxRWSet(txId)
+
+			ts.runContract(tx, txRWSetMap, snapshot, block, paramMap)
+
 			//event := tx.Result.ContractResult.ContractEvent
 			//contractEventMap[txId] = event
 		}
@@ -248,6 +256,35 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	contractEventMap := ts.getContractEventMap(block)
 
 	return txRWSetMap, contractEventMap, nil
+}
+
+func (ts *TxScheduler) runContract(
+	tx *commonPb.Transaction, txRWSetMap map[string]*commonPb.TxRWSet,
+	snapshot protocol.Snapshot, block *commonPb.Block, paramMap map[string][]byte) {
+
+	txSimContext := vm.NewTxSimContext(ts.VmManager, snapshot, tx, block.Header.BlockVersion, ts.log)
+	switch tx.Payload.Method {
+	// 上链接口
+	case "Save":
+		tx.Result = genDefaultTxResult()
+		txId := tx.Payload.TxId
+		txRWSetMap[txId] = genDefaultTxRWSet(txId)
+
+	// 更新接口
+	case "Update":
+		update(tx, txSimContext, txRWSetMap, paramMap)
+	}
+}
+
+func getSimContextKey(bizId, businessType string) []byte {
+	simContextKey := bizId + businessType
+	return []byte(simContextKey)
+}
+
+func getErrResult(txResult *commonPb.Result, errMsg string) {
+	txResult.ContractResult.Message = errMsg
+	txResult.Code = commonPb.TxStatusCode_CONTRACT_FAIL
+	txResult.ContractResult.Code = uint32(1)
 }
 
 // handleTx: run tx and apply tx sim context to snapshot
@@ -433,11 +470,13 @@ func (ts *TxScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.
 		txBatch := block.Txs
 		txResultMap := make(map[string]*commonPb.Result, len(txBatch))
 		createTime := time.Since(startTime)
+		paramMap := make(map[string][]byte)
+
 		for _, tx := range txBatch {
-			txId := tx.Payload.TxId
-			txResultMap[txId] = genDefaultTxResult()
-			txRWSetMap[txId] = genDefaultTxRWSet(txId)
+			ts.runContract(tx, txRWSetMap, snapshot, block, paramMap)
+			txResultMap[tx.Payload.TxId] = tx.Result
 		}
+
 		putMapTime := time.Since(startTime)
 		block.Txs = txBatch
 		block.Dag = genDefaultDag(len(txBatch))
@@ -1594,4 +1633,78 @@ func canUseQuickSchedule(txs []*commonPb.Transaction) bool {
 		}
 	}
 	return true
+}
+
+func update(
+	tx *commonPb.Transaction, txSimContext protocol.TxSimContext,
+	txRWSetMap map[string]*commonPb.TxRWSet, paramMap map[string][]byte) {
+	// 获取参数
+
+	bizId, businessType, nonce := getUpdateParam(tx, paramMap)
+
+	// 设置交易初始结果
+	tx.Result = genDefaultTxResult()
+	valueByte, err := txSimContext.Get(tx.Payload.ContractName, getSimContextKey(bizId, businessType))
+	if err != nil {
+		errMsg := fmt.Sprintf("sz update fail txSimContext get err:%s contract:%s,bizId:%s，businessType：%s",
+			err.Error(), tx.Payload.ContractName, bizId, businessType)
+		getErrResult(tx.Result, errMsg)
+
+		return
+	}
+
+	if valueByte == nil {
+		errMsg := fmt.Sprintf("sz update fail txSimContext get tx not existed contract:%s,bizId:%s，businessType：%s",
+			tx.Payload.ContractName, bizId, businessType)
+		getErrResult(tx.Result, errMsg)
+
+		return
+	}
+
+	simContextValue := make([]*value, 0)
+	if err = json.Unmarshal(valueByte, &simContextValue); err != nil {
+		errMsg := fmt.Sprintf("sz update fail json unmarshal err:%s, contract:%s,bizId:%s，businessType：%s",
+			err.Error(), tx.Payload.ContractName, bizId, businessType)
+		getErrResult(tx.Result, errMsg)
+
+		return
+	}
+
+	// get the last tx value
+	lastNonce := simContextValue[len(simContextValue)-1].Nonce
+	var noncePair int
+	if len(nonce) == 0 {
+		// update nonce
+		noncePair = lastNonce + 1
+	} else {
+		nonceInt, err := strconv.Atoi(nonce)
+		if err != nil {
+			errMsg := fmt.Sprintf("sz update fail strconv Atoi err:%s,contract:%s,bizId:%s，businessType：%s",
+				err.Error(), tx.Payload.ContractName, bizId, businessType)
+			getErrResult(tx.Result, errMsg)
+
+			return
+		}
+
+		if lastNonce >= nonceInt {
+			errMsg := fmt.Sprintf("sz update fail nonce invalid request nonce should be more than the last, "+
+				"contract:%s, nonce:%s, currentNonce:%d", tx.Payload.ContractName, nonce, lastNonce)
+			getErrResult(tx.Result, errMsg)
+
+			return
+		}
+		noncePair = nonceInt
+	}
+
+	tx.Result.ContractResult.Result = []byte(string(noncePair))
+	txRWSetMap[tx.Payload.TxId] = txSimContext.GetTxRWSet(true)
+}
+
+func getUpdateParam(tx *commonPb.Transaction, paramMap map[string][]byte) (string, string, string) {
+	// 获取参数
+	for _, v := range tx.Payload.Parameters {
+		paramMap[v.Key] = v.Value
+	}
+
+	return string(paramMap["bizId"]), string(paramMap["businessType"]), string(paramMap["nonce"])
 }
