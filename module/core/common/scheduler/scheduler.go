@@ -11,7 +11,6 @@ import (
 	"chainmaker.org/chainmaker-go/module/txfilter/filtercommon"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -132,6 +131,7 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	var senderGroup *SenderGroup
 	var senderCollection *SenderCollection
 
+	// 税总合约走快速调度，其余合约走正常调度。快速调度需要在chainmaker.yml中把调度模式变更为快速调度0为正常，1为快速调度。
 	if localconf.ChainMakerConfig.CoreConfig.SchedulerType == 1 &&
 		canUseQuickSchedule(txBatch) {
 
@@ -142,13 +142,16 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 
 		for _, tx := range txBatch {
 
+			// 执行合约
 			ts.runContract(tx, txRWSetMap, snapshot, block, paramMap)
 
 			//event := tx.Result.ContractResult.ContractEvent
 			//contractEventMap[txId] = event
 		}
 		putMapTime := time.Since(startTime)
+		// 将交易填充进区块（此时交易的执行结果已经写入）
 		block.Txs = txBatch
+		// 生成无冲突DAG，因为交易都是串行的执行的，所以都是无冲突DAG
 		block.Dag = genDefaultDag(len(txBatch))
 		entTime := time.Since(startTime)
 		ts.log.Infof("schedule tx batch finished, block:%d, serial, save, success %d, time[create:%v, put:%v, dag:%v, total:%v]",
@@ -264,13 +267,13 @@ func (ts *TxScheduler) runContract(
 
 	txSimContext := vm.NewTxSimContext(ts.VmManager, snapshot, tx, block.Header.BlockVersion, ts.log)
 	switch tx.Payload.Method {
-	// 上链接口
+	// 上链接口走默认处理逻辑，无需逻辑判断以及无读写集
 	case "Save":
 		tx.Result = genDefaultTxResult()
 		txId := tx.Payload.TxId
 		txRWSetMap[txId] = genDefaultTxRWSet(txId)
 
-	// 更新接口
+	// 更新接口，需要有版本号的判断，所以需要有读写集
 	case "Update":
 		update(tx, txSimContext, txRWSetMap, paramMap)
 	}
@@ -1626,6 +1629,7 @@ func genDefaultDag(txCount int) *commonPb.DAG {
 	}
 }
 
+// 判断是不是税总合约
 func canUseQuickSchedule(txs []*commonPb.Transaction) bool {
 	for _, tx := range txs {
 		if _, ok := SZContractList[tx.Payload.ContractName]; !ok {
@@ -1653,25 +1657,22 @@ func update(
 		return
 	}
 
-	if valueByte == nil {
-		errMsg := fmt.Sprintf("sz update fail txSimContext get tx not existed contract:%s,bizId:%s，businessType：%s",
-			tx.Payload.ContractName, bizId, businessType)
-		getErrResult(tx.Result, errMsg)
+	// 第一次更新数据，当前版本号就是0
+	var lastNonce int
+	if valueByte == nil || len(valueByte) == 0 {
+		lastNonce = 0
+	} else {
+		lastNonce, err = strconv.Atoi(string(valueByte))
+		if err != nil {
+			errMsg := fmt.Sprintf("sz update fail strconv Atoi err:%s,contract:%s,bizId:%s，businessType：%s",
+				err.Error(), tx.Payload.ContractName, bizId, businessType)
+			getErrResult(tx.Result, errMsg)
 
-		return
+			return
+		}
 	}
 
-	simContextValue := make([]*value, 0)
-	if err = json.Unmarshal(valueByte, &simContextValue); err != nil {
-		errMsg := fmt.Sprintf("sz update fail json unmarshal err:%s, contract:%s,bizId:%s，businessType：%s",
-			err.Error(), tx.Payload.ContractName, bizId, businessType)
-		getErrResult(tx.Result, errMsg)
-
-		return
-	}
-
-	// get the last tx value
-	lastNonce := simContextValue[len(simContextValue)-1].Nonce
+	// 传参中没传nonce，就当前nonce+1，否则用传入的nonce（需要和旧nonce比较）。
 	var noncePair int
 	if len(nonce) == 0 {
 		// update nonce
@@ -1696,7 +1697,19 @@ func update(
 		noncePair = nonceInt
 	}
 
+	err = txSimContext.Put(tx.Payload.ContractName, getSimContextKey(bizId, businessType), []byte(string(noncePair)))
+	if err != nil {
+		errMsg := fmt.Sprintf("sz update fail,err: %s "+
+			"contract:%s", err.Error(), tx.Payload.ContractName)
+		getErrResult(tx.Result, errMsg)
+
+		return
+	}
+
+	// 返回交易执行结果
 	tx.Result.ContractResult.Result = []byte(string(noncePair))
+
+	// 获取读写集
 	txRWSetMap[tx.Payload.TxId] = txSimContext.GetTxRWSet(true)
 }
 
