@@ -34,10 +34,16 @@ chainmaker:
 		@rm -rf go.sum && cd main && go mod tidy && go build -ldflags '${GOLDFLAGS}' -o ../bin/chainmaker
     endif
 
-autodeploy: vtar-scp deploy-4-node-binary
+autodeploy: gv-pusc-br deploy-4-node-binary
 
-# 1.vendor ; 2.tar ; 3.scp ; 4.build ;
-vtar-scp: gen-clib-vendor tar-source-code scp-source-code build-remote
+# 1.generate vendor and clib ; 2.package source code  ; 3.scp ; 4.build ;
+gv-pusc-br: generate-vendor package-source-code upload-source-code build-remote
+
+deploy-4-node:
+	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp node1 $(DEPLOP_1_SERVER)/home/sz"
+	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp node2 $(DEPLOP_2_SERVER)/home/sz"
+	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp node3 $(DEPLOP_3_SERVER)/home/sz"
+	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp node4 $(DEPLOP_4_SERVER)/home/sz"
 
 deploy-4-node-binary:
 	# stop node1
@@ -68,7 +74,6 @@ deploy-4-node-binary:
 	# start node4
 	@ssh $(DEPLOP_4_SERVER) "cd /home/sz/node4/bin; ./start.sh"
 
-
 build-remote:
 	#删除历史源码
 	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker; rm -rf chainmaker-go"
@@ -78,10 +83,10 @@ build-remote:
 	@ssh $(BUILD_SERVER) "source /etc/profile; cd /home/sz/code/chainmaker/chainmaker-go; make vendor-build"
 	#编译编译完成
 
-tar-source-code:
+package-source-code:
 	@cd .. ; tar -czvf chainmaker-go.tar.gz --exclude=chainmaker-go/.git  --exclude=chainmaker-go/test  --exclude=chainmaker-go/bin  --exclude=chainmaker-go/build  --exclude=chainmaker-go/data  --exclude=chainmaker-go/tools/cmc1  --exclude=chainmaker-go/log chainmaker-go
 
-scp-source-code:
+upload-source-code:
 	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.1:/home/sz/code/chainmaker
 	@cd .. ; scp -r chainmaker-go.tar.gz $(BUILD_SERVER):/home/sz/code/chainmaker
 	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.9:/home/sz/code/chainmaker
@@ -89,7 +94,7 @@ scp-source-code:
 vendor-build:
 	@cd main && go build -mod=vendor -ldflags '${GOLDFLAGS}' -o ../bin/chainmaker
 
-gen-clib-vendor:
+generate-vendor:
 	@sudo -S rm -rf vendor
 	@go mod vendor
 	# 注意：执行此方法前需要切换common项目到对应分支或commit
