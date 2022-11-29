@@ -3232,3 +3232,57 @@ func TestTxScheduler_compareDag(t *testing.T) {
 		})
 	}
 }
+
+func TestTx(t *testing.T) {
+
+	txs := make([]*commonPb.Transaction, 0)
+	txRWSetMap := make(map[string]*commonPb.TxRWSet)
+	for i:=0;i<10;i++ {
+		txs = append(txs, &commonPb.Transaction{
+			Payload:   &commonPb.Payload{
+				ChainId:        "",
+				TxType:         0,
+				TxId:           fmt.Sprint(i),
+				Timestamp:      0,
+				ExpirationTime: 0,
+				ContractName:   "",
+				Method:         "Save",
+				Parameters:     nil,
+				Sequence:       0,
+				Limit:          nil,
+			},
+			Sender:    nil,
+			Endorsers: nil,
+			Result:    nil,
+		})
+	}
+
+	for _, v := range txs {
+
+		runContract(v, txRWSetMap, nil, nil, nil)
+
+
+	}
+
+
+	fmt.Println(txs[0])
+
+}
+
+func runContract(
+	tx *commonPb.Transaction, txRWSetMap map[string]*commonPb.TxRWSet,
+	snapshot protocol.Snapshot, block *commonPb.Block, paramMap map[string][]byte) {
+
+	//txSimContext := vm.NewTxSimContext(ts.VmManager, snapshot, tx, block.Header.BlockVersion, ts.log)
+	switch tx.Payload.Method {
+	// 上链接口走默认处理逻辑，无需逻辑判断以及无读写集
+	case "Save":
+		tx.Result = genDefaultTxResult()
+		txId := tx.Payload.TxId
+		txRWSetMap[txId] = genDefaultTxRWSet(txId)
+
+	// 更新接口，需要有版本号的判断，所以需要有读写集
+	case "Update":
+		//update(tx, txSimContext, txRWSetMap, paramMap)
+	}
+}

@@ -268,7 +268,7 @@ func (ts *TxScheduler) runContract(
 	txSimContext := vm.NewTxSimContext(ts.VmManager, snapshot, tx, block.Header.BlockVersion, ts.log)
 	switch tx.Payload.Method {
 	// 上链接口走默认处理逻辑，无需逻辑判断以及无读写集
-	case "Save":
+	case "Save", "Endorse":
 		tx.Result = genDefaultTxResult()
 		txId := tx.Payload.TxId
 		txRWSetMap[txId] = genDefaultTxRWSet(txId)
@@ -276,6 +276,9 @@ func (ts *TxScheduler) runContract(
 	// 更新接口，需要有版本号的判断，所以需要有读写集
 	case "Update":
 		update(tx, txSimContext, txRWSetMap, paramMap)
+
+	default:
+		ts.log.Error("Invalid sz contract method: %s", tx.Payload.Method)
 	}
 }
 
@@ -1697,7 +1700,7 @@ func update(
 		noncePair = nonceInt
 	}
 
-	err = txSimContext.Put(tx.Payload.ContractName, getSimContextKey(bizId, businessType), []byte(string(noncePair)))
+	err = txSimContext.Put(tx.Payload.ContractName, getSimContextKey(bizId, businessType), []byte(fmt.Sprint(noncePair)))
 	if err != nil {
 		errMsg := fmt.Sprintf("sz update fail,err: %s "+
 			"contract:%s", err.Error(), tx.Payload.ContractName)
@@ -1707,7 +1710,7 @@ func update(
 	}
 
 	// 返回交易执行结果
-	tx.Result.ContractResult.Result = []byte(string(noncePair))
+	tx.Result.ContractResult.Result = []byte(fmt.Sprint(noncePair))
 
 	// 获取读写集
 	txRWSetMap[tx.Payload.TxId] = txSimContext.GetTxRWSet(true)

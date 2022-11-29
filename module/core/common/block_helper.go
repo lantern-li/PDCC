@@ -392,7 +392,7 @@ func getTxHash(tx *commonPb.Transaction,
 	}
 	if tx.Result == nil {
 		// in case tx.Result is nil, avoid panic
-		e := fmt.Errorf("tx(%s) result == nil", tx.Payload.TxId)
+		e := fmt.Errorf("tx(payload:%v) result == nil", tx.Payload)
 		logger.Error(e.Error())
 		return nil, e
 	}
