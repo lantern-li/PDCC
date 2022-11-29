@@ -144,9 +144,6 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 
 			// 执行合约
 			ts.runContract(tx, txRWSetMap, snapshot, block, paramMap)
-
-			//event := tx.Result.ContractResult.ContractEvent
-			//contractEventMap[txId] = event
 		}
 		putMapTime := time.Since(startTime)
 		// 将交易填充进区块（此时交易的执行结果已经写入）
@@ -275,7 +272,7 @@ func (ts *TxScheduler) runContract(
 
 	// 更新接口，需要有版本号的判断，所以需要有读写集
 	case "Update":
-		update(tx, txSimContext, txRWSetMap, paramMap)
+		update(tx, txSimContext, txRWSetMap, paramMap, ts.log)
 
 	default:
 		ts.log.Error("Invalid sz contract method: %s", tx.Payload.Method)
@@ -287,10 +284,12 @@ func getSimContextKey(bizId, businessType string) []byte {
 	return []byte(simContextKey)
 }
 
-func getErrResult(txResult *commonPb.Result, errMsg string) {
+func getErrResult(txResult *commonPb.Result, errMsg string, log protocol.Logger) {
 	txResult.ContractResult.Message = errMsg
 	txResult.Code = commonPb.TxStatusCode_CONTRACT_FAIL
 	txResult.ContractResult.Code = uint32(1)
+
+	log.Error(errMsg)
 }
 
 // handleTx: run tx and apply tx sim context to snapshot
@@ -1644,18 +1643,19 @@ func canUseQuickSchedule(txs []*commonPb.Transaction) bool {
 
 func update(
 	tx *commonPb.Transaction, txSimContext protocol.TxSimContext,
-	txRWSetMap map[string]*commonPb.TxRWSet, paramMap map[string][]byte) {
+	txRWSetMap map[string]*commonPb.TxRWSet, paramMap map[string][]byte,
+	log protocol.Logger) {
 	// 获取参数
-
 	bizId, businessType, nonce := getUpdateParam(tx, paramMap)
 
 	// 设置交易初始结果
 	tx.Result = genDefaultTxResult()
-	valueByte, err := txSimContext.Get(tx.Payload.ContractName, getSimContextKey(bizId, businessType))
+	key := getSimContextKey(bizId, businessType)
+	valueByte, err := txSimContext.Get(tx.Payload.ContractName, key)
 	if err != nil {
 		errMsg := fmt.Sprintf("sz update fail txSimContext get err:%s contract:%s,bizId:%s，businessType：%s",
 			err.Error(), tx.Payload.ContractName, bizId, businessType)
-		getErrResult(tx.Result, errMsg)
+		getErrResult(tx.Result, errMsg, log)
 
 		return
 	}
@@ -1669,7 +1669,7 @@ func update(
 		if err != nil {
 			errMsg := fmt.Sprintf("sz update fail strconv Atoi err:%s,contract:%s,bizId:%s，businessType：%s",
 				err.Error(), tx.Payload.ContractName, bizId, businessType)
-			getErrResult(tx.Result, errMsg)
+			getErrResult(tx.Result, errMsg, log)
 
 			return
 		}
@@ -1685,7 +1685,7 @@ func update(
 		if err != nil {
 			errMsg := fmt.Sprintf("sz update fail strconv Atoi err:%s,contract:%s,bizId:%s，businessType：%s",
 				err.Error(), tx.Payload.ContractName, bizId, businessType)
-			getErrResult(tx.Result, errMsg)
+			getErrResult(tx.Result, errMsg, log)
 
 			return
 		}
@@ -1693,18 +1693,19 @@ func update(
 		if lastNonce >= nonceInt {
 			errMsg := fmt.Sprintf("sz update fail nonce invalid request nonce should be more than the last, "+
 				"contract:%s, nonce:%s, currentNonce:%d", tx.Payload.ContractName, nonce, lastNonce)
-			getErrResult(tx.Result, errMsg)
+			getErrResult(tx.Result, errMsg, log)
 
 			return
 		}
 		noncePair = nonceInt
 	}
 
-	err = txSimContext.Put(tx.Payload.ContractName, getSimContextKey(bizId, businessType), []byte(fmt.Sprint(noncePair)))
+	val := []byte(fmt.Sprint(noncePair))
+	err = txSimContext.Put(tx.Payload.ContractName, key, val)
 	if err != nil {
 		errMsg := fmt.Sprintf("sz update fail,err: %s "+
 			"contract:%s", err.Error(), tx.Payload.ContractName)
-		getErrResult(tx.Result, errMsg)
+		getErrResult(tx.Result, errMsg, log)
 
 		return
 	}
@@ -1713,7 +1714,23 @@ func update(
 	tx.Result.ContractResult.Result = []byte(fmt.Sprint(noncePair))
 
 	// 获取读写集
-	txRWSetMap[tx.Payload.TxId] = txSimContext.GetTxRWSet(true)
+	txReads := []*commonPb.TxRead{{
+		Key:          key,
+		Value:        valueByte,
+		ContractName: tx.Payload.ContractName,
+	}}
+
+	txWrites := []*commonPb.TxWrite{{
+			Key:          key,
+			Value:        val,
+			ContractName: tx.Payload.ContractName,
+		}}
+	
+	txRWSetMap[tx.Payload.TxId] = &commonPb.TxRWSet{
+		TxId:     tx.Payload.TxId,
+		TxReads:  txReads,
+		TxWrites: txWrites,
+	}
 }
 
 func getUpdateParam(tx *commonPb.Transaction, paramMap map[string][]byte) (string, string, string) {
