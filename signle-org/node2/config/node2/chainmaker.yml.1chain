@@ -18,10 +18,7 @@ auth_type: "permissionedWithCert" # [*]
 # Logger settings
 log:
   # Logger configuration file path.
-  config_file: ../config/node3/log.yml
-
-core:
-  scheduler_type: 1
+  config_file: ../config/node2/log.yml
 
 # Crypto engine config
 crypto_engine: gmssl #support gmssl, tencentsm and tjfoc
@@ -30,11 +27,11 @@ crypto_engine: gmssl #support gmssl, tencentsm and tjfoc
 blockchain:
   # chain id and its genesis block file path.
   - chainId: chain_zj
-    genesis: ../config/node3/chainconfig/bc-chain-zj.yml
-  - chainId: chain_gd
-    genesis: ../config/node3/chainconfig/bc-chain-gd.yml
-  - chainId: chain_sh
-    genesis: ../config/node3/chainconfig/bc-chain-sh.yml
+    genesis: ../config/node2/chainconfig/bc-chain-zj.yml
+#  - chainId: chain_gd
+#    genesis: ../config/node2/chainconfig/bc-chain-gd.yml
+#  - chainId: chain_sh
+#    genesis: ../config/node2/chainconfig/bc-chain-sh.yml
 #  - chainId: chain2
 #    genesis: ../config/{org_path2}/chainconfig/bc2.yml
 #  - chainId: chain3
@@ -49,10 +46,10 @@ node:
   org_id:            wx-org.chainmaker.org  # [*]
 
   # Private key file path
-  priv_key_file:     ../config/node3/certs/node/consensus3/consensus3.sign.key  # [*]
+  priv_key_file:     ../config/node2/certs/node/consensus2/consensus2.sign.key  # [*]
 
   # Certificate file path
-  cert_file:         ../config/node3/certs/node/consensus3/consensus3.sign.crt  # [*]
+  cert_file:         ../config/node2/certs/node/consensus2/consensus2.sign.crt  # [*]
 
   # Certificate cache size, used to speed up member identity verification.
   # By default the cache size is 1000.
@@ -103,7 +100,7 @@ net:
 
   # The address and port the node listens on.
   # By default, it uses 0.0.0.0 to listen on all network interfaces.
-  listen_addr: /ip4/0.0.0.0/tcp/11303
+  listen_addr: /ip4/0.0.0.0/tcp/11302
 
   # Max stream of a connection.
   # peer_stream_pool_size: 100
@@ -131,16 +128,16 @@ net:
     enabled: true
 
     # TLS private key file path.
-    priv_key_file: ../config/node3/certs/node/consensus3/consensus3.tls.key
+    priv_key_file: ../config/node2/certs/node/consensus2/consensus2.tls.key
 
     # TLS Certificate file path.
-    cert_file: ../config/node3/certs/node/consensus3/consensus3.tls.crt
+    cert_file: ../config/node2/certs/node/consensus2/consensus2.tls.crt
 
     # TLS enc private key file path. (only for gmtls1.1)
-    priv_enc_key_file: ../config/node3/certs/node/consensus3/consensus3.tls.enc.key
+    priv_enc_key_file: ../config/node2/certs/node/consensus2/consensus2.tls.enc.key
 
     # TLS enc Certificate file path.
-    cert_enc_file: ../config/node3/certs/node/consensus3/consensus3.tls.enc.crt
+    cert_enc_file: ../config/node2/certs/node/consensus2/consensus2.tls.enc.crt
 
   # The blacklist is automatically block the listed seed to connect.
   # blacklist:
@@ -190,7 +187,7 @@ rpc:
   provider: grpc  # [*]
 
   # RPC port
-  port: 12303
+  port: 12302
 
   # Interval of checking trust root changes, in seconds.
   # If changed, the rpc server's root certificate pool will also change.
@@ -235,16 +232,16 @@ rpc:
     mode:           twoway
 
     # RPC TLS private key file path
-    priv_key_file:  ../config/node3/certs/node/consensus3/consensus3.tls.key
+    priv_key_file:  ../config/node2/certs/node/consensus2/consensus2.tls.key
 
     # RPC TLS public key file path
-    cert_file:      ../config/node3/certs/node/consensus3/consensus3.tls.crt
+    cert_file:      ../config/node2/certs/node/consensus2/consensus2.tls.crt
 
     # RPC enc TLS private key file path (only for gmtls1.1)
-    priv_enc_key_file:  ../config/node3/certs/node/consensus3/consensus3.tls.enc.key
+    priv_enc_key_file:  ../config/node2/certs/node/consensus2/consensus2.tls.enc.key
 
     # RPC enc TLS public key file path
-    cert_enc_file:      ../config/node3/certs/node/consensus3/consensus3.tls.enc.crt
+    cert_enc_file:      ../config/node2/certs/node/consensus2/consensus2.tls.enc.crt
 
   # RPC blacklisted ip addresses
   blacklist:
@@ -265,7 +262,7 @@ tx_filter:
     # sharding number
     length: 20
     # sharding task timeout in seconds
-    timeout: 60
+    timeout: 3
     snapshot:
       # serialize type
       # 0 Serialization by height interval
@@ -280,7 +277,7 @@ tx_filter:
       # Serialization interval in seconds
       serialize_interval: 10
       # file path
-      path: /data/node3/tx_filter
+      path: /szdata/node2/tx_filter
     # bird's nest config
     birds_nest:
       # bird's nest size
@@ -304,7 +301,7 @@ tx_filter:
         tags_per_bucket: 2
         # num of bits for each item, which is length of tag(fingerprint)
         # 11 is recommended.
-        bits_per_item: 17
+        bits_per_item: 11
         # keys number
         max_num_keys: 1000000
         # 0 TableTypeSingle normal single table
@@ -330,7 +327,7 @@ tx_filter:
       # Serialization interval in seconds
       serialize_interval: 10
       # file path
-      path: /data/node3/tx_filter
+      path: /szdata/node2/tx_filter
     # Transaction filter rules
     rules:
       # Absolute expiration time /second
@@ -372,7 +369,7 @@ pprof:
   enabled: true
 
   # PProf port
-  port: 24323
+  port: 24322
 
 # Consensus related settings
 consensus:
@@ -405,10 +402,10 @@ scheduler:
 # store_path, dsn the content cannot be changed after startup.
 storage:
   # Default store path
-  store_path: /data/node3/ledgerData1 # [*]
+  store_path: /szdata/node2/ledgerData1 # [*]
 
   # Prefix for mysql db name
-  db_prefix: node3_
+  # db_prefix: org1_
 
   # Minimum block height not allowed to be archived
   unarchive_block_height: 300000
@@ -461,17 +458,16 @@ storage:
     provider: leveldb # [*]
     # If provider is leveldb, leveldb_config should not be null.
     leveldb_config:
-        # LevelDb store path
-        store_path: /data/node3/block
+      # LevelDb store path
+      store_path: /szdata/node2/block
 
-  # State db config
   statedb_config:
     # Stabases type support leveldb, sql, badgerdb, tikvdb
     provider: leveldb # [*]
     # If provider is leveldb, leveldb_config should not be null.
     leveldb_config:
       # LevelDb store path
-      store_path: /data/node3/state
+      store_path: /szdata/node2/state
 
   # History db config
   disable_historydb: true
@@ -484,17 +480,17 @@ storage:
     # If provider is leveldb, leveldb_config should not be null.
     leveldb_config:
       # LevelDb store path
-      store_path: /data/node3/history
+      store_path: /szdata/node2/history
 
   # Result db config
-  disable_resultdb: false
+  disable_resultdb: true
   resultdb_config:
     # Stabases type support leveldb, sql, badgerdb, tikvdb
     provider: leveldb # [*]
     # If provider is leveldb, leveldb_config should not be null.
     leveldb_config:
       # LevelDb store path
-      store_path: /data/node3/result
+      store_path: /szdata/node2/result
 
   # Disable contract event database or not. If it is false, contract_eventdb_config must be mysql
   disable_contract_eventdb: true
@@ -505,7 +501,7 @@ storage:
     # If provider is leveldb, leveldb_config should not be null.
     leveldb_config:
       # LevelDb store path
-      store_path: /data/node3/event
+      store_path: /szdata/node2/event
 
 # Contract Virtual Machine(VM) configs
 vm:
@@ -514,9 +510,9 @@ vm:
     # Enable docker go virtual machine, default: false
     enable: false
     # Mount data path in chainmaker, include contracts, uds socks
-    data_mount_path: /data/node3/go
+    data_mount_path: /szdata/node2/go
     # Mount log path in chainmaker
-    log_mount_path: ../log/node3/go
+    log_mount_path: ../log/node2/go
     # Communication protocol, used for chainmaker and docker manager communication
     # 1. tcp: docker vm uses TCP to communicate with chain
     # 2. uds: docker vm uses unix domain socket to communicate with chain

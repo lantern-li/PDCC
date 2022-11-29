@@ -21,7 +21,7 @@ log:
   config_file: ../config/node4/log.yml
 
 core:
-  scheduler_type: 0
+  scheduler_type: 1
 
 # Crypto engine config
 crypto_engine: gmssl #support gmssl, tencentsm and tjfoc
@@ -480,7 +480,7 @@ storage:
       store_path: /data/node4/history
 
   # Result db config
-  disable_resultdb: true
+  disable_resultdb: false
   resultdb_config:
     provider: leveldb
     leveldb_config:
