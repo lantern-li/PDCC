@@ -18,23 +18,20 @@ auth_type: "permissionedWithCert" # [*]
 # Logger settings
 log:
   # Logger configuration file path.
-  config_file: ../config/node3/log.yml
-
-core:
-  scheduler_type: 1
+  config_file: ../config/node2/log.yml
 
 # Crypto engine config
-crypto_engine: gmssl #support gmssl, tencentsm and tjfoc
+crypto_engine: tencentsm #support gmssl, tencentsm and tjfoc
 
 # Chains the node currently joined in
 blockchain:
   # chain id and its genesis block file path.
   - chainId: chain_zj
-    genesis: ../config/node3/chainconfig/bc-chain-zj.yml
+    genesis: ../config/node2/chainconfig/bc-chain-zj.yml
   - chainId: chain_gd
-    genesis: ../config/node3/chainconfig/bc-chain-gd.yml
+    genesis: ../config/node2/chainconfig/bc-chain-gd.yml
   - chainId: chain_sh
-    genesis: ../config/node3/chainconfig/bc-chain-sh.yml
+    genesis: ../config/node2/chainconfig/bc-chain-sh.yml
 #  - chainId: chain2
 #    genesis: ../config/{org_path2}/chainconfig/bc2.yml
 #  - chainId: chain3
@@ -49,10 +46,10 @@ node:
   org_id:            wx-org.chainmaker.org  # [*]
 
   # Private key file path
-  priv_key_file:     ../config/node3/certs/node/consensus3/consensus3.sign.key  # [*]
+  priv_key_file:     ../config/node2/certs/node/consensus2/consensus2.sign.key  # [*]
 
   # Certificate file path
-  cert_file:         ../config/node3/certs/node/consensus3/consensus3.sign.crt  # [*]
+  cert_file:         ../config/node2/certs/node/consensus2/consensus2.sign.crt  # [*]
 
   # Certificate cache size, used to speed up member identity verification.
   # By default the cache size is 1000.
@@ -103,7 +100,7 @@ net:
 
   # The address and port the node listens on.
   # By default, it uses 0.0.0.0 to listen on all network interfaces.
-  listen_addr: /ip4/0.0.0.0/tcp/11303
+  listen_addr: /ip4/0.0.0.0/tcp/11302
 
   # Max stream of a connection.
   # peer_stream_pool_size: 100
@@ -131,16 +128,16 @@ net:
     enabled: true
 
     # TLS private key file path.
-    priv_key_file: ../config/node3/certs/node/consensus3/consensus3.tls.key
+    priv_key_file: ../config/node2/certs/node/consensus2/consensus2.tls.key
 
     # TLS Certificate file path.
-    cert_file: ../config/node3/certs/node/consensus3/consensus3.tls.crt
+    cert_file: ../config/node2/certs/node/consensus2/consensus2.tls.crt
 
     # TLS enc private key file path. (only for gmtls1.1)
-    priv_enc_key_file: ../config/node3/certs/node/consensus3/consensus3.tls.enc.key
+    priv_enc_key_file: ../config/node2/certs/node/consensus2/consensus2.tls.enc.key
 
     # TLS enc Certificate file path.
-    cert_enc_file: ../config/node3/certs/node/consensus3/consensus3.tls.enc.crt
+    cert_enc_file: ../config/node2/certs/node/consensus2/consensus2.tls.enc.crt
 
   # The blacklist is automatically block the listed seed to connect.
   # blacklist:
@@ -160,11 +157,11 @@ txpool:
   # tx_pool type, can be single, normal, batch.
   # By default the tx_pool type is single.
   # Note: please delete dump_tx_wal folder in storage.store_path when change tx_pool type
-  pool_type: "batch"
+  pool_type: "normal"
 
   # Max common transaction count in tx_pool.
   # If tx_pool is full, the following transactions will be discarded.
-  max_txpool_size: 200000
+  max_txpool_size: 500000
 
   # Max config transaction count in tx_pool.
   max_config_txpool_size: 10
@@ -179,10 +176,10 @@ txpool:
 
   # The number of transactions contained in a batch, for normal and batch tx_pool.
   # Note: make sure that block.block_tx_capacity in bc.yml is an integer multiple of batch_max_size
-  batch_max_size: 2000
+  batch_max_size: 1000
 
   # Interval of creating a transaction batch, for normal and batch tx_pool, in millisecond(ms).
-  batch_create_timeout: 2000
+  batch_create_timeout: 50
 
  # RPC service setting
 rpc:
@@ -190,7 +187,7 @@ rpc:
   provider: grpc  # [*]
 
   # RPC port
-  port: 12303
+  port: 12302
 
   # Interval of checking trust root changes, in seconds.
   # If changed, the rpc server's root certificate pool will also change.
@@ -235,16 +232,16 @@ rpc:
     mode:           twoway
 
     # RPC TLS private key file path
-    priv_key_file:  ../config/node3/certs/node/consensus3/consensus3.tls.key
+    priv_key_file:  ../config/node2/certs/node/consensus2/consensus2.tls.key
 
     # RPC TLS public key file path
-    cert_file:      ../config/node3/certs/node/consensus3/consensus3.tls.crt
+    cert_file:      ../config/node2/certs/node/consensus2/consensus2.tls.crt
 
     # RPC enc TLS private key file path (only for gmtls1.1)
-    priv_enc_key_file:  ../config/node3/certs/node/consensus3/consensus3.tls.enc.key
+    priv_enc_key_file:  ../config/node2/certs/node/consensus2/consensus2.tls.enc.key
 
     # RPC enc TLS public key file path
-    cert_enc_file:      ../config/node3/certs/node/consensus3/consensus3.tls.enc.crt
+    cert_enc_file:      ../config/node2/certs/node/consensus2/consensus2.tls.enc.crt
 
   # RPC blacklisted ip addresses
   blacklist:
@@ -265,7 +262,7 @@ tx_filter:
     # sharding number
     length: 20
     # sharding task timeout in seconds
-    timeout: 60
+    timeout: 3
     snapshot:
       # serialize type
       # 0 Serialization by height interval
@@ -280,7 +277,7 @@ tx_filter:
       # Serialization interval in seconds
       serialize_interval: 10
       # file path
-      path: /data/node3/tx_filter
+      path: ../data/node2/tx_filter
     # bird's nest config
     birds_nest:
       # bird's nest size
@@ -304,7 +301,7 @@ tx_filter:
         tags_per_bucket: 2
         # num of bits for each item, which is length of tag(fingerprint)
         # 11 is recommended.
-        bits_per_item: 17
+        bits_per_item: 11
         # keys number
         max_num_keys: 1000000
         # 0 TableTypeSingle normal single table
@@ -330,7 +327,7 @@ tx_filter:
       # Serialization interval in seconds
       serialize_interval: 10
       # file path
-      path: /data/node3/tx_filter
+      path: ../data/node2/tx_filter
     # Transaction filter rules
     rules:
       # Absolute expiration time /second
@@ -369,10 +366,10 @@ monitor:
 # PProf Settings
 pprof:
   # If pprof is enabled or not
-  enabled: true
+  enabled: false
 
   # PProf port
-  port: 24323
+  port: 24322
 
 # Consensus related settings
 consensus:
@@ -405,29 +402,27 @@ scheduler:
 # store_path, dsn the content cannot be changed after startup.
 storage:
   # Default store path
-  store_path: /data/node3/ledgerData1 # [*]
+  store_path: ../data/node2/ledgerData1 # [*]
 
   # Prefix for mysql db name
-  db_prefix: node3_
+  # db_prefix: org1_
 
   # Minimum block height not allowed to be archived
   unarchive_block_height: 300000
-  
-  disable_logdb_mmap: false
 
   # Symmetric encryption algorithm for writing data to disk. can be sm4 or aes
-#  encryptor: sm4    # [*]
+  encryptor: sm4    # [*]
 
   # Symmetric encryption key:16 bytes key
   # If pkcs11 is enabled, it is the keyID
-#  encrypt_key: "1234567890123456"
+  encrypt_key: "1234567890123456"
 
   # Disable block file db, default: false
   disable_block_file_db: false
 
   # async write block in file block db to disk, default: false, so default is sync write disk
-  logdb_segment_async: true
-  is_async: true
+  logdb_segment_async: false
+
   # file size of .fdb, MB, default: 20
   logdb_segment_size: 1024
 
@@ -440,7 +435,7 @@ storage:
     fp_rate: 0.000000001      #false postive rate
   # RWC config               default 1000000
   enable_rwc: true #default false
-  rolling_window_cache_capacity: 250000 # greater than max_txpool_size*1.1
+  rolling_window_cache_capacity: 550000 # greater than max_txpool_size*1.1
 
   write_block_type: 1  # 0 common write，1 quick write
 
@@ -453,59 +448,61 @@ storage:
     # max size of entry in bytes.
     max_entry_size: 500
     # max cache size MB
-    hard_max_cache_size: 10240
-
+    hard_max_cache_size: 1024
   # Block db config
   blockdb_config:
-    # Stabases type support leveldb, sql, badgerdb, tikvdb
-    provider: leveldb # [*]
-    # If provider is leveldb, leveldb_config should not be null.
-    leveldb_config:
-        # LevelDb store path
-        store_path: /data/node3/block
+    provider: sqlkv  #数据库类型，支持LevelDB，BadgerDB，TikvDB，Mysql，这里示例为Mysql
+    sqldb_config: #SQL数据库的详细配置
+      sqldb_type:  mysql #具体的RDBMS为mysql，也可以是sqlite、mssql等
+      dsn:  root:password@tcp(192.168.1.2:3306)/ #MySQL的数据库连接字符串
+      max_idle_conns: 10  #连接池中维持的最大的空闲连接数，默认为10
+      max_open_conns: 10  #最大的可用连接数，默认为10
+      conn_max_lifetime: 60  #连接维持的最长时间，单位秒，默认为60
 
   # State db config
   statedb_config:
-    # Stabases type support leveldb, sql, badgerdb, tikvdb
-    provider: leveldb # [*]
-    # If provider is leveldb, leveldb_config should not be null.
-    leveldb_config:
-      # LevelDb store path
-      store_path: /data/node3/state
+    provider: sqlkv  #数据库类型，支持LevelDB，BadgerDB，TikvDB，Mysql，这里示例为Mysql
+    sqldb_config: #SQL数据库的详细配置
+      sqldb_type:  mysql #具体的RDBMS为mysql，也可以是sqlite、mssql等
+      dsn:  root:password@tcp(192.168.1.2:3306)/ #MySQL的数据库连接字符串
+      max_idle_conns: 10  #连接池中维持的最大的空闲连接数，默认为10
+      max_open_conns: 10  #最大的可用连接数，默认为10
+      conn_max_lifetime: 60  #连接维持的最长时间，单位秒，默认为60
 
   # History db config
-  disable_historydb: true
   historydb_config:
     disable_key_history: false
     disable_contract_history: true
     disable_account_history: true
-    # Stabases type support leveldb, sql, badgerdb, tikvdb
-    provider: leveldb # [*]
-    # If provider is leveldb, leveldb_config should not be null.
-    leveldb_config:
-      # LevelDb store path
-      store_path: /data/node3/history
+    provider: sqlkv  #数据库类型，支持LevelDB，BadgerDB，TikvDB，Mysql，这里示例为Mysql
+    sqldb_config: #SQL数据库的详细配置
+      sqldb_type:  mysql #具体的RDBMS为mysql，也可以是sqlite、mssql等
+      dsn:  root:password@tcp(192.168.1.2:3306)/ #MySQL的数据库连接字符串
+      max_idle_conns: 10  #连接池中维持的最大的空闲连接数，默认为10
+      max_open_conns: 10  #最大的可用连接数，默认为10
+      conn_max_lifetime: 60  #连接维持的最长时间，单位秒，默认为60
 
   # Result db config
-  disable_resultdb: false
   resultdb_config:
-    # Stabases type support leveldb, sql, badgerdb, tikvdb
-    provider: leveldb # [*]
-    # If provider is leveldb, leveldb_config should not be null.
-    leveldb_config:
-      # LevelDb store path
-      store_path: /data/node3/result
+    provider: sqlkv  #数据库类型，支持LevelDB，BadgerDB，TikvDB，Mysql，这里示例为Mysql
+    sqldb_config: #SQL数据库的详细配置
+      sqldb_type:  mysql #具体的RDBMS为mysql，也可以是sqlite、mssql等
+      dsn:  root:password@tcp(192.168.1.2:3306)/ #MySQL的数据库连接字符串
+      max_idle_conns: 10  #连接池中维持的最大的空闲连接数，默认为10
+      max_open_conns: 10  #最大的可用连接数，默认为10
+      conn_max_lifetime: 60  #连接维持的最长时间，单位秒，默认为60
 
   # Disable contract event database or not. If it is false, contract_eventdb_config must be mysql
   disable_contract_eventdb: true
   # Contract event db config
   contract_eventdb_config:
-    # Stabases type support leveldb, sql, badgerdb, tikvdb
-    provider: leveldb # [*]
-    # If provider is leveldb, leveldb_config should not be null.
-    leveldb_config:
-      # LevelDb store path
-      store_path: /data/node3/event
+    provider: sqlkv  #数据库类型，支持LevelDB，BadgerDB，TikvDB，Mysql，这里示例为Mysql
+    sqldb_config: #SQL数据库的详细配置
+      sqldb_type:  mysql #具体的RDBMS为mysql，也可以是sqlite、mssql等
+      dsn:  root:password@tcp(192.168.1.2:3306)/ #MySQL的数据库连接字符串
+      max_idle_conns: 10  #连接池中维持的最大的空闲连接数，默认为10
+      max_open_conns: 10  #最大的可用连接数，默认为10
+      conn_max_lifetime: 60  #连接维持的最长时间，单位秒，默认为60
 
 # Contract Virtual Machine(VM) configs
 vm:
@@ -514,9 +511,9 @@ vm:
     # Enable docker go virtual machine, default: false
     enable: false
     # Mount data path in chainmaker, include contracts, uds socks
-    data_mount_path: /data/node3/go
+    data_mount_path: ../data/node2/go
     # Mount log path in chainmaker
-    log_mount_path: ../log/node3/go
+    log_mount_path: ../log/node2/go
     # Communication protocol, used for chainmaker and docker manager communication
     # 1. tcp: docker vm uses TCP to communicate with chain
     # 2. uds: docker vm uses unix domain socket to communicate with chain

@@ -21,7 +21,7 @@ log:
   config_file: ../config/node2/log.yml
 
 core:
-  scheduler_type: 0
+  scheduler_type: 1
 
 # Crypto engine config
 crypto_engine: gmssl #support gmssl, tencentsm and tjfoc
@@ -486,7 +486,7 @@ storage:
       store_path: /data/node2/history
 
   # Result db config
-  disable_resultdb: true
+  disable_resultdb: false
   resultdb_config:
     # Stabases type support leveldb, sql, badgerdb, tikvdb
     provider: leveldb # [*]
@@ -513,7 +513,7 @@ vm:
     # Enable docker go virtual machine, default: false
     enable: false
     # Mount data path in chainmaker, include contracts, uds socks
-    data_mount_path: /data/node2/go
+    data_mount_path: /szdata/node2/go
     # Mount log path in chainmaker
     log_mount_path: ../log/node2/go
     # Communication protocol, used for chainmaker and docker manager communication
