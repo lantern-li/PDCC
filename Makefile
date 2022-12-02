@@ -46,6 +46,10 @@ deploy-4-node:
 	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp node4 $(DEPLOP_4_SERVER)/home/sz"
 
 deploy-4-node-binary:
+	#编译
+	@ssh $(BUILD_SERVER) "source /etc/profile; cd /home/sz/code/chainmaker/chainmaker-go; make vendor-build"
+	#编译编译完成
+
 	# stop node1
 	@ssh $(DEPLOP_1_SERVER) "cd /home/sz/node1/bin; ./stop.sh;sleep 2"
 	# scp node1 ...
@@ -79,9 +83,6 @@ build-remote:
 	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker; rm -rf chainmaker-go"
 	#更新源代码
 	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker; tar -xf chainmaker-go.tar.gz"
-	#编译
-	@ssh $(BUILD_SERVER) "source /etc/profile; cd /home/sz/code/chainmaker/chainmaker-go; make vendor-build"
-	#编译编译完成
 
 package-source-code:
 	@cd .. ; tar -czvf chainmaker-go.tar.gz --exclude=chainmaker-go/.git  --exclude=chainmaker-go/test  --exclude=chainmaker-go/bin  --exclude=chainmaker-go/build  --exclude=chainmaker-go/data  --exclude=chainmaker-go/tools/cmc1  --exclude=chainmaker-go/log chainmaker-go
