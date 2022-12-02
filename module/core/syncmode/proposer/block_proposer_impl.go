@@ -575,6 +575,7 @@ func (bp *BlockProposerImpl) getLastProposeTimeByBlockFinger(blockFinger string)
 
 	switch timeNow := timeValue.(type) {
 	case int64:
+		common.ProposeRepeatTimerMap.Store(blockFinger, utils.CurrentTimeMillisSeconds())
 		return timeNow, nil
 	default:
 		timeNow = utils.CurrentTimeMillisSeconds()
