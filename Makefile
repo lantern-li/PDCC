@@ -85,7 +85,7 @@ build-remote:
 	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker; tar -xf chainmaker-go.tar.gz"
 
 package-source-code:
-	@cd .. ; tar -czvf chainmaker-go.tar.gz --exclude=chainmaker-go/.git  --exclude=chainmaker-go/test  --exclude=chainmaker-go/bin  --exclude=chainmaker-go/build  --exclude=chainmaker-go/data  --exclude=chainmaker-go/tools/cmc1  --exclude=chainmaker-go/log chainmaker-go
+	@cd .. ; tar -czvf chainmaker-go.tar.gz --exclude=chainmaker-go/.git  --exclude=chainmaker-go/test  --exclude=chainmaker-go/bin  --exclude=chainmaker-go/build  --exclude=chainmaker-go/data  --exclude=chainmaker-go/tools/cmc1  --exclude=chainmaker-go/log --exclude=.DS_Store chainmaker-go
 
 upload-source-code:
 	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.1:/home/sz/code/chainmaker
