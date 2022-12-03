@@ -18,7 +18,7 @@ auth_type: "permissionedWithCert" # [*]
 # Logger settings
 log:
   # Logger configuration file path.
-  config_file: ../config/node4/log.yml
+  config_file: ../config/node4common/log.yml
 
 core:
   scheduler_type: 1
@@ -30,11 +30,11 @@ crypto_engine: tencentsm #support gmssl, tencentsm and tjfoc
 blockchain:
   # chain id and its genesis block file path.
   - chainId: chain_zj
-    genesis: ../config/node4/chainconfig/bc-chain-zj.yml
+    genesis: ../config/node4common/chainconfig/bc-chain-zj.yml
   - chainId: chain_gd
-    genesis: ../config/node4/chainconfig/bc-chain-gd.yml
+    genesis: ../config/node4common/chainconfig/bc-chain-gd.yml
   - chainId: chain_sh
-    genesis: ../config/node4/chainconfig/bc-chain-sh.yml
+    genesis: ../config/node4common/chainconfig/bc-chain-sh.yml
 #  - chainId: chain2
 #    genesis: ../config/{org_path2}/chainconfig/bc2.yml
 #  - chainId: chain3
@@ -49,10 +49,10 @@ node:
   org_id:            wx-org.chainmaker.org  # [*]
 
   # Private key file path
-  priv_key_file:     ../config/node4/certs/node/consensus4/consensus4.sign.key  # [*]
+  priv_key_file:     ../config/node4common/certs/node/common4/common4.sign.key  # [*]
 
   # Certificate file path
-  cert_file:         ../config/node4/certs/node/consensus4/consensus4.sign.crt  # [*]
+  cert_file:         ../config/node4common/certs/node/common4/common4.sign.crt  # [*]
 
   # Certificate cache size, used to speed up member identity verification.
   # By default the cache size is 1000.
@@ -103,7 +103,7 @@ net:
 
   # The address and port the node listens on.
   # By default, it uses 0.0.0.0 to listen on all network interfaces.
-  listen_addr: /ip4/0.0.0.0/tcp/11304
+  listen_addr: /ip4/0.0.0.0/tcp/11305
 
   # Max stream of a connection.
   # peer_stream_pool_size: 100
@@ -131,16 +131,16 @@ net:
     enabled: true
 
     # TLS private key file path.
-    priv_key_file: ../config/node4/certs/node/consensus4/consensus4.tls.key
+    priv_key_file: ../config/node4common/certs/node/common4/common4.tls.key
 
     # TLS Certificate file path.
-    cert_file: ../config/node4/certs/node/consensus4/consensus4.tls.crt
+    cert_file: ../config/node4common/certs/node/common4/common4.tls.crt
 
     # TLS enc private key file path. (only for gmtls1.1)
-    priv_enc_key_file: ../config/node4/certs/node/consensus4/consensus4.tls.enc.key
+    priv_enc_key_file: ../config/node4common/certs/node/common4/common4.tls.enc.key
 
     # TLS enc Certificate file path.
-    cert_enc_file: ../config/node4/certs/node/consensus4/consensus4.tls.enc.crt
+    cert_enc_file: ../config/node4common/certs/node/common4/common4.tls.enc.crt
 
   # The blacklist is automatically block the listed seed to connect.
   # blacklist:
@@ -190,7 +190,7 @@ rpc:
   provider: grpc  # [*]
 
   # RPC port
-  port: 12304
+  port: 12305
 
   # Interval of checking trust root changes, in seconds.
   # If changed, the rpc server's root certificate pool will also change.
@@ -235,16 +235,16 @@ rpc:
     mode:           twoway
 
     # RPC TLS private key file path
-    priv_key_file:  ../config/node4/certs/node/consensus4/consensus4.tls.key
+    priv_key_file:  ../config/node4common/certs/node/common4/common4.tls.key
 
     # RPC TLS public key file path
-    cert_file:      ../config/node4/certs/node/consensus4/consensus4.tls.crt
+    cert_file:      ../config/node4common/certs/node/common4/common4.tls.crt
 
     # RPC enc TLS private key file path (only for gmtls1.1)
-    priv_enc_key_file:  ../config/node4/certs/node/consensus4/consensus4.tls.enc.key
+    priv_enc_key_file:  ../config/node4common/certs/node/common4/common4.tls.enc.key
 
     # RPC enc TLS public key file path
-    cert_enc_file:      ../config/node4/certs/node/consensus4/consensus4.tls.enc.crt
+    cert_enc_file:      ../config/node4common/certs/node/common4/common4.tls.enc.crt
 
   # RPC blacklisted ip addresses
   blacklist:
@@ -364,7 +364,7 @@ monitor:
   enabled: true
 
   # Monitor service port
-  port: 14324
+  port: 14325
 
 # PProf Settings
 pprof:
@@ -372,7 +372,7 @@ pprof:
   enabled: true
 
   # PProf port
-  port: 24324
+  port: 24325
 
 # Consensus related settings
 consensus:

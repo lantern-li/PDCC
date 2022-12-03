@@ -20,21 +20,18 @@ log:
   # Logger configuration file path.
   config_file: ../config/node4/log.yml
 
-core:
-  scheduler_type: 1
-
 # Crypto engine config
-crypto_engine: tencentsm #support gmssl, tencentsm and tjfoc
+crypto_engine: gmssl #support gmssl, tencentsm and tjfoc
 
 # Chains the node currently joined in
 blockchain:
   # chain id and its genesis block file path.
   - chainId: chain_zj
     genesis: ../config/node4/chainconfig/bc-chain-zj.yml
-  - chainId: chain_gd
-    genesis: ../config/node4/chainconfig/bc-chain-gd.yml
-  - chainId: chain_sh
-    genesis: ../config/node4/chainconfig/bc-chain-sh.yml
+#  - chainId: chain_gd
+#    genesis: ../config/node4/chainconfig/bc-chain-gd.yml
+#  - chainId: chain_sh
+#    genesis: ../config/node4/chainconfig/bc-chain-sh.yml
 #  - chainId: chain2
 #    genesis: ../config/{org_path2}/chainconfig/bc2.yml
 #  - chainId: chain3
@@ -120,10 +117,10 @@ net:
   # Example ip format: "/ip4/127.0.0.1/tcp/11301/p2p/"+nodeid
   # Example dns format："/dns/cm-node1.org/tcp/11301/p2p/"+nodeid
   seeds:
-    - "/ip4/127.0.0.1/tcp/11301/p2p/QmP6rr61xV9zGWR7UVX8BNASfWdnUiQbYbCaB5nH8BqcFp"
-    - "/ip4/127.0.0.1/tcp/11302/p2p/QmbXSSfAwA8d5Hhhro2swcmUBjYy8QXG4xbeviuJoCPg5Q"
-    - "/ip4/127.0.0.1/tcp/11303/p2p/QmPsSc2QRmqyyq4xKcgcE9qdYaw31f2Zt8cWjXDb77Bd3S"
-    - "/ip4/127.0.0.1/tcp/11304/p2p/QmPwnUEQ8HyRDtLCi4Q2ax2aAcX8QoyJXR3raNWr3i1YAC"
+    - "/ip4/192.168.1.5/tcp/11301/p2p/QmP6rr61xV9zGWR7UVX8BNASfWdnUiQbYbCaB5nH8BqcFp"
+    - "/ip4/192.168.1.6/tcp/11302/p2p/QmbXSSfAwA8d5Hhhro2swcmUBjYy8QXG4xbeviuJoCPg5Q"
+    - "/ip4/192.168.1.7/tcp/11303/p2p/QmPsSc2QRmqyyq4xKcgcE9qdYaw31f2Zt8cWjXDb77Bd3S"
+    - "/ip4/192.168.1.8/tcp/11304/p2p/QmPwnUEQ8HyRDtLCi4Q2ax2aAcX8QoyJXR3raNWr3i1YAC"
 
   # Network tls settings.
   tls:
@@ -265,7 +262,7 @@ tx_filter:
     # sharding number
     length: 20
     # sharding task timeout in seconds
-    timeout: 60
+    timeout: 3
     snapshot:
       # serialize type
       # 0 Serialization by height interval
@@ -280,7 +277,7 @@ tx_filter:
       # Serialization interval in seconds
       serialize_interval: 10
       # file path
-      path: /data/node4/tx_filter
+      path: /szdata/node4/tx_filter
     # bird's nest config
     birds_nest:
       # bird's nest size
@@ -304,7 +301,7 @@ tx_filter:
         tags_per_bucket: 2
         # num of bits for each item, which is length of tag(fingerprint)
         # 11 is recommended.
-        bits_per_item: 17
+        bits_per_item: 11
         # keys number
         max_num_keys: 1000000
         # 0 TableTypeSingle normal single table
@@ -330,7 +327,7 @@ tx_filter:
       # Serialization interval in seconds
       serialize_interval: 10
       # file path
-      path: /data/node4/tx_filter
+      path: /szdata/node4/tx_filter
     # Transaction filter rules
     rules:
       # Absolute expiration time /second
@@ -361,10 +358,10 @@ tx_filter:
 # Monitor related settings
 monitor:
   # Monitor service switch, default is false.
-  enabled: true
+  enabled: false
 
   # Monitor service port
-  port: 14324
+  port: 14321
 
 # PProf Settings
 pprof:
@@ -405,10 +402,10 @@ scheduler:
 # store_path, dsn the content cannot be changed after startup.
 storage:
   # Default store path
-  store_path: /data/node4/ledgerData1 # [*]
+  store_path: /szdata/node4/ledgerData1 # [*]
 
   # Prefix for mysql db name
-  db_prefix: node4_
+  # db_prefix: org1_
 
   # Minimum block height not allowed to be archived
   unarchive_block_height: 300000
@@ -461,13 +458,13 @@ storage:
     # If provider is leveldb, leveldb_config should not be null.
     leveldb_config:
       # LevelDb store path
-      store_path: /data/node4/block
+      store_path: /szdata/node4/block
 
   # State db config
   statedb_config:
     provider: leveldb
     leveldb_config:
-      store_path: /data/node4/state
+      store_path: /szdata/node4/state
 
   # History db config
   disable_historydb: true
@@ -477,14 +474,14 @@ storage:
     disable_account_history: true
     provider: leveldb
     leveldb_config:
-      store_path: /data/node4/history
+      store_path: /szdata/node4/history
 
   # Result db config
-  disable_resultdb: false
+  disable_resultdb: true
   resultdb_config:
     provider: leveldb
     leveldb_config:
-      store_path: /data/node4/result
+      store_path: /szdata/node4/result
 
   # Disable contract event database or not. If it is false, contract_eventdb_config must be mysql
   disable_contract_eventdb: true
@@ -505,7 +502,7 @@ vm:
     # Enable docker go virtual machine, default: false
     enable: false
     # Mount data path in chainmaker, include contracts, uds socks
-    data_mount_path: /data/node4/go
+    data_mount_path: /szdata/node4/go
     # Mount log path in chainmaker
     log_mount_path: ../log/node4/go
     # Communication protocol, used for chainmaker and docker manager communication

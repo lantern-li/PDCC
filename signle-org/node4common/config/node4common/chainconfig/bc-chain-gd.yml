@@ -9,7 +9,7 @@
 # The content should be consistent across all nodes in this chain.
 
 # chain id
-chain_id: chain1
+chain_id: chain_gd
 
 # chain maker version
 version: v2.3.0
@@ -69,7 +69,7 @@ block:
   block_size: 10
 
   # The interval of block proposing attempts, in millisecond
-  block_interval: 10
+  block_interval: 400
 
 # Core settings
 core:
@@ -144,13 +144,18 @@ consensus:
   ext_config:
     # - key: aa
     #   value: chain01_ext11
+    - key: "TBFT_blocks_per_proposer"
+      value: "100000000"
+    - key: "WAL_write_mode"
+      value: "2"      #sync: 0  async: 1 none: 2
+
 
 # Trust roots is used to specify the organizations' root certificates in permessionedWithCert mode.
 # When in permessionedWithKey mode or public mode, it represents the admin users.
 trust_roots:
   - org_id: "wx-org.chainmaker.org"
     root:
-      - "../config/node4/certs/ca/ca.crt"
+      - "../config/node4common/certs/ca/ca.crt"
 
 # Trust members are members that do not need to be verified against trust roots.
 # trust_members:
@@ -165,7 +170,7 @@ resource_policies:
   - resource_name: CHAIN_CONFIG-NODE_ID_UPDATE
     policy:
       # Rule can be Any, All, Majority, Self...
-      rule: SELF
+      rule: ANY
       # The org id list, all organizations are need if here is null.
       org_list:
       # The role list
@@ -173,19 +178,19 @@ resource_policies:
         - admin
   - resource_name: CHAIN_CONFIG-TRUST_ROOT_ADD
     policy:
-      rule: SELF
+      rule: ANY
       org_list:
       role_list:
         - admin
   - resource_name: CHAIN_CONFIG-CERTS_FREEZE
     policy:
-      rule: SELF
+      rule: ANY
       org_list:
       role_list:
         - admin
   - resource_name: CONTRACT_MANAGE-INIT_CONTRACT
     policy:
-      rule: SELF
+      rule: ANY
       org_list:
       role_list:
 

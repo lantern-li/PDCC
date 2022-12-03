@@ -120,10 +120,10 @@ net:
   # Example ip format: "/ip4/127.0.0.1/tcp/11301/p2p/"+nodeid
   # Example dns format："/dns/cm-node1.org/tcp/11301/p2p/"+nodeid
   seeds:
-    - "/ip4/192.168.1.5/tcp/11301/p2p/QmP6rr61xV9zGWR7UVX8BNASfWdnUiQbYbCaB5nH8BqcFp"
-    - "/ip4/192.168.1.6/tcp/11302/p2p/QmbXSSfAwA8d5Hhhro2swcmUBjYy8QXG4xbeviuJoCPg5Q"
-    - "/ip4/192.168.1.7/tcp/11303/p2p/QmPsSc2QRmqyyq4xKcgcE9qdYaw31f2Zt8cWjXDb77Bd3S"
-    - "/ip4/192.168.1.8/tcp/11304/p2p/QmPwnUEQ8HyRDtLCi4Q2ax2aAcX8QoyJXR3raNWr3i1YAC"
+    - "/ip4/127.0.0.1/tcp/11301/p2p/QmP6rr61xV9zGWR7UVX8BNASfWdnUiQbYbCaB5nH8BqcFp"
+    - "/ip4/127.0.0.1/tcp/11302/p2p/QmbXSSfAwA8d5Hhhro2swcmUBjYy8QXG4xbeviuJoCPg5Q"
+    - "/ip4/127.0.0.1/tcp/11303/p2p/QmPsSc2QRmqyyq4xKcgcE9qdYaw31f2Zt8cWjXDb77Bd3S"
+    - "/ip4/127.0.0.1/tcp/11304/p2p/QmPwnUEQ8HyRDtLCi4Q2ax2aAcX8QoyJXR3raNWr3i1YAC"
 
   # Network tls settings.
   tls:
@@ -361,7 +361,7 @@ tx_filter:
 # Monitor related settings
 monitor:
   # Monitor service switch, default is false.
-  enabled: false
+  enabled: true
 
   # Monitor service port
   port: 14321
