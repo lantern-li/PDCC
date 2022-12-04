@@ -28,7 +28,7 @@ auth_type: "permissionedWithCert"
 # Crypto settings
 crypto:
   # Hash algorithm, can be SHA256, SHA3_256 and SM3
-  hash: SM3
+  hash: SHA256
 
 # User contract related settings
 contract:
