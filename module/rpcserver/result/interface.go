@@ -8,6 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 package result
 
 import (
+	"chainmaker.org/chainmaker/logger/v2"
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
 	"chainmaker.org/chainmaker/protocol/v2"
 )
@@ -32,23 +33,25 @@ var ResultTypeNames = map[Type]string{
 
 // SubscribeResult subscribe results
 type SubscribeResult interface {
-	// GetResult get result by height
-	GetResult(height uint64, fn func(*commonPb.Block) []*commonPb.Transaction) (*commonPb.SubscribeResult, error)
+	// GetResultByBlockInfo get result by blockinfo
+	GetResultByBlockInfo(blockInfo *commonPb.BlockInfo, fn func(*commonPb.Block) []*commonPb.Transaction) (*commonPb.SubscribeResult, error)
+	// GetResultByHeight get result by height
+	GetResultByHeight(height uint64, fn func(*commonPb.Block) []*commonPb.Transaction) (*commonPb.SubscribeResult, error)
 	// GetType get current type
 	GetType() Type
 }
 
 // NewSubscribeResult new subscribe result
-func NewSubscribeResult(resultType Type, store protocol.BlockchainStore) SubscribeResult {
+func NewSubscribeResult(resultType Type, store protocol.BlockchainStore, log *logger.CMLogger) SubscribeResult {
 	switch resultType {
 	case BlockResultType:
-		return &BlockSubscribeResult{store: store}
+		return &BlockSubscribeResult{store: store, log: log}
 	case OnlyHeaderResultType:
-		return &BlockHeaderSubscribeResult{store: store}
+		return &BlockHeaderSubscribeResult{store: store, log: log}
 	case RWSetResultType:
-		return &BlockWithRWSetSubscribeResult{store: store}
+		return &BlockWithRWSetSubscribeResult{store: store, log: log}
 	default:
-		return &BlockSubscribeResult{store: store}
+		return &BlockSubscribeResult{store: store, log: log}
 	}
 }
 

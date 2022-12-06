@@ -8,6 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 package helper
 
 import (
+	"chainmaker.org/chainmaker-go/module/txfilter/filtercommon"
 	"path"
 	"strconv"
 
@@ -50,15 +51,11 @@ func (h *OrgIdHelper) GetBaseHelper() *BaseHelper {
 // Verify block
 func (h *OrgIdHelper) Verify(current *commonPb.Block) (result []*commonPb.Transaction) {
 	// 非轻节点返回所有交易
-	if h.helper.role != protocol.RoleLight {
-		h.helper.Log.Errorf("%s %s non-light nodes do not judge rules", ruleHelperPrefix, orgPrefix)
-		return current.Txs
-	}
-
 	result = []*commonPb.Transaction{}
 
 	filterRules, err := h.FilterRule(true)
 	if err != nil {
+		h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("[%v] get filter rule fail. txs: %v, error: %v", err, current.Header.BlockHeight, len(current.Txs), err))
 		return
 	}
 	filterRule := filterRules[fixMethod]
@@ -83,8 +80,15 @@ func (h *OrgIdHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 		}
 		if tx.Sender.Signer.OrgId == h.helper.Tx.Sender.Signer.OrgId {
 			result = append(result, tx)
+			h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("%s %s [%v] rule match [status:%v,start:%v,end:%v,txs:%v,sub:%v,sender:%s]", ruleHelperPrefix, orgPrefix,
+				current.Header.BlockHeight, rule.Rule.Status, rule.Rule.StartHeight, rule.Rule.EndHeight, len(result), h.helper.Tx.Sender.Signer.OrgId, tx.Sender.Signer.OrgId))
+		} else {
+			h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("%s %s [%v] not match [status:%v,start:%v,end:%v,txs:%v,sub:%v,sender:%s]", ruleHelperPrefix, orgPrefix,
+				current.Header.BlockHeight, rule.Rule.Status, rule.Rule.StartHeight, rule.Rule.EndHeight, len(result), h.helper.Tx.Sender.Signer.OrgId, tx.Sender.Signer.OrgId))
 		}
 	}
+	h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("%s %s [%v] match over [status:%v,start:%v,end:%v,txs:%v]", ruleHelperPrefix, orgPrefix,
+		current.Header.BlockHeight, rule.Rule.Status, rule.Rule.StartHeight, rule.Rule.EndHeight, len(result)))
 	return
 }
 

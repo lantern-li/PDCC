@@ -77,7 +77,7 @@ func TestBlockHeaderSubscribeResult_GetResult(t *testing.T) {
 			b := BlockHeaderSubscribeResult{
 				store: tt.fields.store,
 			}
-			got, err := b.GetResult(tt.args.height, tt.args.in1)
+			got, err := b.GetResultByHeight(tt.args.height, tt.args.in1)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetResult() error = %v, wantErr %v", err, tt.wantErr)
 				return

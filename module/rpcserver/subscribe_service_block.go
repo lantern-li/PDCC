@@ -9,12 +9,12 @@ SPDX-License-Identifier: Apache-2.0
 package rpcserver
 
 import (
+	"chainmaker.org/chainmaker-go/module/txfilter/filtercommon"
+	"chainmaker.org/chainmaker/logger/v2"
+	"chainmaker.org/chainmaker/utils/v2"
 	"encoding/json"
 	"fmt"
 	"github.com/hokaccha/go-prettyjson"
-
-	"chainmaker.org/chainmaker/logger/v2"
-	"chainmaker.org/chainmaker/utils/v2"
 
 	"chainmaker.org/chainmaker-go/module/rpcserver/helper"
 	"chainmaker.org/chainmaker-go/module/rpcserver/result"
@@ -83,7 +83,7 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction, server apiP
 		return s.errorResultByMessage(codes.InvalidArgument, "%v rule, filter rule not found, parameters: %v", helper0.GetType().String(), parameters)
 	}
 	resultType := result.GetResultType(onlyHeader, withRWSet)
-	subscribeResult := result.NewSubscribeResult(resultType, store)
+	subscribeResult := result.NewSubscribeResult(resultType, store, s.log)
 	return s.sendBlock(server, helper0, subscribeResult)
 }
 
@@ -137,11 +137,15 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 
 	chainId := tx.Payload.ChainId
 	if eventSubscriber, err = s.chainMakerServer.GetEventSubscribe(chainId); err != nil {
+		s.log.Errorf("send_new_block [%v] rpc unsubscribe, error:%v, end: %v, start: %v", err, base.End, base.Start)
 		return s.errorResultByCode(codes.Internal, commonErr.ERR_CODE_GET_SUBSCRIBER, err)
 	}
 
 	sub := eventSubscriber.SubscribeBlockEvent(blockCh)
-	defer sub.Unsubscribe()
+	defer func() {
+		sub.Unsubscribe()
+		s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_new_block [%v] rpc unsubscribe, error: %v, end: %v, start: %v", err, base.End, base.Start))
+	}()
 
 	for {
 		select {
@@ -152,7 +156,7 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 				int64(blockInfo.Block.Header.BlockHeight) > alreadySendHistoryBlockHeight {
 				_, err = s.sendHistoryBlock(server, helper0, subscribeResult)
 				if err != nil {
-					s.log.Errorf("send history block failed, %v", err)
+					s.log.Errorf("send_new_block [%v] send history block failed, error: %v, end: %v, start: %v", blockInfo.Block.Header.BlockHeight, err, base.End, base.Start)
 					return err
 				}
 
@@ -162,31 +166,32 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 
 			updateFilterRules(blockInfo, helper0, s.log)
 
-			res, err := subscribeResult.GetResult(blockInfo.Block.Header.BlockHeight, helper0.Verify)
+			res, err := subscribeResult.GetResultByBlockInfo(blockInfo, helper0.Verify)
 			if err != nil {
+				s.log.Errorf("send_new_block [%v] get result failed. error: %v, end: %v, start: %v", blockInfo.Block.Header.BlockHeight, err, base.End, base.Start)
 				return err
 			}
 			if res == nil {
+				s.log.Warnf("send_new_block [%v] res is nil. end: %v, start: %v", blockInfo.Block.Header.BlockHeight, base.End, base.Start)
 				continue
 			}
 			if base.End != -1 && int64(blockInfo.Block.Header.BlockHeight) >= base.End {
+				s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_new_block [%v] beyond the subscription range. end: %v, start: %v", blockInfo.Block.Header.BlockHeight, base.End, base.Start))
 				return status.Error(codes.OK, "OK")
 			}
 
 			if err = server.Send(res); err != nil {
-				return fmt.Errorf("send block subscribe result by realtime failed, %s", err)
+				err = fmt.Errorf("send_new_block [%v] send block subscribe result by realtime failed. error:%v, end: %v, start: %v", blockInfo.Block.Header.BlockHeight, err, base.End, base.Start)
+				s.log.Error(err)
+				return err
 			}
 
-			s.log.Infof("send new block success [%v], resultType: %v", blockInfo.Block.Header.BlockHeight,
-				result.ResultTypeNames[subscribeResult.GetType()])
-
-			if base.End != -1 && int64(blockInfo.Block.Header.BlockHeight) >= base.End {
-				return status.Error(codes.OK, "OK")
-			}
-
+			s.log.Infof("send_new_block [%v] send new block success, resultType: %v", blockInfo.Block.Header.BlockHeight, result.ResultTypeNames[subscribeResult.GetType()])
 		case <-server.Context().Done():
+			s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_new_block|rpc server context done."))
 			return nil
 		case <-s.ctx.Done():
+			s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_new_block|api server context done."))
 			return nil
 		}
 	}
@@ -256,7 +261,7 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, help
 				return i - 1, nil
 			}
 
-			res, err := subscribeResult.GetResult(uint64(i), helper0.Verify)
+			res, err := subscribeResult.GetResultByHeight(uint64(i), helper0.Verify)
 			if err != nil {
 				return -1, s.errorResultByMessage(codes.Internal, "get result fail, error: %v", err)
 			}

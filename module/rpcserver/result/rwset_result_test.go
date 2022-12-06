@@ -91,7 +91,7 @@ func TestBlockWithRWSetSubscribeResult_GetResult(t *testing.T) {
 			b := &BlockWithRWSetSubscribeResult{
 				store: tt.fields.store,
 			}
-			got, err := b.GetResult(tt.args.height, tt.args.filter)
+			got, err := b.GetResultByHeight(tt.args.height, tt.args.filter)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetResult() error = %v, wantErr %v", err, tt.wantErr)
 				return
