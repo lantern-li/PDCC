@@ -8,7 +8,6 @@ SPDX-License-Identifier: Apache-2.0
 package scheduler
 
 import (
-	"chainmaker.org/chainmaker-go/module/txfilter/filtercommon"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -17,6 +16,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"chainmaker.org/chainmaker-go/module/txfilter/filtercommon"
 
 	"chainmaker.org/chainmaker/pb-go/v2/consensus"
 
@@ -54,7 +55,7 @@ const (
 
 var (
 	SZContractList = map[string]struct{}{
-		"REAL_ESTATE": {}, "RECEPIT": {}, "DECLARATION": {},"EXPORT_REBATE": {},"SOCIAL_SECURITY": {},"ENDORSEMENT": {}}
+		"REAL_ESTATE": {}, "RECEPIT": {}, "DECLARATION": {}, "EXPORT_REBATE": {}, "SOCIAL_SECURITY": {}, "ENDORSEMENT": {}}
 )
 
 // TxScheduler transaction scheduler structure
@@ -71,6 +72,8 @@ type TxScheduler struct {
 	signer          protocol.SigningMember
 	ledgerCache     protocol.LedgerCache
 	contractCache   *sync.Map
+
+	metricContractInvokeCounter *prometheus.CounterVec
 }
 
 // Transaction dependency in adjacency table representation
@@ -470,7 +473,7 @@ func (ts *TxScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.
 	}
 	ts.log.Infof("simulate with dag start, size %d", len(block.Txs))
 
-	if localconf.ChainMakerConfig.CoreConfig.SchedulerType == 1  &&
+	if localconf.ChainMakerConfig.CoreConfig.SchedulerType == 1 &&
 		canUseQuickSchedule(block.Txs) {
 		txBatch := block.Txs
 		txResultMap := make(map[string]*commonPb.Result, len(txBatch))
@@ -480,6 +483,11 @@ func (ts *TxScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.
 		for _, tx := range txBatch {
 			ts.runContract(tx, txRWSetMap, snapshot, block, paramMap)
 			txResultMap[tx.Payload.TxId] = tx.Result
+			if localconf.ChainMakerConfig.MonitorConfig.Enabled {
+				// count user contract invoke times
+				ts.metricContractInvokeCounter.WithLabelValues(ts.chainConf.ChainConfig().ChainId, tx.Payload.ContractName,
+					commonPb.RuntimeType_NATIVE.String(), "true").Inc()
+			}
 		}
 
 		putMapTime := time.Since(startTime)
@@ -1078,54 +1086,54 @@ func (ts *TxScheduler) dispatchTxsInSenderCollection(
 	for _, txCollection := range senderCollection.txsMap {
 		//balance := txCollection.accountBalance
 		for _, tx := range txCollection.txs {
-		//	ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("dispatch sender collection tx => %s", tx.Payload))
-		//	var gasLimit int64
-		//	limit := tx.Payload.Limit
-		//	txNeedChargeGas := ts.checkNativeFilter(tx.GetPayload().ContractName, tx.GetPayload().Method)
-		//	ts.log.Debugf("tx need charge gas => %v", txNeedChargeGas)
-		//	if limit == nil && txNeedChargeGas {
-		//		// tx需要扣费，但是limit没有设置
-		//		tx.Result = &commonPb.Result{
-		//			Code: commonPb.TxStatusCode_GAS_LIMIT_NOT_SET,
-		//			ContractResult: &commonPb.ContractResult{
-		//				Code:    uint32(1),
-		//				Result:  nil,
-		//				Message: ErrMsgOfGasLimitNotSet,
-		//				GasUsed: uint64(0),
-		//			},
-		//			RwSetHash: nil,
-		//			Message:   ErrMsgOfGasLimitNotSet,
-		//		}
-		//
-		//		runningTxC <- tx
-		//		continue
-		//	} else if !txNeedChargeGas {
-		//		// tx 不需要扣费
-		//		gasLimit = int64(0)
-		//	} else {
-		//		// tx 需要扣费，limit 正常设置
-		//		gasLimit = int64(limit.GasLimit)
-		//	}
-		//
-		//	// if the balance less than gas limit, set the result ahead, working goroutine will never runVM for it.
-		//	if balance-gasLimit < 0 {
-		//		pkStr, _ := txCollection.publicKey.String()
-		//		ts.log.Debugf("balance is too low to execute tx. address = %v, public key = %s", addr, pkStr)
-		//		errMsg := fmt.Sprintf("`%s` has no enough balance to execute tx.", addr)
-		//		tx.Result = &commonPb.Result{
-		//			Code: commonPb.TxStatusCode_GAS_BALANCE_NOT_ENOUGH_FAILED,
-		//			ContractResult: &commonPb.ContractResult{
-		//				Code:    uint32(1),
-		//				Result:  nil,
-		//				Message: errMsg,
-		//				GasUsed: uint64(0),
-		//			},
-		//			RwSetHash: nil,
-		//			Message:   errMsg,
-		//		}
-		//	} else {
-		//		balance = balance - gasLimit
-		//	}
+			//	ts.log.DebugDynamic(filtercommon.LoggingFixLengthFunc("dispatch sender collection tx => %s", tx.Payload))
+			//	var gasLimit int64
+			//	limit := tx.Payload.Limit
+			//	txNeedChargeGas := ts.checkNativeFilter(tx.GetPayload().ContractName, tx.GetPayload().Method)
+			//	ts.log.Debugf("tx need charge gas => %v", txNeedChargeGas)
+			//	if limit == nil && txNeedChargeGas {
+			//		// tx需要扣费，但是limit没有设置
+			//		tx.Result = &commonPb.Result{
+			//			Code: commonPb.TxStatusCode_GAS_LIMIT_NOT_SET,
+			//			ContractResult: &commonPb.ContractResult{
+			//				Code:    uint32(1),
+			//				Result:  nil,
+			//				Message: ErrMsgOfGasLimitNotSet,
+			//				GasUsed: uint64(0),
+			//			},
+			//			RwSetHash: nil,
+			//			Message:   ErrMsgOfGasLimitNotSet,
+			//		}
+			//
+			//		runningTxC <- tx
+			//		continue
+			//	} else if !txNeedChargeGas {
+			//		// tx 不需要扣费
+			//		gasLimit = int64(0)
+			//	} else {
+			//		// tx 需要扣费，limit 正常设置
+			//		gasLimit = int64(limit.GasLimit)
+			//	}
+			//
+			//	// if the balance less than gas limit, set the result ahead, working goroutine will never runVM for it.
+			//	if balance-gasLimit < 0 {
+			//		pkStr, _ := txCollection.publicKey.String()
+			//		ts.log.Debugf("balance is too low to execute tx. address = %v, public key = %s", addr, pkStr)
+			//		errMsg := fmt.Sprintf("`%s` has no enough balance to execute tx.", addr)
+			//		tx.Result = &commonPb.Result{
+			//			Code: commonPb.TxStatusCode_GAS_BALANCE_NOT_ENOUGH_FAILED,
+			//			ContractResult: &commonPb.ContractResult{
+			//				Code:    uint32(1),
+			//				Result:  nil,
+			//				Message: errMsg,
+			//				GasUsed: uint64(0),
+			//			},
+			//			RwSetHash: nil,
+			//			Message:   errMsg,
+			//		}
+			//	} else {
+			//		balance = balance - gasLimit
+			//	}
 
 			runningTxC <- tx
 		}
@@ -1721,11 +1729,11 @@ func update(
 	}}
 
 	txWrites := []*commonPb.TxWrite{{
-			Key:          key,
-			Value:        val,
-			ContractName: tx.Payload.ContractName,
-		}}
-	
+		Key:          key,
+		Value:        val,
+		ContractName: tx.Payload.ContractName,
+	}}
+
 	txRWSetMap[tx.Payload.TxId] = &commonPb.TxRWSet{
 		TxId:     tx.Payload.TxId,
 		TxReads:  txReads,
