@@ -144,9 +144,13 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 		paramMap := make(map[string][]byte)
 
 		for _, tx := range txBatch {
-
 			// 执行合约
 			ts.runContract(tx, txRWSetMap, snapshot, block, paramMap)
+			if localconf.ChainMakerConfig.MonitorConfig.Enabled {
+				// count user contract invoke times
+				ts.metricContractInvokeCounter.WithLabelValues(ts.chainConf.ChainConfig().ChainId, tx.Payload.ContractName,
+					commonPb.RuntimeType_NATIVE.String(), "true").Inc()
+			}
 		}
 		putMapTime := time.Since(startTime)
 		// 将交易填充进区块（此时交易的执行结果已经写入）
