@@ -118,12 +118,11 @@ func subscriberByRule() error {
 					if !ok {
 						fmt.Println("require true")
 					}
-					bytes, _ := json.Marshal(blockInfo.Block.Header)
-
-					total += len(blockInfo.Block.Txs)
-					fmt.Printf("recv block [%d] txs: %v, total: %v, rwset: %v => %+v\n",
-						blockInfo.Block.Header.BlockHeight, len(blockInfo.Block.Txs), total,
-						blockInfo.RwsetList != nil, string(bytes))
+					for _, tx := range blockInfo.Block.Txs {
+						bytes, _ := json.Marshal(tx)
+						fmt.Printf("recv block [%d] txs: %v, total: %v, txid: %v \n %v \n",
+							blockInfo.Block.Header.BlockHeight, len(blockInfo.Block.Txs), total, tx.Payload.TxId, string(bytes))
+					}
 				}
 				fmt.Println()
 
