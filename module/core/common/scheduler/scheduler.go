@@ -1664,6 +1664,19 @@ func update(
 	tx.Result = genDefaultTxResult()
 	key := getSimContextKey(bizId, businessType)
 	valueByte, err := txSimContext.Get(tx.Payload.ContractName, key)
+
+	// 获取读写集（避免交易失败后未赋值读写集）
+	txReads := []*commonPb.TxRead{{
+		Key:          key,
+		Value:        valueByte,
+		ContractName: tx.Payload.ContractName,
+	}}
+
+	txRWSetMap[tx.Payload.TxId] = &commonPb.TxRWSet{
+		TxId:     tx.Payload.TxId,
+		TxReads:  txReads,
+	}
+
 	if err != nil {
 		errMsg := fmt.Sprintf("sz update fail txSimContext get err:%s contract:%s,bizId:%s，businessType：%s",
 			err.Error(), tx.Payload.ContractName, bizId, businessType)
@@ -1706,7 +1719,6 @@ func update(
 			errMsg := fmt.Sprintf("sz update fail nonce invalid request nonce should be more than the last, "+
 				"contract:%s, nonce:%s, currentNonce:%d", tx.Payload.ContractName, nonce, lastNonce)
 			getErrResult(tx.Result, errMsg, log)
-
 			return
 		}
 		noncePair = nonceInt
@@ -1725,13 +1737,7 @@ func update(
 	// 返回交易执行结果
 	tx.Result.ContractResult.Result = []byte(fmt.Sprint(noncePair))
 
-	// 获取读写集
-	txReads := []*commonPb.TxRead{{
-		Key:          key,
-		Value:        valueByte,
-		ContractName: tx.Payload.ContractName,
-	}}
-
+	// 将成功交易的写集写入
 	txWrites := []*commonPb.TxWrite{{
 		Key:          key,
 		Value:        val,
