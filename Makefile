@@ -19,11 +19,11 @@ GOLDFLAGS += -X "${LOCALCONF_HOME}.BuildDateTime=${DATETIME}"
 GOLDFLAGS += -X "${LOCALCONF_HOME}.GitBranch=${GIT_BRANCH}"
 GOLDFLAGS += -X "${LOCALCONF_HOME}.GitCommit=${GIT_COMMIT}"
 
-BUILD_SERVER=root@127.0.0.1
-DEPLOP_1_SERVER=root@127.0.0.1
-DEPLOP_2_SERVER=root@127.0.0.1
-DEPLOP_3_SERVER=root@127.0.0.1
-DEPLOP_4_SERVER=root@127.0.0.1
+BUILD_SERVER=root@192.168.1.5
+DEPLOP_1_SERVER=root@192.168.1.1
+DEPLOP_2_SERVER=root@192.168.1.2
+DEPLOP_3_SERVER=root@192.168.1.3
+DEPLOP_4_SERVER=root@192.168.1.4
 
 chainmaker:
     ifeq ($(PLATFORM),"Windows")
@@ -40,10 +40,10 @@ autodeploy: gv-pusc-br deploy-4-node-binary
 gv-pusc-br: generate-vendor package-source-code upload-source-code build-remote
 
 deploy-4-node:
-	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp node1 $(DEPLOP_1_SERVER)/home/sz"
-	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp node2 $(DEPLOP_2_SERVER)/home/sz"
-	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp node3 $(DEPLOP_3_SERVER)/home/sz"
-	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp node4 $(DEPLOP_4_SERVER)/home/sz"
+	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp -r node1 $(DEPLOP_1_SERVER):/home/sz"
+	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp -r node2 $(DEPLOP_2_SERVER):/home/sz"
+	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp -r node3 $(DEPLOP_3_SERVER):/home/sz"
+	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp -r node4 $(DEPLOP_4_SERVER):/home/sz"
 
 deploy-4-node-binary:
 	#编译
