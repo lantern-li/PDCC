@@ -1,6 +1,6 @@
 chain_client:
   # 链ID
-  chain_id: "chain_zj"
+  chain_id: "chain_sh"
   # 组织ID
   org_id: "wx-org.chainmaker.org"
   # 客户端用户私钥路径
