@@ -10,6 +10,7 @@ package result
 import (
 	"chainmaker.org/chainmaker/logger/v2"
 	"fmt"
+	"time"
 
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
 	"chainmaker.org/chainmaker/protocol/v2"
@@ -28,27 +29,39 @@ func (b BlockHeaderSubscribeResult) GetType() Type {
 }
 
 // GetResultByBlockInfo get result by BlockInfo
-func (b BlockHeaderSubscribeResult) GetResultByBlockInfo(blockInfo *commonPb.BlockInfo, _ func(*commonPb.Block) []*commonPb.Transaction) (*commonPb.SubscribeResult, error) {
+func (b BlockHeaderSubscribeResult) GetResultByBlockInfo(blockInfo *commonPb.BlockInfo, _ func(block *commonPb.Block) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error) {
 	data, err := proto.Marshal(blockInfo.Block.Header)
 	if err != nil {
-		return nil, fmt.Errorf("data marshal fail, at [blockInfo:%d], %s", blockInfo, err)
+		return nil, nil, fmt.Errorf("data marshal fail, at [blockInfo:%d], %s", blockInfo, err)
 	}
-	return &commonPb.SubscribeResult{Data: data}, nil
+	return &commonPb.SubscribeResult{Data: data}, nil, nil
 }
 
 // GetResultByHeight get result by height
-func (b BlockHeaderSubscribeResult) GetResultByHeight(height uint64, _ func(*commonPb.Block) []*commonPb.Transaction) (
-	*commonPb.SubscribeResult, error) {
+func (b BlockHeaderSubscribeResult) GetResultByHeight(height uint64, _ func(*commonPb.Block) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error) {
+	start := time.Now()
 	header, err := b.store.GetBlockHeaderByHeight(height)
+	getBlockElapsed := time.Since(start)
+
 	if err != nil {
-		return nil, fmt.Errorf("get block failed, at [height:%d], %s", height, err)
+		return nil, nil, fmt.Errorf("get block failed, at [height:%d], %s", height, err)
 	}
 	if header == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
+	start = time.Now()
 	data, err := proto.Marshal(header)
 	if err != nil {
-		return nil, fmt.Errorf("data marshal fail, at [height:%d], %s", height, err)
+		return nil, nil, fmt.Errorf("data marshal fail, at [height:%d], %s", height, err)
 	}
-	return &commonPb.SubscribeResult{Data: data}, nil
+	marshalElapsed := time.Since(start)
+
+	stat := &Stat{
+		ResultTxCount:   0,
+		TotalTxCount:    0,
+		GetBlockElapsed: getBlockElapsed.Milliseconds(),
+		FilterElapsed:   0,
+		MarshalElapsed:  marshalElapsed.Milliseconds(),
+	}
+	return &commonPb.SubscribeResult{Data: data}, stat, nil
 }

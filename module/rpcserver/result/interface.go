@@ -31,12 +31,21 @@ var ResultTypeNames = map[Type]string{
 	RWSetResultType:      "RWSetResult",
 }
 
+type Stat struct {
+	ResultTxCount int
+	TotalTxCount  uint32
+
+	GetBlockElapsed int64
+	FilterElapsed   int64
+	MarshalElapsed  int64
+}
+
 // SubscribeResult subscribe results
 type SubscribeResult interface {
 	// GetResultByBlockInfo get result by blockinfo
-	GetResultByBlockInfo(blockInfo *commonPb.BlockInfo, fn func(*commonPb.Block) []*commonPb.Transaction) (*commonPb.SubscribeResult, error)
+	GetResultByBlockInfo(blockInfo *commonPb.BlockInfo, fn func(block *commonPb.Block) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error)
 	// GetResultByHeight get result by height
-	GetResultByHeight(height uint64, fn func(*commonPb.Block) []*commonPb.Transaction) (*commonPb.SubscribeResult, error)
+	GetResultByHeight(height uint64, fn func(*commonPb.Block) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error)
 	// GetType get current type
 	GetType() Type
 }

@@ -70,8 +70,12 @@ func (h *AliasHelper) GetBaseHelper() *BaseHelper {
 	return h.helper
 }
 
+func (h AliasHelper) GetSubscriber() id.SubscriberId {
+	return h.subscriberId
+}
+
 // Verify block
-func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transaction) {
+func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transaction, count int) {
 	result = []*commonPb.Transaction{}
 	filterRules, err := h.FilterRule(true)
 	if err != nil {
@@ -107,8 +111,9 @@ func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 	//h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("%s %s current rules [type:alias,status:%v,"+
 	//	"start:%v,end:%v,name:%v,index:%v,offset:%v]", ruleHelperPrefix, aliasPrefix, rules.Rule.Status, rules.Rule.StartHeight, rules.Rule.EndHeight, rules.Name, rules.Index, rules.Offset))
 	var (
-		wg      = &sync.WaitGroup{}
-		resultC = make(chan *commonPb.Transaction, current.Header.TxCount)
+		wg            = &sync.WaitGroup{}
+		resultC       = make(chan *commonPb.Transaction, current.Header.TxCount)
+		resultTxCount int
 	)
 
 	for _, method := range h.methods {
@@ -119,9 +124,12 @@ func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 	close(resultC)
 	// merge transactions
 	for transaction := range resultC {
+		if transaction.Payload.ContractName != "" {
+			resultTxCount++
+		}
 		result = append(result, transaction)
 	}
-	return result
+	return result, resultTxCount
 }
 
 func verifyTxs(wg *sync.WaitGroup, log protocol.Logger, rule *txassign.AliasRule, txs []*commonPb.Transaction, method, contractName string, subscriberId id.SubscriberId, result chan *commonPb.Transaction) {

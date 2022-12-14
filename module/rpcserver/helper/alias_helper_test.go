@@ -288,7 +288,7 @@ func TestAliasHelper_Verify(t *testing.T) {
 				contractName: tt.fields.contractName,
 				methods:      tt.fields.methods,
 			}
-			if gotResult := h.Verify(tt.args.current); !reflect.DeepEqual(gotResult, tt.wantResult) {
+			if gotResult, _ := h.Verify(tt.args.current); !reflect.DeepEqual(gotResult, tt.wantResult) {
 				t.Errorf("Verify() = %v, want %v", gotResult, tt.wantResult)
 			}
 		})

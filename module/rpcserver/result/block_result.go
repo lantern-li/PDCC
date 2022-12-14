@@ -10,6 +10,7 @@ package result
 import (
 	"chainmaker.org/chainmaker/logger/v2"
 	"fmt"
+	"time"
 
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
 	"chainmaker.org/chainmaker/protocol/v2"
@@ -28,8 +29,12 @@ func (b BlockSubscribeResult) GetType() Type {
 }
 
 // GetResultByBlockInfo get result by BlockInfo
-func (b BlockSubscribeResult) GetResultByBlockInfo(blockInfo *commonPb.BlockInfo, filter func(*commonPb.Block) []*commonPb.Transaction) (*commonPb.SubscribeResult, error) {
-	transactions := filter(blockInfo.Block)
+func (b BlockSubscribeResult) GetResultByBlockInfo(blockInfo *commonPb.BlockInfo, filter func(block *commonPb.Block) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error) {
+	start := time.Now()
+	transactions, count := filter(blockInfo.Block)
+	filterElapsed := time.Since(start)
+
+	start = time.Now()
 	data, err := proto.Marshal(&commonPb.BlockInfo{
 		Block: &commonPb.Block{
 			Header:         blockInfo.Block.Header,
@@ -38,23 +43,37 @@ func (b BlockSubscribeResult) GetResultByBlockInfo(blockInfo *commonPb.BlockInfo
 			Txs:            transactions,
 		},
 	})
-	if err != nil {
-		return nil, fmt.Errorf("data marshal fail, at [height:%d], %s", blockInfo.Block.Header.BlockHeight, err)
+	marshalElapsed := time.Since(start)
+
+	stat := &Stat{
+		ResultTxCount:  count,
+		TotalTxCount:   blockInfo.Block.Header.TxCount,
+		FilterElapsed:  filterElapsed.Milliseconds(),
+		MarshalElapsed: marshalElapsed.Milliseconds(),
 	}
-	return &commonPb.SubscribeResult{Data: data}, nil
+
+	if err != nil {
+		return nil, stat, fmt.Errorf("data marshal fail, at [height:%d], %s", blockInfo.Block.Header.BlockHeight, err)
+	}
+	return &commonPb.SubscribeResult{Data: data}, stat, nil
 }
 
 // GetResultByHeight get result by height
-func (b BlockSubscribeResult) GetResultByHeight(height uint64, filter func(*commonPb.Block) []*commonPb.Transaction) (
-	*commonPb.SubscribeResult, error) {
+func (b BlockSubscribeResult) GetResultByHeight(height uint64, filter func(*commonPb.Block) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error) {
+	start := time.Now()
 	block, err := b.store.GetBlock(height)
 	if err != nil {
-		return nil, fmt.Errorf("get block failed, at [height:%d], %s", height, err)
+		return nil, nil, fmt.Errorf("get block failed, at [height:%d], %s", height, err)
 	}
 	if block == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
-	transactions := filter(block)
+	getBlockElapsed := time.Since(start)
+
+	start = time.Now()
+	transactions, count := filter(block)
+	filterElapsed := time.Since(start)
+	start = time.Now()
 	data, err := proto.Marshal(&commonPb.BlockInfo{
 		Block: &commonPb.Block{
 			Header:         block.Header,
@@ -63,8 +82,16 @@ func (b BlockSubscribeResult) GetResultByHeight(height uint64, filter func(*comm
 			Txs:            transactions,
 		},
 	})
-	if err != nil {
-		return nil, fmt.Errorf("data marshal fail, at [height:%d], %s", height, err)
+	marshalElapsed := time.Since(start)
+	stat := &Stat{
+		ResultTxCount:   count,
+		TotalTxCount:    block.Header.TxCount,
+		GetBlockElapsed: getBlockElapsed.Milliseconds(),
+		FilterElapsed:   filterElapsed.Milliseconds(),
+		MarshalElapsed:  marshalElapsed.Milliseconds(),
 	}
-	return &commonPb.SubscribeResult{Data: data}, nil
+	if err != nil {
+		return nil, stat, fmt.Errorf("data marshal fail, at [height:%d], %s", height, err)
+	}
+	return &commonPb.SubscribeResult{Data: data}, stat, nil
 }

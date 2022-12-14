@@ -167,7 +167,7 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 
 			updateFilterRules(blockInfo, helper0, s.log)
 
-			res, err := subscribeResult.GetResultByBlockInfo(blockInfo, helper0.Verify)
+			res, stat, err := subscribeResult.GetResultByBlockInfo(blockInfo, helper0.Verify)
 			if err != nil {
 				s.log.Errorf("send_new_block [%v] get result failed. error: %v, end: %v, start: %v", blockInfo.Block.Header.BlockHeight, err, base.End, base.Start)
 				return err
@@ -180,7 +180,7 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 				s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_new_block [%v] beyond the subscription range. end: %v, start: %v", blockInfo.Block.Header.BlockHeight, base.End, base.Start))
 				return status.Error(codes.OK, "OK")
 			}
-			filterElapsed := time.Since(start)
+			resultElapsed := time.Since(start)
 			sendStart := time.Now()
 			if err = server.Send(res); err != nil {
 				err = fmt.Errorf("send_block [%v] send block subscribe result by realtime failed. error:%v, end: %v, start: %v", blockInfo.Block.Header.BlockHeight, err, base.End, base.Start)
@@ -189,10 +189,13 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 			}
 			sendElapsed := time.Since(sendStart)
 			allElapsed := time.Since(start)
-			s.log.Infof("send_block [%v] send new block success, [all:%v,filter:%v,send:%v] resultType: %v",
-				blockInfo.Block.Header.BlockHeight,
-				allElapsed.Milliseconds(), filterElapsed.Milliseconds(), sendElapsed.Milliseconds(),
-				result.ResultTypeNames[subscribeResult.GetType()])
+			s.log.Infof("send_block_new [%v] %v [%d/%d] subscriber:%v,costs[all:%v,result:%v,send:%v,db:%d,filter:%v,marshal:%v,] ",
+				blockInfo.Block.Header.BlockHeight, result.ResultTypeNames[subscribeResult.GetType()],
+				stat.TotalTxCount, stat.ResultTxCount, string(helper0.GetBaseHelper().Tx.Sender.Signer.MemberInfo),
+				allElapsed.Milliseconds(), resultElapsed.Milliseconds(), sendElapsed.Milliseconds(),
+				stat.GetBlockElapsed, stat.FilterElapsed, stat.MarshalElapsed,
+			)
+
 		case <-server.Context().Done():
 			s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_new_block|rpc server context done."))
 			return nil
@@ -269,7 +272,7 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, help
 				return i - 1, nil
 			}
 
-			res, err := subscribeResult.GetResultByHeight(uint64(i), helper0.Verify)
+			res, stat, err := subscribeResult.GetResultByHeight(uint64(i), helper0.Verify)
 			if err != nil {
 				return -1, s.errorResultByMessage(codes.Internal, "get result fail, error: %v", err)
 			}
@@ -281,17 +284,19 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, help
 			if res.Data == nil {
 				continue
 			}
-			filterElapsed := time.Since(start)
+			resultElapsed := time.Since(start)
 			sendStart := time.Now()
 			if err := server.Send(res); err != nil {
 				return -1, s.errorResultByMessage(codes.Internal, "send block info by history failed, %s", err)
 			}
 			sendElapsed := time.Since(sendStart)
 			allElapsed := time.Since(start)
-
-			s.log.Infof("send_block [%v] send history block success, [all:%v,filter:%v,send:%v] resultType: %v", i,
-				allElapsed.Milliseconds(), filterElapsed.Milliseconds(), sendElapsed.Milliseconds(),
-				result.ResultTypeNames[subscribeResult.GetType()])
+			s.log.Infof("send_block_history [%v] %v [%d/%d] subscriber:%v,costs[all:%v,result:%v,send:%v,db:%d,filter:%v,marshal:%v] ",
+				i, result.ResultTypeNames[subscribeResult.GetType()],
+				stat.TotalTxCount, stat.ResultTxCount, string(helper0.GetBaseHelper().Tx.Sender.Signer.MemberInfo),
+				allElapsed.Milliseconds(), resultElapsed.Milliseconds(), sendElapsed.Milliseconds(),
+				stat.GetBlockElapsed, stat.FilterElapsed, stat.MarshalElapsed,
+			)
 		}
 	}
 }

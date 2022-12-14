@@ -8,6 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 package helper
 
 import (
+	"chainmaker.org/chainmaker-go/module/rpcserver/id"
 	"chainmaker.org/chainmaker-go/module/txfilter/filtercommon"
 	"path"
 	"strconv"
@@ -48,8 +49,12 @@ func (h *OrgIdHelper) GetBaseHelper() *BaseHelper {
 	return h.helper
 }
 
+func (h OrgIdHelper) GetSubscriber() id.SubscriberId {
+	return nil
+}
+
 // Verify block
-func (h *OrgIdHelper) Verify(current *commonPb.Block) (result []*commonPb.Transaction) {
+func (h *OrgIdHelper) Verify(current *commonPb.Block) (result []*commonPb.Transaction, count int) {
 	// 非轻节点返回所有交易
 	result = []*commonPb.Transaction{}
 
