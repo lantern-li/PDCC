@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hokaccha/go-prettyjson"
+	"time"
 
 	"chainmaker.org/chainmaker-go/module/rpcserver/helper"
 	"chainmaker.org/chainmaker-go/module/rpcserver/result"
@@ -150,13 +151,13 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 	for {
 		select {
 		case ev := <-blockCh:
+			start := time.Now()
 			blockInfo = ev.BlockInfo
-
 			if alreadySendHistoryBlockHeight != -1 &&
 				int64(blockInfo.Block.Header.BlockHeight) > alreadySendHistoryBlockHeight {
 				_, err = s.sendHistoryBlock(server, helper0, subscribeResult)
 				if err != nil {
-					s.log.Errorf("send_new_block [%v] send history block failed, error: %v, end: %v, start: %v", blockInfo.Block.Header.BlockHeight, err, base.End, base.Start)
+					s.log.Errorf("send_new_block [%v] send history block failed, error: %v, end: %v, sendStart: %v", blockInfo.Block.Header.BlockHeight, err, base.End, base.Start)
 					return err
 				}
 
@@ -179,14 +180,19 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 				s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_new_block [%v] beyond the subscription range. end: %v, start: %v", blockInfo.Block.Header.BlockHeight, base.End, base.Start))
 				return status.Error(codes.OK, "OK")
 			}
-
+			filterElapsed := time.Since(start)
+			sendStart := time.Now()
 			if err = server.Send(res); err != nil {
-				err = fmt.Errorf("send_new_block [%v] send block subscribe result by realtime failed. error:%v, end: %v, start: %v", blockInfo.Block.Header.BlockHeight, err, base.End, base.Start)
+				err = fmt.Errorf("send_block [%v] send block subscribe result by realtime failed. error:%v, end: %v, start: %v", blockInfo.Block.Header.BlockHeight, err, base.End, base.Start)
 				s.log.Error(err)
 				return err
 			}
-
-			s.log.Infof("send_new_block [%v] send new block success, resultType: %v", blockInfo.Block.Header.BlockHeight, result.ResultTypeNames[subscribeResult.GetType()])
+			sendElapsed := time.Since(sendStart)
+			allElapsed := time.Since(start)
+			s.log.Infof("send_block [%v] send new block success, [all:%v,filter:%v,send:%v] resultType: %v",
+				blockInfo.Block.Header.BlockHeight,
+				allElapsed.Milliseconds(), filterElapsed.Milliseconds(), sendElapsed.Milliseconds(),
+				result.ResultTypeNames[subscribeResult.GetType()])
 		case <-server.Context().Done():
 			s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_new_block|rpc server context done."))
 			return nil
@@ -251,6 +257,8 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, help
 		case <-s.ctx.Done():
 			return -1, s.errorResultByMessage(codes.Internal, "chainmaker is restarting, please retry later")
 		default:
+			start := time.Now()
+
 			// The default traffic limit is 1000
 			if err := s.getRateLimitToken(); err != nil {
 				return -1, s.errorResultByError(codes.Internal, err)
@@ -273,10 +281,16 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, help
 			if res.Data == nil {
 				continue
 			}
+			filterElapsed := time.Since(start)
+			sendStart := time.Now()
 			if err := server.Send(res); err != nil {
 				return -1, s.errorResultByMessage(codes.Internal, "send block info by history failed, %s", err)
 			}
-			s.log.Infof("send history block success [%v], resultType: %v", i,
+			sendElapsed := time.Since(sendStart)
+			allElapsed := time.Since(start)
+
+			s.log.Infof("send_block [%v] send history block success, [all:%v,filter:%v,send:%v] resultType: %v", i,
+				allElapsed.Milliseconds(), filterElapsed.Milliseconds(), sendElapsed.Milliseconds(),
 				result.ResultTypeNames[subscribeResult.GetType()])
 		}
 	}
