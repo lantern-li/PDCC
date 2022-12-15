@@ -19,11 +19,27 @@ GOLDFLAGS += -X "${LOCALCONF_HOME}.BuildDateTime=${DATETIME}"
 GOLDFLAGS += -X "${LOCALCONF_HOME}.GitBranch=${GIT_BRANCH}"
 GOLDFLAGS += -X "${LOCALCONF_HOME}.GitCommit=${GIT_COMMIT}"
 
-BUILD_SERVER=root@192.168.1.5
-DEPLOP_1_SERVER=root@192.168.1.1
-DEPLOP_2_SERVER=root@192.168.1.2
-DEPLOP_3_SERVER=root@192.168.1.3
-DEPLOP_4_SERVER=root@192.168.1.4
+# 注意：需要添加ssh互信才能使用以下部署功能
+# 编译服务器代码路径（需要提前创建）
+BUILD_DIR=/home/sz/code/chainmaker
+# 部署服务器目标路径（需要提前创建）
+DEPLOY_DIR=/home/sz
+BUILD_SERVER=root@127.0.0.1
+DEPLOY_1_SERVER=root@127.0.0.1
+DEPLOY_2_SERVER=root@127.0.0.1
+DEPLOY_3_SERVER=root@127.0.0.1
+DEPLOY_4_SERVER=root@127.0.0.1
+
+## 北京环境
+## 编译服务器代码路径（需要提前创建）
+#BUILD_DIR=/root/guoxin/v2.3.0_qc_txassign_sz
+## 部署服务器目标路径（需要提前创建）
+#DEPLOY_DIR=/root/guoxin/v2.3.0_qc_txassign_sz/signle-org
+#BUILD_SERVER=root@172.16.12.98
+#DEPLOY_1_SERVER=root@172.16.12.98
+#DEPLOY_2_SERVER=root@172.16.12.98
+#DEPLOY_3_SERVER=root@172.16.12.98
+#DEPLOY_4_SERVER=root@172.16.12.98
 
 chainmaker:
     ifeq ($(PLATFORM),"Windows")
@@ -40,57 +56,55 @@ autodeploy: gv-pusc-br deploy-4-node-binary
 gv-pusc-br: generate-vendor package-source-code upload-source-code build-remote
 
 deploy-4-node:
-	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp -r node1 $(DEPLOP_1_SERVER):/home/sz"
-	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp -r node2 $(DEPLOP_2_SERVER):/home/sz"
-	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp -r node3 $(DEPLOP_3_SERVER):/home/sz"
-	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker/chainmaker-go/signle-org; scp -r node4 $(DEPLOP_4_SERVER):/home/sz"
+	@ssh $(BUILD_SERVER) "cd $(BUILD_DIR)/chainmaker-go/signle-org; scp -r node1 $(DEPLOY_1_SERVER):$(DEPLOY_DIR)"
+	@ssh $(BUILD_SERVER) "cd $(BUILD_DIR)/chainmaker-go/signle-org; scp -r node2 $(DEPLOY_2_SERVER):$(DEPLOY_DIR)"
+	@ssh $(BUILD_SERVER) "cd $(BUILD_DIR)/chainmaker-go/signle-org; scp -r node3 $(DEPLOY_3_SERVER):$(DEPLOY_DIR)"
+	@ssh $(BUILD_SERVER) "cd $(BUILD_DIR)/chainmaker-go/signle-org; scp -r node4 $(DEPLOY_4_SERVER):$(DEPLOY_DIR)"
 
 deploy-4-node-binary:
 	#编译
-	@ssh $(BUILD_SERVER) "source /etc/profile; cd /home/sz/code/chainmaker/chainmaker-go; make vendor-build"
+	@ssh $(BUILD_SERVER) "source /etc/profile; cd $(BUILD_DIR)/chainmaker-go; make vendor-build"
 	#编译编译完成
 
 	# stop node1
-	@ssh $(DEPLOP_1_SERVER) "cd /home/sz/node1/bin; ./stop.sh;sleep 2"
+	@ssh $(DEPLOY_1_SERVER) "cd $(DEPLOY_DIR)/node1/bin; ./stop.sh;sleep 2"
 	# scp node1 ...
-	@ssh $(BUILD_SERVER) "scp -r /home/sz/code/chainmaker/chainmaker-go/bin/chainmaker $(DEPLOP_1_SERVER):/home/sz/node1/bin"
+	@ssh $(BUILD_SERVER) "scp -r $(BUILD_DIR)/chainmaker-go/bin/chainmaker $(DEPLOY_1_SERVER):$(DEPLOY_DIR)/node1/bin"
 	# start node1
-	@ssh $(DEPLOP_1_SERVER) "cd /home/sz/node1/bin; ./start.sh"
+	@ssh $(DEPLOY_1_SERVER) "cd $(DEPLOY_DIR)/node1/bin; ./start.sh"
 
 	# stop node2
-	@ssh $(DEPLOP_2_SERVER) "cd /home/sz/node2/bin; ./stop.sh;sleep 2"
+	@ssh $(DEPLOY_2_SERVER) "cd $(DEPLOY_DIR)/node2/bin; ./stop.sh;sleep 2"
 	# scp node2 ...
-	@ssh $(BUILD_SERVER) "scp -r /home/sz/code/chainmaker/chainmaker-go/bin/chainmaker $(DEPLOP_2_SERVER):/home/sz/node2/bin"
+	@ssh $(BUILD_SERVER) "scp -r $(BUILD_DIR)/chainmaker-go/bin/chainmaker $(DEPLOY_2_SERVER):$(DEPLOY_DIR)/node2/bin"
 	# start node2
-	@ssh $(DEPLOP_2_SERVER) "cd /home/sz/node2/bin; ./start.sh"
+	@ssh $(DEPLOY_2_SERVER) "cd $(DEPLOY_DIR)/node2/bin; ./start.sh"
 
 	# stop node3
-	@ssh $(DEPLOP_3_SERVER) "cd /home/sz/node3/bin; ./stop.sh;sleep 2"
+	@ssh $(DEPLOY_3_SERVER) "cd $(DEPLOY_DIR)/node3/bin; ./stop.sh;sleep 2"
 	# scp node3 ...
-	@ssh $(BUILD_SERVER) "scp -r /home/sz/code/chainmaker/chainmaker-go/bin/chainmaker $(DEPLOP_3_SERVER):/home/sz/node3/bin"
+	@ssh $(BUILD_SERVER) "scp -r $(BUILD_DIR)/chainmaker-go/bin/chainmaker $(DEPLOY_3_SERVER):$(DEPLOY_DIR)/node3/bin"
 	# start node3
-	@ssh $(DEPLOP_3_SERVER) "cd /home/sz/node3/bin; ./start.sh"
+	@ssh $(DEPLOY_3_SERVER) "cd $(DEPLOY_DIR)/node3/bin; ./start.sh"
 
 	# stop node4
-	@ssh $(DEPLOP_4_SERVER) "cd /home/sz/node4/bin; ./stop.sh;sleep 2"
+	@ssh $(DEPLOY_4_SERVER) "cd $(DEPLOY_DIR)/node4/bin; ./stop.sh;sleep 2"
 	# scp node4 ...
-	@ssh $(BUILD_SERVER) "scp -r /home/sz/code/chainmaker/chainmaker-go/bin/chainmaker $(DEPLOP_4_SERVER):/home/sz/node4/bin"
+	@ssh $(BUILD_SERVER) "scp -r $(BUILD_DIR)/chainmaker-go/bin/chainmaker $(DEPLOY_4_SERVER):$(DEPLOY_DIR)/node4/bin"
 	# start node4
-	@ssh $(DEPLOP_4_SERVER) "cd /home/sz/node4/bin; ./start.sh"
+	@ssh $(DEPLOY_4_SERVER) "cd $(DEPLOY_DIR)/node4/bin; ./start.sh"
 
 build-remote:
 	#删除历史源码
-	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker; rm -rf chainmaker-go"
+	@ssh $(BUILD_SERVER) "cd $(BUILD_DIR); rm -rf chainmaker-go"
 	#更新源代码
-	@ssh $(BUILD_SERVER) "cd /home/sz/code/chainmaker; tar -xf chainmaker-go.tar.gz"
+	@ssh $(BUILD_SERVER) "cd $(BUILD_DIR); tar -xf chainmaker-go.tar.gz"
 
 package-source-code:
 	@cd .. ; tar -czvf chainmaker-go.tar.gz --exclude=chainmaker-go/.git  --exclude=chainmaker-go/test  --exclude=chainmaker-go/bin  --exclude=chainmaker-go/build  --exclude=chainmaker-go/data  --exclude=chainmaker-go/tools/cmc1  --exclude=chainmaker-go/log --exclude=.DS_Store chainmaker-go
 
 upload-source-code:
-	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.1:/home/sz/code/chainmaker
-	@cd .. ; scp -r chainmaker-go.tar.gz $(BUILD_SERVER):/home/sz/code/chainmaker
-	@cd .. ; scp -r chainmaker-go.tar.gz root@192.168.1.9:/home/sz/code/chainmaker
+	@cd .. ; scp -r chainmaker-go.tar.gz $(BUILD_SERVER):$(BUILD_DIR)
 
 vendor-build:
 	#ln -s vendor/chainmaker.org/chainmaker/vm-wasmer/v2/wasmer-go/wasmer-go/packaged/lib/linux-aarch64/libwasmer.so /usr/lib

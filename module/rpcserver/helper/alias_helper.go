@@ -119,16 +119,17 @@ func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 	)
 	for _, method := range h.methods {
 		wg.Add(1)
+		method1 := method
 		if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.FilterPool.Enable {
 			err = h.pool.Submit(func() {
-				verifyTxs(wg, h.helper.Log, rules[method], current.Txs, method, h.contractName, h.subscriberId, resultC)
+				verifyTxs(wg, h.helper.Log, rules[method1], current.Txs, method1, h.contractName, h.subscriberId, resultC)
 			})
 			if err != nil {
 				log.Errorf("subscribe pool submit fail. error: %v", err)
 				return
 			}
 		} else {
-			go verifyTxs(wg, h.helper.Log, rules[method], current.Txs, method, h.contractName, h.subscriberId, resultC)
+			go verifyTxs(wg, h.helper.Log, rules[method1], current.Txs, method1, h.contractName, h.subscriberId, resultC)
 		}
 	}
 	wg.Wait()
