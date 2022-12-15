@@ -10,6 +10,7 @@ package helper
 import (
 	"errors"
 	"fmt"
+	"github.com/panjf2000/ants/v2"
 
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
 	"chainmaker.org/chainmaker/pb-go/v2/syscontract"
@@ -66,8 +67,7 @@ func newBaseHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, rol
 }
 
 // NewHelper new helper
-func NewHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, role protocol.Role, log protocol.Logger) (
-	Helper, error) {
+func NewHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, role protocol.Role, log protocol.Logger, pool *ants.Pool) (Helper, error) {
 	ruleType, err := getRuleType(tx.Payload.Parameters)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func NewHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, role pr
 	case txassign.RuleType_OrgId:
 		return newOrgIdHelper(tx, store, role, log)
 	case txassign.RuleType_Alias:
-		return newAliasHelper(tx, store, role, log)
+		return newAliasHelper(tx, store, role, log, pool)
 	default:
 		return nil, fmt.Errorf("rule type %v not support", ruleType)
 	}

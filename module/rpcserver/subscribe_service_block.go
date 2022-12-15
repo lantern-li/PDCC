@@ -68,7 +68,7 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction, server apiP
 	}
 
 	// new helper
-	helper0, err := helper.NewHelper(tx, store, role, s.log)
+	helper0, err := helper.NewHelper(tx, store, role, s.log, s.subscribeFilterPool)
 	if err != nil {
 		return s.errorResultByError(codes.InvalidArgument, err)
 	}
@@ -183,7 +183,7 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 				return status.Error(codes.OK, "OK")
 			}
 			sendStart := time.Now()
-			if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.Concurrent {
+			if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Enable {
 				err = s.subscribeSendPool.Submit(func() {
 					if err := server.Send(res); err != nil {
 						errC <- s.errorResultByMessage(codes.Internal, "[%v] send block info by new failed, %s", blockInfo.Block.Header.BlockHeight, err)
@@ -298,7 +298,7 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, help
 			}
 
 			sendStart := time.Now()
-			if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.Concurrent {
+			if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Enable {
 				err = s.subscribeSendPool.Submit(func() {
 					if err := server.Send(res); err != nil {
 						errC <- s.errorResultByMessage(codes.Internal, "[%v] send block info by history failed, %s", i, err)

@@ -8,6 +8,11 @@ SPDX-License-Identifier: Apache-2.0
 package rpcserver
 
 import (
+	"chainmaker.org/chainmaker/localconf/v2"
+	"chainmaker.org/chainmaker/logger/v2"
+	"chainmaker.org/chainmaker/protocol/v2"
+	"chainmaker.org/chainmaker/utils/v2"
+	"chainmaker.org/chainmaker/vm/v2"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -15,22 +20,18 @@ import (
 	"github.com/panjf2000/ants/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"runtime"
 
 	"chainmaker.org/chainmaker-go/module/blockchain"
 	"chainmaker.org/chainmaker-go/module/snapshot"
 	commonErr "chainmaker.org/chainmaker/common/v2/errors"
 	"chainmaker.org/chainmaker/common/v2/monitor"
-	"chainmaker.org/chainmaker/localconf/v2"
-	"chainmaker.org/chainmaker/logger/v2"
 	apiPb "chainmaker.org/chainmaker/pb-go/v2/api"
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
 	configPb "chainmaker.org/chainmaker/pb-go/v2/config"
 	txpoolPb "chainmaker.org/chainmaker/pb-go/v2/txpool"
-	"chainmaker.org/chainmaker/protocol/v2"
 	"chainmaker.org/chainmaker/store/v2/archive"
-	"chainmaker.org/chainmaker/utils/v2"
 	native "chainmaker.org/chainmaker/vm-native/v2"
-	"chainmaker.org/chainmaker/vm/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/time/rate"
 )
@@ -53,6 +54,7 @@ type ApiService struct {
 	metricInvokeTxSizeHistogram *prometheus.HistogramVec
 	ctx                         context.Context
 	subscribeSendPool           *ants.Pool
+	subscribeFilterPool         *ants.Pool
 }
 
 // NewApiService - new ApiService object
@@ -83,13 +85,19 @@ func NewApiService(ctx context.Context, chainMakerServer *blockchain.ChainMakerS
 		subscriberRateLimiter: subscriberRateLimiter,
 		ctx:                   ctx,
 	}
-
-	if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.Concurrent {
-		subscribeSendPool, err := ants.NewPool(localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPoolSize)
+	if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Enable {
+		subscribeSendPool, err := ants.NewPool(localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Size)
 		if err != nil {
 			panic(fmt.Errorf("init subscribe send pool fail. error: %v", err))
 		}
 		apiService.subscribeSendPool = subscribeSendPool
+	}
+	if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Enable {
+		subscribeFilterPool, err := ants.NewPool(runtime.NumCPU() * localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.FilterPool.Size)
+		if err != nil {
+			panic(fmt.Errorf("init subscribe filter pool fail. error: %v", err))
+		}
+		apiService.subscribeFilterPool = subscribeFilterPool
 	}
 
 	if localconf.ChainMakerConfig.MonitorConfig.Enabled {

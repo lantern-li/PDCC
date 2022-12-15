@@ -10,8 +10,11 @@ package helper
 import (
 	"chainmaker.org/chainmaker-go/module/rpcserver/id"
 	"chainmaker.org/chainmaker-go/module/txfilter/filtercommon"
+	"chainmaker.org/chainmaker/localconf/v2"
 	"errors"
 	"fmt"
+	"github.com/panjf2000/ants/v2"
+	"github.com/prometheus/common/log"
 	"path"
 	"strconv"
 	"strings"
@@ -36,6 +39,8 @@ type AliasHelper struct {
 	methods []string
 	// subscriberId 订阅者（别名ID）
 	subscriberId id.SubscriberId
+
+	pool *ants.Pool
 }
 
 func (h *AliasHelper) GetType() txassign.RuleType {
@@ -43,8 +48,7 @@ func (h *AliasHelper) GetType() txassign.RuleType {
 }
 
 // newAliasHelper
-func newAliasHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, role protocol.Role, log protocol.Logger) (
-	*AliasHelper, error) {
+func newAliasHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, role protocol.Role, log protocol.Logger, pool *ants.Pool) (*AliasHelper, error) {
 	contractName, method, err := getParameters(tx.Payload.Parameters)
 	if err != nil {
 		return nil, err
@@ -62,6 +66,7 @@ func newAliasHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, ro
 		methods:      strings.Split(method, sep),
 		helper:       helper,
 		subscriberId: subscriberId,
+		pool:         pool,
 	}, nil
 }
 
@@ -112,10 +117,19 @@ func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 		wg      = &sync.WaitGroup{}
 		resultC = make(chan *commonPb.Transaction, current.Header.TxCount)
 	)
-
 	for _, method := range h.methods {
 		wg.Add(1)
-		go verifyTxs(wg, h.helper.Log, rules[method], current.Txs, method, h.contractName, h.subscriberId, resultC)
+		if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.FilterPool.Enable {
+			err = h.pool.Submit(func() {
+				verifyTxs(wg, h.helper.Log, rules[method], current.Txs, method, h.contractName, h.subscriberId, resultC)
+			})
+			if err != nil {
+				log.Errorf("subscribe pool submit fail. error: %v", err)
+				return
+			}
+		} else {
+			go verifyTxs(wg, h.helper.Log, rules[method], current.Txs, method, h.contractName, h.subscriberId, resultC)
+		}
 	}
 	wg.Wait()
 	close(resultC)

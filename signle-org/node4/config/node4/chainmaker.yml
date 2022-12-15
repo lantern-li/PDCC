@@ -228,8 +228,13 @@ rpc:
     ratelimit:
       token_per_second: 100
       token_bucket_size: 100
-    concurrent: true
-    send_pool_size: 5
+    send_pool:
+      enable: true
+      size: 5
+    filter_pool:
+      enable: true
+      # Pool size = cpu core number * size
+      size: 4
 
   # RPC TLS settings
   tls:
