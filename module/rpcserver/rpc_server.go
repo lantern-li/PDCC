@@ -189,6 +189,7 @@ func (s *RPCServer) Stop() {
 	s.isShutdown = true
 	s.cancel()
 	s.grpcServer.Stop()
+
 	s.log.Info("RPCServer is stopped!")
 }
 

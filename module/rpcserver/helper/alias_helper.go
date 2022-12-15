@@ -108,12 +108,9 @@ func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 		h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("%s %s no rules available, ", ruleHelperPrefix, aliasPrefix))
 		return
 	}
-	//h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("%s %s current rules [type:alias,status:%v,"+
-	//	"start:%v,end:%v,name:%v,index:%v,offset:%v]", ruleHelperPrefix, aliasPrefix, rules.Rule.Status, rules.Rule.StartHeight, rules.Rule.EndHeight, rules.Name, rules.Index, rules.Offset))
 	var (
-		wg            = &sync.WaitGroup{}
-		resultC       = make(chan *commonPb.Transaction, current.Header.TxCount)
-		resultTxCount int
+		wg      = &sync.WaitGroup{}
+		resultC = make(chan *commonPb.Transaction, current.Header.TxCount)
 	)
 
 	for _, method := range h.methods {
@@ -122,6 +119,7 @@ func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 	}
 	wg.Wait()
 	close(resultC)
+	var resultTxCount int
 	// merge transactions
 	for transaction := range resultC {
 		if transaction.Payload.ContractName != "" {

@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/panjf2000/ants/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -51,6 +52,7 @@ type ApiService struct {
 	metricInvokeCounter         *prometheus.CounterVec
 	metricInvokeTxSizeHistogram *prometheus.HistogramVec
 	ctx                         context.Context
+	subscribeSendPool           *ants.Pool
 }
 
 // NewApiService - new ApiService object
@@ -80,6 +82,14 @@ func NewApiService(ctx context.Context, chainMakerServer *blockchain.ChainMakerS
 		logBrief:              logBrief,
 		subscriberRateLimiter: subscriberRateLimiter,
 		ctx:                   ctx,
+	}
+
+	if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.Concurrent {
+		subscribeSendPool, err := ants.NewPool(localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPoolSize)
+		if err != nil {
+			panic(fmt.Errorf("init subscribe send pool fail. error: %v", err))
+		}
+		apiService.subscribeSendPool = subscribeSendPool
 	}
 
 	if localconf.ChainMakerConfig.MonitorConfig.Enabled {
