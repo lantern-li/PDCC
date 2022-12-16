@@ -129,6 +129,6 @@ func DispatchTxVerifyTask(txCount int) [][]int {
 	for i := 0; i < batchCount-1; i++ {
 		batchIndex[i] = []int{i * batchSize, i*batchSize + batchSize}
 	}
-	batchIndex[batchCount-1] = []int{(batchCount - 1) * batchSize, txCount - 1}
+	batchIndex[batchCount-1] = []int{(batchCount - 1) * batchSize, txCount}
 	return batchIndex
 }
