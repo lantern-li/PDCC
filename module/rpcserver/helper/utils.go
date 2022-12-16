@@ -8,6 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 package helper
 
 import (
+	"chainmaker.org/chainmaker/utils/v2"
 	"fmt"
 	"strconv"
 
@@ -119,4 +120,15 @@ func checkRules(height uint64, rule *txassign.Rule, logger protocol.Logger, typ 
 		})
 	}
 	return false
+}
+
+func DispatchTxVerifyTask(txCount int) [][]int {
+	batchCount := utils.CalcTxVerifyWorkers(txCount)
+	var batchIndex = make([][]int, batchCount)
+	batchSize := txCount / batchCount
+	for i := 0; i < batchCount-1; i++ {
+		batchIndex[i] = []int{i * batchSize, i*batchSize + batchSize}
+	}
+	batchIndex[batchCount-1] = []int{(batchCount - 1) * batchSize, txCount - 1}
+	return batchIndex
 }

@@ -53,7 +53,6 @@ type ApiService struct {
 	metricInvokeCounter         *prometheus.CounterVec
 	metricInvokeTxSizeHistogram *prometheus.HistogramVec
 	ctx                         context.Context
-	subscribeSendPool           *ants.Pool
 	subscribeFilterPool         *ants.Pool
 }
 
@@ -85,20 +84,11 @@ func NewApiService(ctx context.Context, chainMakerServer *blockchain.ChainMakerS
 		subscriberRateLimiter: subscriberRateLimiter,
 		ctx:                   ctx,
 	}
-	if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Enable {
-		subscribeSendPool, err := ants.NewPool(localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Size)
-		if err != nil {
-			panic(fmt.Errorf("init subscribe send pool fail. error: %v", err))
-		}
-		apiService.subscribeSendPool = subscribeSendPool
+	subscribeFilterPool, err := ants.NewPool(runtime.NumCPU() * localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.FilterPool.Size)
+	if err != nil {
+		panic(fmt.Errorf("init subscribe filter pool fail. error: %v", err))
 	}
-	if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Enable {
-		subscribeFilterPool, err := ants.NewPool(runtime.NumCPU() * localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.FilterPool.Size)
-		if err != nil {
-			panic(fmt.Errorf("init subscribe filter pool fail. error: %v", err))
-		}
-		apiService.subscribeFilterPool = subscribeFilterPool
-	}
+	apiService.subscribeFilterPool = subscribeFilterPool
 
 	if localconf.ChainMakerConfig.MonitorConfig.Enabled {
 		apiService.metricQueryCounter = monitor.NewCounterVec(monitor.SUBSYSTEM_RPCSERVER, "metric_query_request_counter",

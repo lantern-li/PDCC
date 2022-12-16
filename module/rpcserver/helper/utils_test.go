@@ -14,6 +14,8 @@ import (
 	"chainmaker.org/chainmaker/pb-go/v2/syscontract"
 	"chainmaker.org/chainmaker/pb-go/v2/txassign"
 	"chainmaker.org/chainmaker/protocol/v2"
+	"fmt"
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
 )
@@ -364,6 +366,52 @@ func Test_checkRules(t *testing.T) {
 			if got := checkRules(tt.args.height, tt.args.rule, tt.args.logger, tt.args.typ); got != tt.want {
 				t.Errorf("checkRules() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestDispatchTxVerifyTask(t *testing.T) {
+	type args struct {
+		txCount int
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "10000",
+			args: args{txCount: 10000},
+			want: 100,
+		},
+		{
+			name: "1000",
+			args: args{txCount: 1000},
+			want: 10,
+		},
+		{
+			name: "500",
+			args: args{txCount: 500},
+			want: 10,
+		},
+		{
+			name: "100",
+			args: args{txCount: 100},
+			want: 5,
+		},
+		{
+			name: "50",
+			args: args{txCount: 50},
+			want: 5,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			batchIndex := DispatchTxVerifyTask(tt.args.txCount)
+			for i, index := range batchIndex {
+				fmt.Println("batch:", i, "start:", index[0], "end:", index[1])
+			}
+			assert.Equalf(t, tt.want, len(batchIndex), "DispatchTxVerifyTask(%v)", tt.args.txCount)
 		})
 	}
 }

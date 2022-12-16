@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hokaccha/go-prettyjson"
+	"github.com/panjf2000/ants/v2"
 	"time"
 
 	"chainmaker.org/chainmaker-go/module/rpcserver/helper"
@@ -86,23 +87,30 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction, server apiP
 	}
 	resultType := result.GetResultType(onlyHeader, withRWSet)
 	subscribeResult := result.NewSubscribeResult(resultType, store, s.log)
-	return s.sendBlock(server, helper0, subscribeResult)
+	var sendPool *ants.Pool
+	if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Enable {
+		sendPool, err = ants.NewPool(localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Size)
+		if err != nil {
+			return s.errorResultByMessage(codes.Internal, "init subscribe send pool fail. error: %v", err)
+		}
+		defer sendPool.Release()
+	}
+	return s.sendBlock(server, helper0, subscribeResult, sendPool)
 }
 
 // sendBlock send block
-func (s ApiService) sendBlock(server apiPb.RpcNode_SubscribeServer, helper0 helper.Helper,
-	subscribeResult result.SubscribeResult) (err error) {
+func (s ApiService) sendBlock(server apiPb.RpcNode_SubscribeServer, helper0 helper.Helper, subscribeResult result.SubscribeResult, pool *ants.Pool) (err error) {
 	s.log.Infof("send block ")
 	baseHelper := helper0.GetBaseHelper()
 
 	if baseHelper.Start == -1 && baseHelper.End == -1 {
 		// send new block
-		return s.sendNewBlock(server, helper0, subscribeResult, -1)
+		return s.sendNewBlock(server, helper0, subscribeResult, -1, pool)
 	}
 
 	if baseHelper.End != -1 && baseHelper.End <= int64(baseHelper.LastBlockHeight) {
 		// send history block
-		_, err = s.sendHistoryBlock(server, helper0, subscribeResult)
+		_, err = s.sendHistoryBlock(server, helper0, subscribeResult, pool)
 		if err != nil {
 			s.log.Errorf("sendHistoryBlock failed, %s", err)
 			return err
@@ -113,7 +121,7 @@ func (s ApiService) sendBlock(server apiPb.RpcNode_SubscribeServer, helper0 help
 
 	// start != -1
 	// send history block
-	alreadySendHistoryBlockHeight, err := s.sendHistoryBlock(server, helper0, subscribeResult)
+	alreadySendHistoryBlockHeight, err := s.sendHistoryBlock(server, helper0, subscribeResult, pool)
 	if err != nil {
 		s.log.Errorf("send history block failed, %s", err)
 		return err
@@ -121,12 +129,11 @@ func (s ApiService) sendBlock(server apiPb.RpcNode_SubscribeServer, helper0 help
 
 	s.log.Debugf("after sendHistoryBlock, alreadySendHistoryBlockHeight is %d", alreadySendHistoryBlockHeight)
 	// send new block
-	return s.sendNewBlock(server, helper0, subscribeResult, alreadySendHistoryBlockHeight)
+	return s.sendNewBlock(server, helper0, subscribeResult, alreadySendHistoryBlockHeight, pool)
 }
 
 // sendNewBlock - send new block to subscriber
-func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 helper.Helper,
-	subscribeResult result.SubscribeResult, alreadySendHistoryBlockHeight int64) (err error) {
+func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 helper.Helper, subscribeResult result.SubscribeResult, alreadySendHistoryBlockHeight int64, pool *ants.Pool) (err error) {
 
 	var (
 		base            = helper0.GetBaseHelper()
@@ -140,14 +147,14 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 
 	chainId := tx.Payload.ChainId
 	if eventSubscriber, err = s.chainMakerServer.GetEventSubscribe(chainId); err != nil {
-		s.log.Errorf("send_block_new [%v] rpc unsubscribe, error:%v, end: %v, start: %v", err, base.End, base.Start)
+		s.log.Errorf("send_block_new rpc unsubscribe, error:%v, end: %v, start: %v", err, base.End, base.Start)
 		return s.errorResultByCode(codes.Internal, commonErr.ERR_CODE_GET_SUBSCRIBER, err)
 	}
 
 	sub := eventSubscriber.SubscribeBlockEvent(blockCh)
 	defer func() {
 		sub.Unsubscribe()
-		s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_block_new [%v] rpc unsubscribe, error: %v, end: %v, start: %v", err, base.End, base.Start))
+		s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_block_new rpc unsubscribe, error: %v, end: %v, start: %v", err, base.End, base.Start))
 	}()
 
 	for {
@@ -157,7 +164,7 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 			blockInfo = ev.BlockInfo
 			if alreadySendHistoryBlockHeight != -1 &&
 				int64(blockInfo.Block.Header.BlockHeight) > alreadySendHistoryBlockHeight {
-				_, err = s.sendHistoryBlock(server, helper0, subscribeResult)
+				_, err = s.sendHistoryBlock(server, helper0, subscribeResult, pool)
 				if err != nil {
 					s.log.Errorf("send_block_new [%v] send history block failed, error: %v, end: %v, sendStart: %v", blockInfo.Block.Header.BlockHeight, err, base.End, base.Start)
 					return err
@@ -184,7 +191,7 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 			}
 			sendStart := time.Now()
 			if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Enable {
-				err = s.subscribeSendPool.Submit(func() {
+				err = pool.Submit(func() {
 					if err := server.Send(res); err != nil {
 						errC <- s.errorResultByMessage(codes.Internal, "[%v] send block info by new failed, %s", blockInfo.Block.Header.BlockHeight, err)
 					}
@@ -200,7 +207,8 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 			sendElapsed := time.Since(sendStart)
 			totalElapsed := time.Since(start)
 			s.log.Infof("send_block_new [%v] %v [%d/%d] subscriber:%v,data:%v,"+
-				"costs[total:%v,send:%v,db:%d,filter:%v,marshal:%v] ", blockInfo.Block.Header.BlockHeight, result.ResultTypeNames[subscribeResult.GetType()], stat.ResultTxCount, stat.TotalTxCount, string(helper0.GetBaseHelper().Tx.Sender.Signer.MemberInfo), len(res.Data),
+				"costs[total:%v,send:%v,db:%d,filter:%v,marshal:%v] ",
+				blockInfo.Block.Header.BlockHeight, result.ResultTypeNames[subscribeResult.GetType()], stat.ResultTxCount, stat.TotalTxCount, string(helper0.GetBaseHelper().Tx.Sender.Signer.MemberInfo), len(res.Data),
 				totalElapsed.Milliseconds(), sendElapsed.Milliseconds(), stat.GetBlockElapsed, stat.FilterElapsed, stat.MarshalElapsed,
 			)
 		case <-server.Context().Done():
@@ -251,8 +259,7 @@ func updateFilterRules(blockInfo *commonPb.BlockInfo, helper0 helper.Helper, log
 }
 
 // sendHistoryBlock - send history block to subscriber
-func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, helper0 helper.Helper,
-	subscribeResult result.SubscribeResult) (int64, error) {
+func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, helper0 helper.Helper, subscribeResult result.SubscribeResult, pool *ants.Pool) (int64, error) {
 
 	var (
 		start = helper0.GetBaseHelper().Start
@@ -299,7 +306,7 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, help
 
 			sendStart := time.Now()
 			if localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.SendPool.Enable {
-				err = s.subscribeSendPool.Submit(func() {
+				err = pool.Submit(func() {
 					if err := server.Send(res); err != nil {
 						errC <- s.errorResultByMessage(codes.Internal, "[%v] send block info by history failed, %s", i, err)
 					}

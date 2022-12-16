@@ -60,7 +60,7 @@ func (h *OrgIdHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 
 	filterRules, err := h.FilterRule(true)
 	if err != nil {
-		h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("[%v] get filter rule fail. txs: %v, error: %v", err, current.Header.BlockHeight, len(current.Txs), err))
+		h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("[%v] get filter rule fail. txs: %v, error: %v", current.Header.BlockHeight, len(current.Txs), err))
 		return
 	}
 	filterRule := filterRules[fixMethod]

@@ -232,6 +232,7 @@ rpc:
       enable: true
       size: 5
     filter_pool:
+      # deprecated filter pool enable
       enable: true
       # Pool size = cpu core number * size
       size: 4
