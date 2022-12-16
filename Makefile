@@ -30,7 +30,36 @@ DEPLOY_2_SERVER=root@127.0.0.1
 DEPLOY_3_SERVER=root@127.0.0.1
 DEPLOY_4_SERVER=root@127.0.0.1
 
-## 北京环境
+# 最小版本
+## 编译服务器代码路径（需要提前创建）
+#BUILD_DIR=/home/sz/code/chainmaker
+## 部署服务器目标路径（需要提前创建）
+#DEPLOY_DIR=/home/sz
+#BUILD_SERVER=root@192.168.1.1
+#DEPLOY_1_SERVER=root@192.168.1.1
+#DEPLOY_2_SERVER=root@192.168.1.1
+#DEPLOY_3_SERVER=root@192.168.1.1
+#DEPLOY_4_SERVER=root@192.168.1.1
+## 编译服务器代码路径（需要提前创建）
+#BUILD_DIR=/home/sz/code/chainmaker
+## 部署服务器目标路径（需要提前创建）
+#DEPLOY_DIR=/home/sz
+#BUILD_SERVER=root@192.168.1.3
+#DEPLOY_1_SERVER=root@192.168.1.3
+#DEPLOY_2_SERVER=root@192.168.1.3
+#DEPLOY_3_SERVER=root@192.168.1.3
+#DEPLOY_4_SERVER=root@192.168.1.3
+## 编译服务器代码路径（需要提前创建）
+#BUILD_DIR=/home/sz/code/chainmaker
+## 部署服务器目标路径（需要提前创建）
+#DEPLOY_DIR=/home/sz
+#BUILD_SERVER=root@192.168.1.4
+#DEPLOY_1_SERVER=root@192.168.1.4
+#DEPLOY_2_SERVER=root@192.168.1.4
+#DEPLOY_3_SERVER=root@192.168.1.4
+#DEPLOY_4_SERVER=root@192.168.1.4
+
+# 北京环境
 ## 编译服务器代码路径（需要提前创建）
 #BUILD_DIR=/root/guoxin/v2.3.0_qc_txassign_sz
 ## 部署服务器目标路径（需要提前创建）
