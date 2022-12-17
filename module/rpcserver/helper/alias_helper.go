@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/panjf2000/ants/v2"
-	"github.com/prometheus/common/log"
 	"path"
 	"strconv"
 	"strings"
@@ -81,6 +80,7 @@ func (h AliasHelper) GetSubscriber() id.SubscriberId {
 // Verify block
 func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transaction, count int) {
 	txs := current.Txs
+	height := current.Header.BlockHeight
 	filterRules, err := h.FilterRule(true)
 	if err != nil {
 		h.helper.Log.Errorf("%s %s get filter rules fail, error: %v", ruleHelperPrefix, aliasPrefix, err)
@@ -102,7 +102,7 @@ func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 			continue
 		}
 		for _, rule0 := range filterRule.Alias {
-			if checkRules(current.Header.BlockHeight, rule0.Rule, h.helper.Log, aliasPrefix) {
+			if checkRules(height, rule0.Rule, h.helper.Log, aliasPrefix) {
 				rules[method] = rule0
 				break
 			}
@@ -118,18 +118,20 @@ func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 		matchTxsIndex = make([]bool, current.Header.TxCount)
 	)
 	batchIndexes := DispatchTxVerifyTask(int(current.Header.TxCount))
+	total := len(batchIndexes)
 	for _, method := range h.methods {
-		for _, index := range batchIndexes {
+		for i, index := range batchIndexes {
 			wg.Add(1)
-			//batch := i
+			batch := i
 			startIndex := index[0]
 			endIndex := index[1]
 			method1 := method
+			h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("[%v] run batch, total:%v,batch:%v,startIndex:%v,endIndex:%v", height, total, batch, startIndex, endIndex))
 			err = h.pool.Submit(func() {
-				verifyTxs(wg, h.helper.Log, rules[method1], txs, method1, h.contractName, h.subscriberId, matchTxsIndex, startIndex, endIndex)
+				verifyTxs(wg, h.helper.Log, height, rules[method1], txs, method1, h.contractName, h.subscriberId, matchTxsIndex, total, batch, startIndex, endIndex)
 			})
 			if err != nil {
-				log.Errorf("subscribe pool submit fail. error: %v", err)
+				h.helper.Log.Errorf("subscribe pool submit fail. error: %v", err)
 				return
 			}
 		}
@@ -137,8 +139,9 @@ func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 	wg.Wait()
 	var resultTxCount int
 	for i, match := range matchTxsIndex {
-		if !match {
+		if match {
 			resultTxCount++
+		} else {
 			notMatchTx := &commonPb.Transaction{
 				Payload: &commonPb.Payload{
 					TxId: txs[i].Payload.TxId,
@@ -151,15 +154,16 @@ func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 	return txs, resultTxCount
 }
 
-func verifyTxs(wg *sync.WaitGroup, log protocol.Logger, rule *txassign.AliasRule, txs []*commonPb.Transaction, method, contractName string, subscriberId id.SubscriberId, matchTxsIndex []bool, startIndex int, endIndex int) {
+func verifyTxs(wg *sync.WaitGroup, log protocol.Logger, height uint64, rule *txassign.AliasRule, txs []*commonPb.Transaction, method, contractName string, subscriberId id.SubscriberId, matchTxsIndex []bool, total, batch, startIndex, endIndex int) {
+	log.DebugDynamic(filtercommon.LoggingFixLengthFunc("run batch, total:%v,batch:%v,startIndex:%v,endIndex:%v", total, batch, startIndex, endIndex))
 MatchSuccessfulToVerifyTheNextTransaction:
 	for index := startIndex; index < endIndex; index++ {
 		tx := txs[index]
 		if contractName != tx.Payload.ContractName || method != tx.Payload.Method {
 			log.DebugDynamic(func() string {
 				bytes, _ := json.Marshal(rule)
-				return fmt.Sprintf("%s %s [%s] [%v] contract name or methods do not match, contract_name(tx:%v,rule:%v), "+
-					"methods(tx:%v,rule:%v), rule: %v", ruleHelperPrefix, aliasPrefix, method, tx.Payload.TxId, tx.Payload.ContractName, contractName, tx.Payload.Method, method, string(bytes))
+				return fmt.Sprintf("%s %s [%s] [%v] [%v] contract name or methods do not match, contract_name(tx:%v,rule:%v), "+
+					"methods(tx:%v,rule:%v), rule: %v", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, tx.Payload.ContractName, contractName, tx.Payload.Method, method, string(bytes))
 			})
 			continue
 		}
@@ -170,7 +174,7 @@ MatchSuccessfulToVerifyTheNextTransaction:
 			if err != nil {
 				log.DebugDynamic(func() string {
 					ruleJson, _ := json.Marshal(rule)
-					return fmt.Sprintf("%s %s [%s] [%v] get string parameter by rule name fail, rule: %v, error: %v", ruleHelperPrefix, aliasPrefix, method, tx.Payload.TxId, string(ruleJson), err)
+					return fmt.Sprintf("%s %s [%s] [%v] [%v] get string parameter by rule name fail, rule: %v, error: %v", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, string(ruleJson), err)
 				})
 				continue
 			}
@@ -178,7 +182,7 @@ MatchSuccessfulToVerifyTheNextTransaction:
 			if rule.Index+rule.Offset > uint32(len(aliasValueString)) {
 				log.DebugDynamic(func() string {
 					ruleJson, _ := json.Marshal(rule)
-					return fmt.Sprintf("%s %s [%s] [%v] all rule value bounds out of range, value: %v, rule: %v", ruleHelperPrefix, aliasPrefix, method, tx.Payload.TxId, aliasValueString, string(ruleJson))
+					return fmt.Sprintf("%s %s [%s] [%v] [%v] all rule value bounds out of range, value: %v, rule: %v", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, aliasValueString, string(ruleJson))
 				})
 				continue
 			}
@@ -186,31 +190,27 @@ MatchSuccessfulToVerifyTheNextTransaction:
 			for i, aliasValue := range aliasValues {
 				participantId, err := id.NewParticipantId(aliasValue)
 				if err != nil {
-					log.Warnf("%s %s [%s] [%v] new participant id error, participantId: %v, error: %v", ruleHelperPrefix, aliasPrefix, method, tx.Payload.TxId, aliasValue, err)
+					log.Warnf("%s %s [%s] [%v] [%v] new participant id error, participantId: %v, error: %v", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, aliasValue, err)
 					continue
 				}
 				if id.IdentityMatchInstance.Match(subscriberId, participantId) {
 					log.DebugDynamic(func() string {
 						ruleJson, _ := json.Marshal(rule)
-						return fmt.Sprintf("%s %s [%s] [%v] rule value match, i: %v, aliasValue: %v, "+
-							"subscriberId: %v, rule: %v, ", ruleHelperPrefix, aliasPrefix, method, tx.Payload.TxId, i, aliasValue, subscriberId, string(ruleJson))
+						return fmt.Sprintf("%s %s [%s] [%v] [%v] rule value match, i: %v, aliasValue: %v, "+
+							"subscriberId: %v, rule: %v, ", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, i, aliasValue, subscriberId, string(ruleJson))
 					})
-					matchTxsIndex[i] = true
+					matchTxsIndex[index] = true
 					continue MatchSuccessfulToVerifyTheNextTransaction
 				} else {
 					log.DebugDynamic(func() string {
 						ruleJson, _ := json.Marshal(rule)
-						return fmt.Sprintf("%s %s [%s] [%v] rule value don't match, i: %v, aliasValue: %v, "+
-							"subscriberId: %v, rule: %v, ", ruleHelperPrefix, aliasPrefix, method, tx.Payload.TxId, i, aliasValue, subscriberId, string(ruleJson))
+						return fmt.Sprintf("%s %s [%s] [%v] [%v] rule value don't match, i: %v, aliasValue: %v, "+
+							"subscriberId: %v, rule: %v, ", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, i, aliasValue, subscriberId, string(ruleJson))
 					})
 					continue
 				}
 			}
 		}
-		matchTxsIndex[index] = false
-
-		// 不匹配返回交易id和读写集
-		//matchTxsIndex <- &commonPb.Transaction{Payload: &commonPb.Payload{TxId: tx.Payload.TxId}, Result: &commonPb.Result{RwSetHash: tx.Result.RwSetHash}}
 	}
 	wg.Done()
 }

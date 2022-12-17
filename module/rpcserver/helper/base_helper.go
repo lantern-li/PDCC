@@ -75,6 +75,7 @@ func NewHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, role pr
 	switch ruleType {
 	case txassign.RuleType_OrgId:
 		return newOrgIdHelper(tx, store, role, log)
+		//return nil, fmt.Errorf("rule type %v not support", ruleType)
 	case txassign.RuleType_Alias:
 		return newAliasHelper(tx, store, role, log, pool)
 	default:
