@@ -37,7 +37,7 @@ blockchain:
 
 core:
   # 1 quick schedule
-  schedule_type: 1
+  scheduler_type: 1
 
 # Blockchain node settings
 node:
