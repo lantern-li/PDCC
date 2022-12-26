@@ -76,7 +76,7 @@ require (
 	github.com/mattn/go-tty v0.0.0-20180907095812-13ff1204f104 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/term v0.0.0-20180730021639-bffc007b7fd5 // indirect
-	github.com/prometheus/common v0.26.0
+	github.com/prometheus/common v0.26.0 // indirect
 	github.com/tjfoc/gmsm v1.4.1
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 )

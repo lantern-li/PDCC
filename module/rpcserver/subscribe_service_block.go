@@ -154,7 +154,7 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 	sub := eventSubscriber.SubscribeBlockEvent(blockCh)
 	defer func() {
 		sub.Unsubscribe()
-		s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_block_new rpc unsubscribe, error: %v, end: %v, start: %v", err, base.End, base.Start))
+		s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_block_new rpc unsubscribe, subscriber: %v, error: %v, end: %v, start: %v", string(base.Tx.Sender.Signer.MemberInfo), err, base.End, base.Start))
 	}()
 
 	for {
