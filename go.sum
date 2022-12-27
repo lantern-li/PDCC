@@ -65,8 +65,8 @@ chainmaker.org/chainmaker/store-sqldb/v2 v2.3.1/go.mod h1:TYjk8bTj1Qv52Y3/LoTyYW
 chainmaker.org/chainmaker/store-tikv/v2 v2.3.0 h1:XS8c2YBfgmnABqeenNRZ44P35PELDHM4C8jrtLOf0HE=
 chainmaker.org/chainmaker/store-tikv/v2 v2.3.0/go.mod h1:FeEQcj1s815M4r4hmzdj7auJtrLzbpQd9ONicl/MoRc=
 chainmaker.org/chainmaker/store/v2 v2.3.1/go.mod h1:gD5NyvGrtZlS0Mjaj0BbLuzJ+k+kAJuf/604ZF9dPn4=
-chainmaker.org/chainmaker/store/v2 v2.3.3-0.20221211094956-da7505245f9c h1:StQzzcKJPo/31VjXGm7fTdV1z+hb7b4FWH5bGPF/0/k=
-chainmaker.org/chainmaker/store/v2 v2.3.3-0.20221211094956-da7505245f9c/go.mod h1:DRdUKy7TlZ5/SwqKNCbARe6ZhXiM632IxPVy3k+WXMg=
+chainmaker.org/chainmaker/store/v2 v2.3.3-0.20221227153711-2b853ad09186 h1:tYtrhQYOF4uaocz8YPAyWUxEUF/EwqxIgjJsmx1F+Xo=
+chainmaker.org/chainmaker/store/v2 v2.3.3-0.20221227153711-2b853ad09186/go.mod h1:DRdUKy7TlZ5/SwqKNCbARe6ZhXiM632IxPVy3k+WXMg=
 chainmaker.org/chainmaker/txpool-batch/v2 v2.3.1-0.20221124033619-e2e42ea261ce h1:0INlc6xadshEVrTDmSmfRsSFaJ6wg/9s7kqFQnnCx1U=
 chainmaker.org/chainmaker/txpool-batch/v2 v2.3.1-0.20221124033619-e2e42ea261ce/go.mod h1:iZZ44k7y7tUSHCbRoxUguvo6UWAxJhbiCiVOzV8Cst4=
 chainmaker.org/chainmaker/txpool-normal/v2 v2.3.1-0.20221103095550-4fad686735d0 h1:nUDqF2VTizWArXqOCniMqm5PnT6iutpTNK8+Fkc3r2g=
@@ -223,11 +223,9 @@ github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBA
 github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5/go.mod h1:SkGFH1ia65gfNATL8TAiHDNxPzPdmEL5uirI2Uyuz6c=
 github.com/alecthomas/jsonschema v0.0.0-20201129101101-7b852d451add/go.mod h1:/n6+1/DWPltRLWL/VKyUxg6tzsl5kHUCcraimt4vr60=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
-github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 h1:JYp7IbQjafoB+tBA3gMyHYHrpOtNuDiK/uB5uXxq5wM=
 github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
-github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d h1:UQZhZ2O0vMHr2cI+DC1Mbh0TJxzA3RcLoMsFw+aXw7E=
 github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d/go.mod h1:rBZYJk541a8SKzHPHnH3zbiI+7dagKZ0cgpgrD7Fyho=
 github.com/allegro/bigcache/v3 v3.0.2 h1:AKZCw+5eAaVyNTBmI2fgyPVJhHkdWder3O9IrprcQfI=
 github.com/allegro/bigcache/v3 v3.0.2/go.mod h1:aPyh7jEvrog9zAwx5N7+JUQX5dZTSGpxF1LAR4dr35I=
@@ -2336,7 +2334,6 @@ google.golang.org/protobuf v1.26.0/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQ
 google.golang.org/protobuf v1.27.1 h1:SnqbnDw1V7RiZcXPx5MEeqPv2s79L9i7BJUlG/+RurQ=
 google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
 gopkg.in/alecthomas/gometalinter.v2 v2.0.12/go.mod h1:NDRytsqEZyolNuAgTzJkZMkSQM7FIKyzVzGhjB/qfYo=
-gopkg.in/alecthomas/kingpin.v2 v2.2.6 h1:jMFz6MfLP0/4fUyZle81rXUoxOBFi19VUFKVDOQfozc=
 gopkg.in/alecthomas/kingpin.v2 v2.2.6/go.mod h1:FMv+mEhP44yOT+4EoQTLFTRgOQ1FBLkstjWtayDeSgw=
 gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20180810215634-df19058c872c/go.mod h1:3HH7i1SgMqlzxCcBmUHW657sD4Kvv9sC3HpL3YukzwA=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
