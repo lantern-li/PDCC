@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"time"
 )
 
 var (
@@ -124,6 +125,7 @@ func subscriberByRule() error {
 							blockInfo.Block.Header.BlockHeight, len(blockInfo.Block.Txs), total, tx.Payload.TxId, string(bytes))
 					}
 				}
+				time.Sleep(time.Second * 2)
 				fmt.Println()
 
 			case <-ctx.Done():
