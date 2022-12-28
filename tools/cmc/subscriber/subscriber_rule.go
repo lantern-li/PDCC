@@ -38,6 +38,8 @@ const (
 	flagRuleType     = "rule-type"
 	flagContractName = "contract-name"
 	flagMethod       = "method"
+
+	timeFormat1 = "2006-01-02 15:04:05.000"
 )
 
 var flags *pflag.FlagSet
@@ -121,8 +123,8 @@ func subscriberByRule() error {
 					}
 					for _, tx := range blockInfo.Block.Txs {
 						bytes, _ := json.Marshal(tx)
-						fmt.Printf("recv block [%d] txs: %v, total: %v, txid: %v \n %v \n",
-							blockInfo.Block.Header.BlockHeight, len(blockInfo.Block.Txs), total, tx.Payload.TxId, string(bytes))
+						fmt.Printf("time:%s|recv block [%d] txs: %v, total: %v, txid: %v \n %v \n",
+							time.Now().Format(timeFormat1), blockInfo.Block.Header.BlockHeight, len(blockInfo.Block.Txs), total, tx.Payload.TxId, string(bytes))
 					}
 				}
 				time.Sleep(time.Second * 2)
