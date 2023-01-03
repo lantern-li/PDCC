@@ -24,7 +24,7 @@ core:
   scheduler_type: 1
 
 # Crypto engine config
-crypto_engine: tencentsm #support gmssl, tencentsm and tjfoc
+crypto_engine: gmssl #support gmssl, tencentsm and tjfoc
 
 # Chains the node currently joined in
 blockchain:
