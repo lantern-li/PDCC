@@ -66,13 +66,13 @@ type TxScheduler struct {
 	log             protocol.Logger
 	chainConf       protocol.ChainConf // chain config
 
-	metricVMRunTime *prometheus.HistogramVec
-	StoreHelper     conf.StoreHelper
-	keyReg          *regexp.Regexp
-	signer          protocol.SigningMember
-	ledgerCache     protocol.LedgerCache
-	contractCache   *sync.Map
+	StoreHelper   conf.StoreHelper
+	keyReg        *regexp.Regexp
+	signer        protocol.SigningMember
+	ledgerCache   protocol.LedgerCache
+	contractCache *sync.Map
 
+	metricVMRunTime             *prometheus.HistogramVec
 	metricContractInvokeCounter *prometheus.CounterVec
 }
 
@@ -144,12 +144,13 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 		paramMap := make(map[string][]byte)
 
 		for _, tx := range txBatch {
+			start := time.Now()
 			// 执行合约
 			ts.runContract(tx, txRWSetMap, snapshot, block, paramMap)
 			if localconf.ChainMakerConfig.MonitorConfig.Enabled {
+				ts.metricVMRunTime.WithLabelValues(tx.Payload.ChainId).Observe(time.Since(start).Seconds())
 				// count user contract invoke times
-				ts.metricContractInvokeCounter.WithLabelValues(ts.chainConf.ChainConfig().ChainId, tx.Payload.ContractName,
-					commonPb.RuntimeType_NATIVE.String(), "true").Inc()
+				ts.metricContractInvokeCounter.WithLabelValues(ts.chainConf.ChainConfig().ChainId, tx.Payload.ContractName, commonPb.RuntimeType_NATIVE.String(), "true").Inc()
 			}
 		}
 		putMapTime := time.Since(startTime)
@@ -1673,8 +1674,8 @@ func update(
 	}}
 
 	txRWSetMap[tx.Payload.TxId] = &commonPb.TxRWSet{
-		TxId:     tx.Payload.TxId,
-		TxReads:  txReads,
+		TxId:    tx.Payload.TxId,
+		TxReads: txReads,
 	}
 
 	if err != nil {
