@@ -404,6 +404,16 @@ func TestDispatchTxVerifyTask(t *testing.T) {
 			args: args{txCount: 50},
 			want: 5,
 		},
+		{
+			name: "1",
+			args: args{txCount: 1},
+			want: 1,
+		},
+		{
+			name: "2",
+			args: args{txCount: 2},
+			want: 1,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -101,14 +101,18 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction, server apiP
 // sendBlock send block
 func (s ApiService) sendBlock(server apiPb.RpcNode_SubscribeServer, helper0 helper.Helper, subscribeResult result.SubscribeResult, pool *ants.Pool) (err error) {
 	s.log.Infof("send block ")
-	baseHelper := helper0.GetBaseHelper()
-
-	if baseHelper.Start == -1 && baseHelper.End == -1 {
+	startTime := time.Now()
+	base := helper0.GetBaseHelper()
+	defer func() {
+		since := time.Since(startTime)
+		s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_block rpc unsubscribe, subscriber: %v, error: %v, end: %v, start: %v, costs: %v", string(base.Tx.Sender.Signer.MemberInfo), err, base.End, base.Start, since))
+	}()
+	if base.Start == -1 && base.End == -1 {
 		// send new block
 		return s.sendNewBlock(server, helper0, subscribeResult, -1, pool)
 	}
 
-	if baseHelper.End != -1 && baseHelper.End <= int64(baseHelper.LastBlockHeight) {
+	if base.End != -1 && base.End <= int64(base.LastBlockHeight) {
 		// send history block
 		_, err = s.sendHistoryBlock(server, helper0, subscribeResult, pool)
 		if err != nil {
@@ -129,7 +133,11 @@ func (s ApiService) sendBlock(server apiPb.RpcNode_SubscribeServer, helper0 help
 
 	s.log.Debugf("after sendHistoryBlock, alreadySendHistoryBlockHeight is %d", alreadySendHistoryBlockHeight)
 	// send new block
-	return s.sendNewBlock(server, helper0, subscribeResult, alreadySendHistoryBlockHeight, pool)
+	err = s.sendNewBlock(server, helper0, subscribeResult, alreadySendHistoryBlockHeight, pool)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // sendNewBlock - send new block to subscriber
@@ -147,14 +155,13 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 
 	chainId := tx.Payload.ChainId
 	if eventSubscriber, err = s.chainMakerServer.GetEventSubscribe(chainId); err != nil {
-		s.log.Errorf("send_block_new rpc unsubscribe, error:%v, end: %v, start: %v", err, base.End, base.Start)
+		s.log.Errorf("send_block_new get event subscribe fail. error:%v, end: %v, start: %v", err, base.End, base.Start)
 		return s.errorResultByCode(codes.Internal, commonErr.ERR_CODE_GET_SUBSCRIBER, err)
 	}
 
 	sub := eventSubscriber.SubscribeBlockEvent(blockCh)
 	defer func() {
 		sub.Unsubscribe()
-		s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_block_new rpc unsubscribe, subscriber: %v, error: %v, end: %v, start: %v", string(base.Tx.Sender.Signer.MemberInfo), err, base.End, base.Start))
 	}()
 
 	for {
@@ -275,6 +282,7 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, help
 	for {
 		select {
 		case <-s.ctx.Done():
+			s.log.InfoDynamic(filtercommon.LoggingFixLengthFunc("send_block_history|api server context done."))
 			return -1, s.errorResultByMessage(codes.Internal, "chainmaker is restarting, please retry later")
 		case err := <-errC:
 			return -1, err
