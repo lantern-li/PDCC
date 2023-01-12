@@ -136,22 +136,24 @@ func (h *AliasHelper) Verify(current *commonPb.Block) (result []*commonPb.Transa
 			}
 		}
 	}
+	var transactions = make([]*commonPb.Transaction, 0, len(txs))
 	wg.Wait()
 	var resultTxCount int
 	for i, match := range matchTxsIndex {
 		if match {
 			resultTxCount++
+			transactions = append(transactions, txs[i])
 		} else {
-			notMatchTx := &commonPb.Transaction{
+			// not match tx
+			transactions = append(transactions, &commonPb.Transaction{
 				Payload: &commonPb.Payload{
 					TxId: txs[i].Payload.TxId,
 				},
 				Result: &commonPb.Result{RwSetHash: txs[i].Result.RwSetHash},
-			}
-			txs[i] = notMatchTx
+			})
 		}
 	}
-	return txs, resultTxCount
+	return transactions, resultTxCount
 }
 
 func verifyTxs(wg *sync.WaitGroup, log protocol.Logger, height uint64, rule *txassign.AliasRule, txs []*commonPb.Transaction, method, contractName string, subscriberId id.SubscriberId, matchTxsIndex []bool, total, batch, startIndex, endIndex int) {
