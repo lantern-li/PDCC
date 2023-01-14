@@ -23,7 +23,7 @@ chain_client:
 
   nodes:
     - # 节点地址，格式为：IP:端口:连接数
-      node_addr: "127.0.0.1:12302"
+      node_addr: "172.16.12.98:12301"
       # 节点连接数
       conn_cnt: 10
       # RPC连接是否启用双向TLS认证
@@ -33,6 +33,18 @@ chain_client:
         - "./testdata/crypto-config/wx-org.chainmaker.org/ca"
       # TLS hostname
       tls_host_name: "chainmaker.org"
+    - # 节点地址，格式为：IP:端口:连接数
+      node_addr: "172.16.12.98:12302"
+      # 节点连接数
+      conn_cnt: 10
+      # RPC连接是否启用双向TLS认证
+      enable_tls: true
+      # 信任证书池路径
+      trust_root_paths:
+        - "./testdata/crypto-config/wx-org.chainmaker.org/ca"
+      # TLS hostname
+      tls_host_name: "chainmaker.org"
+
   archive:
     # 数据归档链外存储相关配置
     type: "mysql"
