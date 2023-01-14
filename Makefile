@@ -20,16 +20,27 @@ GOLDFLAGS += -X "${LOCALCONF_HOME}.GitBranch=${GIT_BRANCH}"
 GOLDFLAGS += -X "${LOCALCONF_HOME}.GitCommit=${GIT_COMMIT}"
 
 # 注意：需要添加ssh互信才能使用以下部署功能
-# 编译服务器代码路径（需要提前创建）
-BUILD_DIR=/home/sz/code/chainmaker
-# 部署服务器目标路径（需要提前创建）
-DEPLOY_DIR=/home/sz
-BUILD_SERVER=root@127.0.0.1
-DEPLOY_1_SERVER=root@127.0.0.1
-DEPLOY_2_SERVER=root@127.0.0.1
-DEPLOY_3_SERVER=root@127.0.0.1
-DEPLOY_4_SERVER=root@127.0.0.1
+## 编译服务器代码路径（需要提前创建）
+#BUILD_DIR=/home/sz/code/chainmaker
+## 部署服务器目标路径（需要提前创建）
+#DEPLOY_DIR=/home/sz
+#BUILD_SERVER=root@127.0.0.1
+#DEPLOY_1_SERVER=root@127.0.0.1
+#DEPLOY_2_SERVER=root@127.0.0.1
+#DEPLOY_3_SERVER=root@127.0.0.1
+#DEPLOY_4_SERVER=root@127.0.0.1
 
+# 最小版本4567
+## 编译服务器代码路径（需要提前创建）
+BUILD_DIR=/home/sz/code/chainmaker
+## 部署服务器目标路径（需要提前创建）
+DEPLOY_DIR=/home/sz
+BUILD_SERVER=root@192.168.1.5
+YACE_SERVER=root@192.168.1.9
+DEPLOY_1_SERVER=root@192.168.1.5
+DEPLOY_2_SERVER=root@192.168.1.6
+DEPLOY_3_SERVER=root@192.168.1.7
+DEPLOY_4_SERVER=root@192.168.1.8
 # 最小版本
 ## 编译服务器代码路径（需要提前创建）
 #BUILD_DIR=/home/sz/code/chainmaker
@@ -82,7 +93,10 @@ chainmaker:
 autodeploy: gv-pusc-br deploy-4-node-binary
 
 # 1.generate vendor and clib ; 2.package source code  ; 3.scp ; 4.build ;
-gv-pusc-br: generate-vendor package-source-code upload-source-code build-remote
+gv-pusc-br: generate-commit-id generate-vendor package-source-code upload-source-code build-remote
+
+generate-commit-id:
+	@echo `git log -1 | awk 'NR==1'` > commit_id
 
 deploy-4-node:
 	@ssh $(BUILD_SERVER) "cd $(BUILD_DIR)/chainmaker-go/signle-org; scp -r node1 $(DEPLOY_1_SERVER):$(DEPLOY_DIR)"
@@ -128,12 +142,17 @@ build-remote:
 	@ssh $(BUILD_SERVER) "cd $(BUILD_DIR); rm -rf chainmaker-go"
 	#更新源代码
 	@ssh $(BUILD_SERVER) "cd $(BUILD_DIR); tar -xf chainmaker-go.tar.gz"
+	#删除历史源码
+	@ssh $(YACE_SERVER) "cd $(BUILD_DIR); rm -rf chainmaker-go"
+	#更新源代码
+	@ssh $(YACE_SERVER) "cd $(BUILD_DIR); tar -xf chainmaker-go.tar.gz"
 
 package-source-code:
 	@cd .. ; tar -czvf chainmaker-go.tar.gz --exclude=chainmaker-go/.git  --exclude=chainmaker-go/test  --exclude=chainmaker-go/bin  --exclude=chainmaker-go/build  --exclude=chainmaker-go/data  --exclude=chainmaker-go/tools/cmc1  --exclude=chainmaker-go/log --exclude=.DS_Store chainmaker-go
 
 upload-source-code:
 	@cd .. ; scp -r chainmaker-go.tar.gz $(BUILD_SERVER):$(BUILD_DIR)
+	@cd .. ; scp -r chainmaker-go.tar.gz $(YACE_SERVER):$(BUILD_DIR)
 
 vendor-build:
 	#ln -s vendor/chainmaker.org/chainmaker/vm-wasmer/v2/wasmer-go/wasmer-go/packaged/lib/linux-aarch64/libwasmer.so /usr/lib
