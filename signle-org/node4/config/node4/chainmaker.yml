@@ -462,6 +462,8 @@ storage:
     max_entry_size: 500
     # max cache size MB
     hard_max_cache_size: 10240
+  disable_historydb: true
+  disable_contract_eventdb: true
 
   blockdb_config:
     # Databases type support leveldb, sql, badgerdb, tikvdb
@@ -477,34 +479,10 @@ storage:
     leveldb_config:
       store_path: /data/node4/state
 
-  # History db config
-  disable_historydb: true
-  historydb_config:
-    disable_key_history: false
-    disable_contract_history: true
-    disable_account_history: true
-    provider: leveldb
-    leveldb_config:
-      store_path: /data/node4/history
-
-  # Result db config
-  disable_resultdb: false
   resultdb_config:
     provider: leveldb
     leveldb_config:
       store_path: /data/node4/result
-
-  # Disable contract event database or not. If it is false, contract_eventdb_config must be mysql
-  disable_contract_eventdb: true
-  # Contract event db config
-  contract_eventdb_config:
-    provider: sqlkv  #数据库类型，支持LevelDB，BadgerDB，TikvDB，Mysql，这里示例为Mysql
-    sqldb_config: #SQL数据库的详细配置
-      sqldb_type:  mysql #具体的RDBMS为mysql，也可以是sqlite、mssql等
-      dsn:  root:password@tcp(192.168.1.4:3306)/ #MySQL的数据库连接字符串
-      max_idle_conns: 10  #连接池中维持的最大的空闲连接数，默认为10
-      max_open_conns: 10  #最大的可用连接数，默认为10
-      conn_max_lifetime: 60  #连接维持的最长时间，单位秒，默认为60
 
 # Contract Virtual Machine(VM) configs
 vm:

@@ -451,6 +451,8 @@ storage:
   rolling_window_cache_capacity: 250000 # greater than max_txpool_size*1.1
 
   write_block_type: 1  # 0 common write，1 quick write
+  disable_historydb: true
+  disable_contract_eventdb: true
 
   # state db cache
   state_cache_config:
@@ -481,21 +483,7 @@ storage:
       # LevelDb store path
       store_path: /data/node1/state
 
-  # History db config
-  disable_historydb: true
-  historydb_config:
-    disable_key_history: false
-    disable_contract_history: true
-    disable_account_history: true
-    # Databases type support leveldb, sql, badgerdb, tikvdb
-    provider: leveldb # [*]
-    # If provider is leveldb, leveldb_config should not be null.
-    leveldb_config:
-      # LevelDb store path
-      store_path: /data/node1/history
-
   # Result db config
-  disable_resultdb: false
   resultdb_config:
     # Databases type support leveldb, sql, badgerdb, tikvdb
     provider: leveldb # [*]
@@ -503,17 +491,6 @@ storage:
     leveldb_config:
       # LevelDb store path
       store_path: /data/node1/result
-
-  # Disable contract event database or not. If it is false, contract_eventdb_config must be mysql
-  disable_contract_eventdb: true
-  # Contract event db config
-  contract_eventdb_config:
-    # Databases type support leveldb, sql, badgerdb, tikvdb
-    provider: leveldb # [*]
-    # If provider is leveldb, leveldb_config should not be null.
-    leveldb_config:
-      # LevelDb store path
-      store_path: /data/node1/event
 
 # Contract Virtual Machine(VM) configs
 vm:

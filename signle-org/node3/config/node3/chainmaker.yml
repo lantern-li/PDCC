@@ -462,6 +462,8 @@ storage:
     max_entry_size: 500
     # max cache size MB
     hard_max_cache_size: 10240
+  disable_historydb: true
+  disable_contract_eventdb: true
 
   # Block db config
   blockdb_config:
@@ -481,21 +483,6 @@ storage:
       # LevelDb store path
       store_path: /data/node3/state
 
-  # History db config
-  disable_historydb: true
-  historydb_config:
-    disable_key_history: false
-    disable_contract_history: true
-    disable_account_history: true
-    # Stabases type support leveldb, sql, badgerdb, tikvdb
-    provider: leveldb # [*]
-    # If provider is leveldb, leveldb_config should not be null.
-    leveldb_config:
-      # LevelDb store path
-      store_path: /data/node3/history
-
-  # Result db config
-  disable_resultdb: false
   resultdb_config:
     # Stabases type support leveldb, sql, badgerdb, tikvdb
     provider: leveldb # [*]
@@ -503,17 +490,6 @@ storage:
     leveldb_config:
       # LevelDb store path
       store_path: /data/node3/result
-
-  # Disable contract event database or not. If it is false, contract_eventdb_config must be mysql
-  disable_contract_eventdb: true
-  # Contract event db config
-  contract_eventdb_config:
-    # Stabases type support leveldb, sql, badgerdb, tikvdb
-    provider: leveldb # [*]
-    # If provider is leveldb, leveldb_config should not be null.
-    leveldb_config:
-      # LevelDb store path
-      store_path: /data/node3/event
 
 # Contract Virtual Machine(VM) configs
 vm:
