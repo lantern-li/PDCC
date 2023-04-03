@@ -27,7 +27,7 @@ func NewSubscriberId(id string) (SubscriberId, error) {
 		typ: string(id[0]),
 	}
 
-	if subscriberId.typ == SocialCreditCodeCode || subscriberId.typ == GovernmentBodyCode {
+	if subscriberId.typ == SocialCreditCodeCode || subscriberId.typ == GovernmentBodyCode || subscriberId.typ == TaxationAdministrationCode {
 		subscriberId.identity = id
 		subscriberId.offset = 0
 		return subscriberId, nil

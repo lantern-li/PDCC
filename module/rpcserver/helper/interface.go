@@ -11,6 +11,7 @@ import (
 	"chainmaker.org/chainmaker-go/module/rpcserver/id"
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
 	"chainmaker.org/chainmaker/pb-go/v2/txassign"
+	"chainmaker.org/chainmaker/protocol/v2"
 )
 
 const (
@@ -38,4 +39,6 @@ type Helper interface {
 	GetSubscriber() id.SubscriberId
 
 	GetType() txassign.RuleType
+
+	GetStore() protocol.BlockchainStore
 }

@@ -41,6 +41,10 @@ type AliasHelper struct {
 	pool *ants.Pool
 }
 
+func (h *AliasHelper) GetStore() protocol.BlockchainStore {
+	return h.helper.store
+}
+
 func (h *AliasHelper) GetType() txassign.RuleType {
 	return txassign.RuleType_Alias
 }

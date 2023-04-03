@@ -7,15 +7,14 @@ package subscriber
 
 import (
 	"chainmaker.org/chainmaker-go/tools/cmc/util"
+	"chainmaker.org/chainmaker/common/v2/json"
 	"chainmaker.org/chainmaker/pb-go/v2/common"
 	"chainmaker.org/chainmaker/pb-go/v2/txassign"
 	"chainmaker.org/chainmaker/sdk-go/v2/examples"
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"time"
 )
 
 var (
@@ -96,7 +95,6 @@ func subscriberByRule() error {
 			fmt.Println("Subscribe failed, err:", err)
 			return
 		}
-		var total int
 		for {
 			select {
 			case block, ok := <-c:
@@ -107,29 +105,25 @@ func subscriberByRule() error {
 
 				if block == nil {
 					fmt.Println("require not nil")
+					continue
 				}
-
-				if onlyHeader {
-					blockHeader, ok := block.(*common.BlockHeader)
-					if !ok {
-						fmt.Println("require true")
+				go func() {
+					if onlyHeader {
+						blockHeader, ok := block.(*common.BlockHeader)
+						if !ok {
+							fmt.Println("require true")
+						}
+						bytes, _ := json.Marshal(blockHeader)
+						fmt.Printf("recv block header [%d] => %+v\n", blockHeader.BlockHeight, string(bytes))
+					} else {
+						blockInfo, ok := block.(*common.BlockInfo)
+						if !ok {
+							fmt.Println("require true")
+						}
+						bytes, _ := json.Marshal(blockInfo.Block.Header)
+						fmt.Printf("recv block header [%d] => %+v\n", blockInfo.Block.Header.BlockHeight, string(bytes))
 					}
-					bytes, _ := json.Marshal(blockHeader)
-					fmt.Printf("recv block header [%d] => %+v\n", blockHeader.BlockHeight, string(bytes))
-				} else {
-					blockInfo, ok := block.(*common.BlockInfo)
-					if !ok {
-						fmt.Println("require true")
-					}
-					for _, tx := range blockInfo.Block.Txs {
-						bytes, _ := json.Marshal(tx)
-						fmt.Printf("time:%s|recv block [%d] txs: %v, total: %v, txid: %v \n %v \n",
-							time.Now().Format(timeFormat1), blockInfo.Block.Header.BlockHeight, len(blockInfo.Block.Txs), total, tx.Payload.TxId, string(bytes))
-					}
-				}
-				time.Sleep(time.Second * 2)
-				fmt.Println()
-
+				}()
 			case <-ctx.Done():
 				return
 			}

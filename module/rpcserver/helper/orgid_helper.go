@@ -27,6 +27,10 @@ type OrgIdHelper struct {
 	helper *BaseHelper
 }
 
+func (h *OrgIdHelper) GetStore() protocol.BlockchainStore {
+	return h.helper.store
+}
+
 func (h *OrgIdHelper) GetType() txassign.RuleType {
 	return txassign.RuleType_OrgId
 }
