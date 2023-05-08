@@ -8,8 +8,11 @@ SPDX-License-Identifier: Apache-2.0
 package rpcserver
 
 import (
+	"chainmaker.org/chainmaker-go/module/subscriber/model"
+	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/gogo/protobuf/proto"
 
@@ -129,4 +132,42 @@ func (s *ApiService) getRoleFromTx(tx *commonPb.Transaction) (protocol.Role, err
 
 	ac := bc.GetAccessControl()
 	return utils.GetRoleFromTx(tx, ac)
+}
+
+func (s *ApiService) startSubscribeBlockEvent(ctx context.Context, lastBlockHeight *int64, chainId string,
+	dataC chan model.NewBlockEvent) error {
+	db, err := s.chainMakerServer.GetStore(chainId)
+	if err != nil {
+		return fmt.Errorf("get block failed. error: %s", err)
+	}
+	lastBlock, err := db.GetLastBlock()
+	if err != nil {
+		return fmt.Errorf("get last block failed. error: %s", err)
+	}
+	atomic.StoreInt64(lastBlockHeight, int64(lastBlock.Header.BlockHeight))
+
+	blockEventC := make(chan model.NewBlockEvent, 1)
+	eventSubscriber, err := s.chainMakerServer.GetEventSubscribe(chainId)
+	if err != nil {
+		return fmt.Errorf("get event subscribe. error: %s", err)
+	}
+
+	go func() {
+		sub := eventSubscriber.SubscribeBlockEvent(blockEventC)
+		defer sub.Unsubscribe()
+
+		for {
+			select {
+			case ev := <-blockEventC:
+				atomic.StoreInt64(lastBlockHeight, int64(ev.BlockInfo.Block.Header.BlockHeight))
+				select {
+				case dataC <- ev:
+				default:
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return nil
 }
