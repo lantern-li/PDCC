@@ -1,6 +1,6 @@
 chain_client:
    # 链ID
-   chain_id: "GT_32_BDC"
+   chain_id: "GT_65_SB"
    # 组织ID
    org_id: "金税_32_BDC_SSM"
    # 客户端用户私钥路径
@@ -18,7 +18,7 @@ chain_client:
    # 默认支持TimestampKey，如果开启enableNormalKey则使用NormalKey
    enable_normal_key: false
    # 别名
-   alias: "13200000000" # 总局
+   alias: "16500000000" # 总局
 
    nodes:
       - # 节点地址，格式为：IP:端口:连接数

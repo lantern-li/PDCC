@@ -1,35 +1,37 @@
 chain_client:
   # 链ID
-  chain_id: "GT_32_BDC"
+  chain_id: "GT_00_CKTS"
   # 组织ID
-  org_id: "金税_32_BDC_SSM"
+  org_id: "金税_00_BDC_SSM"
   # 客户端用户私钥路径
-  user_key_file_path: "./testdata/certs/32.admin1.org/admin_tls.key"
+  user_key_file_path: "./testdata/certs/client2.org/client_tls.key"
   # 客户端用户证书路径
-  user_crt_file_path: "./testdata/certs/32.admin1.org/admin_tls.crt"
+  user_crt_file_path: "./testdata/certs/client2.org/client_tls.crt"
   # 客户端用户交易签名私钥路径(若未设置，将使用user_key_file_path)
-  user_sign_key_file_path: "./testdata/certs/32.admin1.org/admin_sign.key"
+  user_sign_key_file_path: "./testdata/certs/client2.org/client_sign.key"
   # 客户端用户交易签名证书路径(若未设置，将使用user_crt_file_path)
-  user_sign_crt_file_path: "./testdata/certs/32.admin1.org/admin_sign.crt"
+  user_sign_crt_file_path: "./testdata/certs/client2.org/client_sign.crt"
   # 同步交易结果模式下，轮训获取交易结果时的最大轮训次数，删除此项或设为<=0则使用默认值 10
   retry_limit: 10
   # 同步交易结果模式下，每次轮训交易结果时的等待时间，单位：ms 删除此项或设为<=0则使用默认值 500
   retry_interval: 500
   # 默认支持TimestampKey，如果开启enableNormalKey则使用NormalKey
   enable_normal_key: false
+  # 别名
+  alias: "00000000000" # 总局
 
   nodes:
     - # 节点地址，格式为：IP:端口:连接数
-      node_addr: "10.5.5.5:12301"
+      node_addr: "10.5.5.3:12302"
       # 节点连接数
       conn_cnt: 10
       # RPC连接是否启用双向TLS认证
       enable_tls: true
       # 信任证书池路径
       trust_root_paths:
-        - "./testdata/certs/32_ca/"
+        - "./testdata/certs/ca/"
       # TLS hostname
-      tls_host_name: "GT32BDCSSM.node1.org"
+      tls_host_name: "GT00BDCSSM.node1.org"
   archive:
     # 数据归档链外存储相关配置
     type: "mysql"

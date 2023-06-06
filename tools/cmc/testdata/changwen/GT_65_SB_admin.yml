@@ -1,6 +1,6 @@
 chain_client:
   # 链ID
-  chain_id: "GT_32_BDC"
+  chain_id: "GT_65_SB"
   # 组织ID
   org_id: "金税_32_BDC_SSM"
   # 客户端用户私钥路径
