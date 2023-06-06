@@ -6,7 +6,7 @@ start() {
   export WASMER_BACKTRACE=1
   pid=`ps -ef | grep chainmaker | grep "\-c ../config/wx-org.chainmaker.org/chainmaker.yml" | grep -v grep |  awk  '{print $2}'`
   if [ -z ${pid} ];then
-      nohup ./chainmaker start -c ../config/wx-org.chainmaker.org/chainmaker.yml > panic.log &
+      nohup ./chainmaker start -c ../config/wx-org.chainmaker.org/chainmaker.yml >> panic.log &
       echo "chainmaker is starting, pls check log..."
   else
       echo "chainmaker is already started"

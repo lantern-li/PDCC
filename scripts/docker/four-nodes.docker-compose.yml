@@ -7,7 +7,7 @@ services:
     image: "chainmaker:v2.3.0"
     restart: always
     working_dir: "/chainmaker-go/bin"
-    command: "./chainmaker start -c ../config/wx-org1.chainmaker.org/chainmaker.yml > panic.log"
+    command: "./chainmaker start -c ../config/wx-org1.chainmaker.org/chainmaker.yml >> panic.log"
     ports:
       - "11301:11301"
       - "12301:12301"
@@ -26,7 +26,7 @@ services:
     image: "chainmaker:v2.3.0"
     restart: always
     working_dir: "/chainmaker-go/bin"
-    command: "./chainmaker start -c ../config/wx-org2.chainmaker.org/chainmaker.yml > panic.log"
+    command: "./chainmaker start -c ../config/wx-org2.chainmaker.org/chainmaker.yml >> panic.log"
     ports:
       - "11302:11302"
       - "12302:12302"
@@ -45,7 +45,7 @@ services:
     image: "chainmaker:v2.3.0"
     restart: always
     working_dir: "/chainmaker-go/bin"
-    command: "./chainmaker start -c ../config/wx-org3.chainmaker.org/chainmaker.yml > panic.log"
+    command: "./chainmaker start -c ../config/wx-org3.chainmaker.org/chainmaker.yml >> panic.log"
     ports:
       - "11303:11303"
       - "12303:12303"
@@ -64,7 +64,7 @@ services:
     image: "chainmaker:v2.3.0"
     restart: always
     working_dir: "/chainmaker-go/bin"
-    command: "./chainmaker start -c ../config/wx-org4.chainmaker.org/chainmaker.yml > panic.log"
+    command: "./chainmaker start -c ../config/wx-org4.chainmaker.org/chainmaker.yml >> panic.log"
     ports:
       - "11304:11304"
       - "12304:12304"
