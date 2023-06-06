@@ -102,10 +102,10 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction, server apiP
 		}
 		defer sendPool.Release()
 	}
-	defer wg.Wait()
 	if err := s.sendBlock(server, helper0, subscribeResult, sendPool, wg); err != nil {
 		return err
 	}
+	wg.Wait()
 	return nil
 }
 
