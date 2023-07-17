@@ -223,7 +223,10 @@ func (s *ApiService) sendNewBlock(server apiPb.RpcNode_SubscribeServer, helper0 
 					err = pool.Submit(func() {
 						defer wg.Done()
 						if err := server.Send(res); err != nil {
-							errC <- s.errorResultByMessage(codes.Internal, "[%v] send block info by new failed, %s", nextHeight, err)
+							select {
+							case errC <- s.errorResultByMessage(codes.Internal, "[%v] send block info by new failed, %s", nextHeight, err):
+							default:
+							}
 						}
 					})
 				} else {
@@ -279,7 +282,8 @@ func updateFilterRules(txs []*commonPb.Transaction, helper0 helper.Helper, logge
 }
 
 // sendHistoryBlock - send history block to subscriber
-func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, helper0 helper.Helper, subscribeResult result.SubscribeResult, pool *ants.Pool, wg *sync.WaitGroup) (int64, error) {
+func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer, helper0 helper.Helper,
+	subscribeResult result.SubscribeResult, pool *ants.Pool, wg *sync.WaitGroup) (int64, error) {
 
 	var (
 		start = helper0.GetBaseHelper().Start

@@ -30,11 +30,19 @@ func (b BlockHeaderSubscribeResult) GetType() Type {
 
 // GetResultByBlockInfo get result by BlockInfo
 func (b BlockHeaderSubscribeResult) GetResultByBlockInfo(blockInfo *commonPb.BlockInfo, _ func(block *commonPb.Block) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error) {
+	start := time.Now()
 	data, err := proto.Marshal(blockInfo.Block.Header)
 	if err != nil {
 		return nil, nil, fmt.Errorf("data marshal fail, at [blockInfo:%d], %s", blockInfo, err)
 	}
-	return &commonPb.SubscribeResult{Data: data}, nil, nil
+	marshalElapsed := time.Since(start)
+	stat := &Stat{
+		ResultTxCount:  0,
+		TotalTxCount:   blockInfo.Block.Header.TxCount,
+		FilterElapsed:  0,
+		MarshalElapsed: marshalElapsed.Milliseconds(),
+	}
+	return &commonPb.SubscribeResult{Data: data}, stat, nil
 }
 
 // GetResultByHeight get result by height
