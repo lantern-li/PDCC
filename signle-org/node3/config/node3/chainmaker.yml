@@ -31,10 +31,10 @@ blockchain:
   # chain id and its genesis block file path.
   - chainId: chain_zj
     genesis: ../config/node3/chainconfig/bc-chain-zj.yml
-  - chainId: chain_gd
-    genesis: ../config/node3/chainconfig/bc-chain-gd.yml
-  - chainId: chain_sh
-    genesis: ../config/node3/chainconfig/bc-chain-sh.yml
+#  - chainId: chain_gd
+#    genesis: ../config/node3/chainconfig/bc-chain-gd.yml
+#  - chainId: chain_sh
+#    genesis: ../config/node3/chainconfig/bc-chain-sh.yml
 #  - chainId: chain2
 #    genesis: ../config/{org_path2}/chainconfig/bc2.yml
 #  - chainId: chain3
@@ -288,7 +288,7 @@ tx_filter:
       # Serialization interval in seconds
       serialize_interval: 10
       # file path
-      path: /data/node3/tx_filter
+      path: ../data/node3/tx_filter
     # bird's nest config
     birds_nest:
       # bird's nest size
@@ -338,7 +338,7 @@ tx_filter:
       # Serialization interval in seconds
       serialize_interval: 10
       # file path
-      path: /data/node3/tx_filter
+      path: ../data/node3/tx_filter
     # Transaction filter rules
     rules:
       # Absolute expiration time /second
@@ -413,7 +413,7 @@ scheduler:
 # store_path, dsn the content cannot be changed after startup.
 storage:
   # Default store path
-  store_path: /data/node3/ledgerData1 # [*]
+  store_path: ../data/node3/ledgerData1 # [*]
 
   # Prefix for mysql db name
   db_prefix: node3_
@@ -472,7 +472,7 @@ storage:
     # If provider is leveldb, leveldb_config should not be null.
     leveldb_config:
         # LevelDb store path
-        store_path: /data/node3/block
+        store_path: ../data/node3/block
 
   # State db config
   statedb_config:
@@ -481,7 +481,7 @@ storage:
     # If provider is leveldb, leveldb_config should not be null.
     leveldb_config:
       # LevelDb store path
-      store_path: /data/node3/state
+      store_path: ../data/node3/state
 
   resultdb_config:
     # Stabases type support leveldb, sql, badgerdb, tikvdb
@@ -489,7 +489,7 @@ storage:
     # If provider is leveldb, leveldb_config should not be null.
     leveldb_config:
       # LevelDb store path
-      store_path: /data/node3/result
+      store_path: ../data/node3/result
 
 # Contract Virtual Machine(VM) configs
 vm:
@@ -498,7 +498,7 @@ vm:
     # Enable docker go virtual machine, default: false
     enable: false
     # Mount data path in chainmaker, include contracts, uds socks
-    data_mount_path: /data/node3/go
+    data_mount_path: ../data/node3/go
     # Mount log path in chainmaker
     log_mount_path: ../log/node3/go
     # Communication protocol, used for chainmaker and docker manager communication

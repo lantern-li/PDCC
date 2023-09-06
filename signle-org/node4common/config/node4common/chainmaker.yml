@@ -280,7 +280,7 @@ tx_filter:
       # Serialization interval in seconds
       serialize_interval: 10
       # file path
-      path: /data/node4/tx_filter
+      path: ../data/node4/tx_filter
     # bird's nest config
     birds_nest:
       # bird's nest size
@@ -330,7 +330,7 @@ tx_filter:
       # Serialization interval in seconds
       serialize_interval: 10
       # file path
-      path: /data/node4/tx_filter
+      path: ../data/node4/tx_filter
     # Transaction filter rules
     rules:
       # Absolute expiration time /second
@@ -405,7 +405,7 @@ scheduler:
 # store_path, dsn the content cannot be changed after startup.
 storage:
   # Default store path
-  store_path: /data/node4/ledgerData1 # [*]
+  store_path: ../data/node4/ledgerData1 # [*]
 
   # Prefix for mysql db name
   db_prefix: node4_
@@ -461,13 +461,13 @@ storage:
     # If provider is leveldb, leveldb_config should not be null.
     leveldb_config:
       # LevelDb store path
-      store_path: /data/node4/block
+      store_path: ../data/node4/block
 
   # State db config
   statedb_config:
     provider: leveldb
     leveldb_config:
-      store_path: /data/node4/state
+      store_path: ../data/node4/state
 
   # History db config
   disable_historydb: true
@@ -477,14 +477,14 @@ storage:
     disable_account_history: true
     provider: leveldb
     leveldb_config:
-      store_path: /data/node4/history
+      store_path: ../data/node4/history
 
   # Result db config
   disable_resultdb: false
   resultdb_config:
     provider: leveldb
     leveldb_config:
-      store_path: /data/node4/result
+      store_path: ../data/node4/result
 
   # Disable contract event database or not. If it is false, contract_eventdb_config must be mysql
   disable_contract_eventdb: true
@@ -505,7 +505,7 @@ vm:
     # Enable docker go virtual machine, default: false
     enable: false
     # Mount data path in chainmaker, include contracts, uds socks
-    data_mount_path: /data/node4/go
+    data_mount_path: ../data/node4/go
     # Mount log path in chainmaker
     log_mount_path: ../log/node4/go
     # Communication protocol, used for chainmaker and docker manager communication
