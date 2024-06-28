@@ -1,5 +1,5 @@
 /*
-   Created by guoxin in 2022/11/17 5:10 PM
+Created by guoxin in 2022/11/17 5:10 PM
 */
 package id
 
@@ -37,6 +37,66 @@ func TestIdentityMatchImpl_Match(t *testing.T) {
 				}(),
 			},
 			want: true,
+		},
+		{
+			name: "重庆税务省局订阅，重庆省局下辖区县交易清分",
+			args: args{
+				subscriberId: func() SubscriberId {
+					subscriberId, err := NewSubscriberId("15000000000")
+					if err != nil {
+						panic(err)
+					}
+					return subscriberId
+				}(),
+				p: func() ParticipantId {
+					participant, err := NewParticipantId("15001111111")
+					if err != nil {
+						panic(err)
+					}
+					return participant
+				}(),
+			},
+			want: true,
+		},
+		{
+			name: "重庆税务省局订阅，重庆省局下辖区县交易清分",
+			args: args{
+				subscriberId: func() SubscriberId {
+					subscriberId, err := NewSubscriberId("15001000000")
+					if err != nil {
+						panic(err)
+					}
+					return subscriberId
+				}(),
+				p: func() ParticipantId {
+					participant, err := NewParticipantId("15001111111")
+					if err != nil {
+						panic(err)
+					}
+					return participant
+				}(),
+			},
+			want: true,
+		},
+		{
+			name: "重庆税务省局订阅，重庆省局下辖区县交易清分",
+			args: args{
+				subscriberId: func() SubscriberId {
+					subscriberId, err := NewSubscriberId("15002000000")
+					if err != nil {
+						panic(err)
+					}
+					return subscriberId
+				}(),
+				p: func() ParticipantId {
+					participant, err := NewParticipantId("15001111111")
+					if err != nil {
+						panic(err)
+					}
+					return participant
+				}(),
+			},
+			want: false,
 		},
 		{
 			name: "税务省局订阅，外部政府部门交易清分",

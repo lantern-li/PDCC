@@ -1,11 +1,10 @@
 /*
-   Created by guoxin in 2022/11/17 9:34 AM
+Created by guoxin in 2022/11/17 9:34 AM
 */
 package id
 
 import (
 	"errors"
-	"strings"
 )
 
 type SubscriberId interface {
@@ -32,8 +31,14 @@ func NewSubscriberId(id string) (SubscriberId, error) {
 		subscriberId.offset = 0
 		return subscriberId, nil
 	}
-	index := strings.Index(id, Both)
-	if index == NotFoundIndex {
+	var index int
+	for i := 1; i < len(id); i += 2 {
+		if id[i:i+2] == Both {
+			index = i
+			break
+		}
+	}
+	if index == 0 {
 		return nil, errors.New("subscriberId identifier is invalid, identifier does not contain \"00\"")
 	}
 
