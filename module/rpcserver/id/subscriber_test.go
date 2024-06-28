@@ -1,5 +1,5 @@
 /*
-   Created by guoxin in 2022/11/17 2:48 PM
+Created by guoxin in 2022/11/17 2:48 PM
 */
 package id
 
@@ -31,6 +31,17 @@ func TestSubscriberId_GetType(t *testing.T) {
 		s    SubscriberId
 		want string
 	}{
+		{
+			name: "正常",
+			s: func() SubscriberId {
+				subscriberId, err := NewSubscriberId("150000")
+				if err != nil {
+					panic(err)
+				}
+				return subscriberId
+			}(),
+			want: "1",
+		},
 		{
 			name: "正常",
 			s: func() SubscriberId {

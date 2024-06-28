@@ -1,5 +1,7 @@
 /*
-   Created by guoxin in 2022/11/17 9:37 AM
+Copyright (C) BABEC. All rights reserved.
+
+SPDX-License-Identifier: Apache-2.0
 */
 package id
 
@@ -19,14 +21,14 @@ const (
 	SocialCreditCodeLength       = 19
 	IDCardNumberLength           = 19
 
-	Both = "00"
+	DoubleZero = "00"
 
 	NilString = ""
 
-	// ValidTaxationCodeIndex 该常量用于描述税务编号（TaxationCode）和身份证编号（IDCardNumberCode）
-	ValidTaxationCodeIndex = 1
-	// ValidExternalCodeIndex 该常量用于描述税务编号（GovernmentBodyCode）和身份证编号（SocialCreditCodeCode）
-	ValidExternalCodeIndex = 3
+	// ValidTaxAndIdIndex 该常量用于描述 省局（TaxationCode）和身份证编号（IDCardNumberCode）
+	ValidTaxAndIdIndex = 1
+	// ValidGovAndEnpIndex 该常量用于描述 外部政府（GovernmentBodyCode）和企业（SocialCreditCodeCode）
+	ValidGovAndEnpIndex = 3
 	// NotFoundIndex 如果在id中没有匹配则使用-1标示
 	NotFoundIndex = -1
 )

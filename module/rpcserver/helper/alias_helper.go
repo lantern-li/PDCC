@@ -194,12 +194,7 @@ MatchSuccessfulToVerifyTheNextTransaction:
 			}
 			aliasValues := strings.Split(aliasValueString, sep)
 			for i, aliasValue := range aliasValues {
-				participantId, err := id.NewParticipantId(aliasValue)
-				if err != nil {
-					log.Warnf("%s %s [%s] [%v] [%v] new participant id error, participantId: %v, error: %v", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, aliasValue, err)
-					continue
-				}
-				if id.IdentityMatchInstance.Match(subscriberId, participantId) {
+				if id.IdentityMatchInstance.Match(subscriberId, aliasValue) {
 					log.DebugDynamic(func() string {
 						ruleJson, _ := json.Marshal(rule)
 						return fmt.Sprintf("%s %s [%s] [%v] [%v] rule value match, i: %v, aliasValue: %v, "+
