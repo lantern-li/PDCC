@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	chainmaker.org/chainmaker/chainconf/v2 v2.3.1-0.20221109030152-29b09937bc1f
-	chainmaker.org/chainmaker/common/v2 v2.3.1-0.20221103080328-39ebe8c6722f
+	chainmaker.org/chainmaker/common/v2 v2.3.1
 	chainmaker.org/chainmaker/consensus-dpos/v2 v2.3.0
 	chainmaker.org/chainmaker/consensus-maxbft/v2 v2.3.0
 	chainmaker.org/chainmaker/consensus-raft/v2 v2.3.0
@@ -16,10 +16,10 @@ require (
 	chainmaker.org/chainmaker/net-common v1.2.1
 	chainmaker.org/chainmaker/net-libp2p v1.2.2-0.20221210132214-3698e036d0c2
 	chainmaker.org/chainmaker/net-liquid v1.1.0
-	chainmaker.org/chainmaker/pb-go/v2 v2.3.2-0.20221122133546-6c0d11394fd9
-	chainmaker.org/chainmaker/protocol/v2 v2.3.2-0.20221210062113-6dbeaa53eb9c // v2.3.1_qc_sz_store
+	chainmaker.org/chainmaker/pb-go/v2 v2.3.2
+	chainmaker.org/chainmaker/protocol/v2 v2.3.2 // v2.3.1_qc_sz_store
 	chainmaker.org/chainmaker/sdk-go/v2 v2.3.2-0.20221122142750-dcc4c69646dc
-	chainmaker.org/chainmaker/store/v2 v2.3.3-0.20230411071651-145d42574774 // v2.3.1_qc_fix
+	chainmaker.org/chainmaker/store/v2 v2.3.3-0.20231129092934-f550e1eab0f8 // v2.3.1_qc_fix
 	chainmaker.org/chainmaker/txpool-batch/v2 v2.3.1-0.20221124033619-e2e42ea261ce
 	chainmaker.org/chainmaker/txpool-normal/v2 v2.3.1-0.20221103095550-4fad686735d0
 	chainmaker.org/chainmaker/txpool-single/v2 v2.3.1-0.20221103125525-c11ec6726025
@@ -81,6 +81,9 @@ require (
 )
 
 replace (
+	chainmaker.org/chainmaker/common/v2 v2.3.1 => chainmaker.org/chainmaker/common/v2 v2.3.1-0.20221103080328-39ebe8c6722f
+	chainmaker.org/chainmaker/pb-go/v2 => chainmaker.org/chainmaker/pb-go/v2 v2.3.2-0.20221122133546-6c0d11394fd9
+	chainmaker.org/chainmaker/protocol/v2 => chainmaker.org/chainmaker/protocol/v2 v2.3.2-0.20221210062113-6dbeaa53eb9c
 	github.com/RedisBloom/redisbloom-go => chainmaker.org/third_party/redisbloom-go v1.0.0
 	github.com/dgraph-io/badger/v3 => chainmaker.org/third_party/badger/v3 v3.0.0
 	github.com/libp2p/go-conn-security-multistream v0.2.0 => chainmaker.org/third_party/go-conn-security-multistream v1.0.2
