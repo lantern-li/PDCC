@@ -8,9 +8,10 @@ SPDX-License-Identifier: Apache-2.0
 package sync
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math"
-	"sort"
+	"math/big"
 	"time"
 
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
@@ -399,8 +400,23 @@ func (sch *scheduler) selectPeer(pendingHeight uint64) string {
 		}
 	}
 	peers = pendingReqInPeers[min]
-	sort.Strings(peers)
-	return peers[0]
+	if len(peers) == 1 {
+		return peers[0]
+	}
+	// sort.Strings(peers) //Sorting seems useless in random scenarios
+	// select a node randomly to avoid one or some nodes being selected all the time,
+	// which may cause sync process to be blocked.
+	return peers[randIntN(len(peers))]
+}
+
+// randIntN generates a random number in [0, n), n must be greater than 0.
+func randIntN(n int) int {
+	number, err := rand.Int(rand.Reader, big.NewInt(int64(n)))
+	if err != nil {
+		fmt.Printf("random number generation error for sync, use 0: %v\n", err)
+		return 0
+	}
+	return int(number.Int64())
 }
 
 // get all nodes containing this block height
