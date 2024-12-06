@@ -314,7 +314,10 @@ func (s *ApiService) sendHistoryContractEvent(store protocol.BlockchainStore,
 			}
 
 			sendSubscribeContractEventStick := utils.CurrentTimeMillisSeconds()
-			if err = s.sendSubscribeContractEvent(server, block, contractName, topic); err != nil {
+			// get evenInfo list from block
+			evenList := s.getSubscribeContractEvent(block, contractName, topic)
+			// send evenInfo list to subscriber
+			if err = s.doSendSubscribeContractEvent(server, evenList); err != nil {
 				errMsg = fmt.Sprintf("send subscribe tx failed, %s", err)
 				s.log.Warnf(errMsg + fmt.Sprintf("[txId:%s, sender:%s, contractName:%s, topic:%s]",
 					txId, senderAddr, contractName, topic))
@@ -322,9 +325,11 @@ func (s *ApiService) sendHistoryContractEvent(store protocol.BlockchainStore,
 			}
 			sendSubscribeContractEventCost := utils.CurrentTimeMillisSeconds() - sendSubscribeContractEventStick
 
-			s.log.Infof("sendHistoryContractEvent[height:%d]. [txId:%s, sender:%s, "+
+			s.log.Infof("sendHistoryContractEvent[height:%d]. [txId:%s, sender:%s, evenListLen:%d"+
 				"contractName:%s, topic:%s, getTokenCost:%d, getBlockCost:%d, sendSubscribeContractEventCost:%d]",
-				i, txId, senderAddr, contractName, topic, getTokenCost, getBlockCost, sendSubscribeContractEventCost)
+				i, txId, senderAddr, len(evenList), contractName, topic,
+				getTokenCost, getBlockCost, sendSubscribeContractEventCost)
+
 			i++
 		}
 	}
@@ -337,8 +342,8 @@ For example:
   - If `contract_name` is provided and `event_name` is empty, all events for the specified contract will be returned.
   - If `contract_name` is empty, an error will be raised, as it is no longer supported.
 */
-func (s *ApiService) sendSubscribeContractEvent(server apiPb.RpcNode_SubscribeServer,
-	block *commonPb.Block, contractName, topic string) error {
+func (s *ApiService) getSubscribeContractEvent(
+	block *commonPb.Block, contractName, topic string) []*commonPb.ContractEventInfo {
 
 	var (
 		contractEvents []*commonPb.ContractEventInfo
@@ -369,14 +374,14 @@ func (s *ApiService) sendSubscribeContractEvent(server apiPb.RpcNode_SubscribeSe
 
 	// If no matching events are found, send an empty contract event with block height and chain id.
 	if len(contractEvents) == 0 {
-		return s.doSendSubscribeContractEvent(server, []*commonPb.ContractEventInfo{{
+		return []*commonPb.ContractEventInfo{{
 			BlockHeight: block.Header.BlockHeight,
 			ChainId:     block.Header.ChainId,
-		}})
+		}}
 	}
 
 	// Send all collected contract events in a single batch.
-	return s.doSendSubscribeContractEvent(server, contractEvents)
+	return contractEvents
 }
 
 func (s *ApiService) doSendSubscribeContractEvent(server apiPb.RpcNode_SubscribeServer,
