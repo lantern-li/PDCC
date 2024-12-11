@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -101,6 +102,8 @@ func (f *TxFilter) SetHeight(height uint64) {
 // IsExistsAndReturnHeight is exists and return height
 func (f *TxFilter) IsExistsAndReturnHeight(txId string, ruleType ...bn.RuleType) (exists bool, height uint64,
 	stat *txfilter.Stat, err error) {
+	start := time.Now()
+	defer filtercommon.ShowLog("IsExistsAndReturnHeight", txId, start, f.log)
 	exists, stat, err = f.IsExists(txId, ruleType...)
 	if err != nil {
 		return false, 0, stat, err
@@ -111,6 +114,7 @@ func (f *TxFilter) IsExistsAndReturnHeight(txId string, ruleType ...bn.RuleType)
 // Add txId to transaction filter
 func (f *TxFilter) Add(txId string) error {
 	start := time.Now()
+	defer filtercommon.ShowLog("Add", txId, start, f.log)
 	// Convert the transaction ID to TimestampKey
 	key, err := bn.ToTimestampKey(txId)
 	if err != nil {
@@ -130,6 +134,7 @@ func (f *TxFilter) Add(txId string) error {
 // Adds batch Add txId
 func (f *TxFilter) Adds(txIds []string) error {
 	start := time.Now()
+	defer filtercommon.ShowLog("Adds", strings.Join(txIds, ","), start, f.log)
 	// Convert the transaction ID to TimestampKey
 	timestampKeys, _ := bn.ToTimestampKeysAndNormalKeys(txIds)
 	if len(timestampKeys) <= 0 {
@@ -171,6 +176,8 @@ func (f *TxFilter) addsPrintInfo(txIds []string, start time.Time) {
 // AddsAndSetHeight batch add tx id and set height
 func (f *TxFilter) AddsAndSetHeight(txIds []string, height uint64) error {
 	start := time.Now()
+	defer filtercommon.ShowLog("AddsAndSetHeight", strings.Join(txIds, ","), start, f.log)
+
 	// Convert the transaction ID to TimestampKey
 	timestampKeys, _ := bn.ToTimestampKeysAndNormalKeys(txIds)
 	if len(timestampKeys) <= 0 {
@@ -191,6 +198,9 @@ func (f *TxFilter) AddsAndSetHeight(txIds []string, height uint64) error {
 
 // IsExists Check whether TxId exists in the transaction filter
 func (f *TxFilter) IsExists(txId string, ruleType ...bn.RuleType) (exists bool, stat *txfilter.Stat, err error) {
+	start1 := time.Now()
+	defer filtercommon.ShowLog("IsExists", txId, start1, f.log)
+
 	var costs time.Duration
 	// Convert the transaction ID to TimestampKey
 	key, err := bn.ToTimestampKey(txId)
@@ -238,6 +248,9 @@ func (f *TxFilter) Close() {
 }
 
 func (f *TxFilter) findDb(txId string) (bool, time.Duration, error) {
+	start1 := time.Now()
+	defer filtercommon.ShowLog("findDb", txId, start1, f.log)
+
 	start := time.Now()
 	exists, err := f.store.TxExists(txId)
 	costs := time.Since(start)

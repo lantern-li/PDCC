@@ -13,7 +13,7 @@ log:
 crypto_engine: tjfoc #crypto engine config setting, support gmssl, tencentsm and tjfoc
 
 blockchain:
-  - chainId: chain1
+  - chainId: chain_zj
     genesis: ../config/wx-org-solo/chainconfig/bc1.yml
 #  - chainId: chain2
 #    genesis: ../config/wx-org-solo/chainconfig/bc2.yml
@@ -34,11 +34,15 @@ net:
   provider: LibP2P
   listen_addr: /ip4/0.0.0.0/tcp/11301
   seeds:
-    - "/ip4/127.0.0.1/tcp/11301/p2p/Qmbh5QRj9zMXPJH8BYkh6nPgztji3geU8fKEuuzDJ7KS5k"
+    - "/ip4/127.0.0.1/tcp/11301/p2p/QmP6rr61xV9zGWR7UVX8BNASfWdnUiQbYbCaB5nH8BqcFp"
   tls:
     enabled: true
     priv_key_file: ../config/wx-org-solo/certs/wx-org.chainmaker.org/node/consensus1/consensus1.tls.key
     cert_file: ../config/wx-org-solo/certs/wx-org.chainmaker.org/node/consensus1/consensus1.tls.crt
+
+
+core:
+  scheduler_type: 1
 
 # Other txpool settings can be found in tx_Pool_config.go
 txpool:
@@ -82,6 +86,19 @@ rpc:
     mode: twoway
     priv_key_file: ../config/wx-org-solo/certs/wx-org.chainmaker.org/node/consensus1/consensus1.tls.key
     cert_file: ../config/wx-org-solo/certs/wx-org.chainmaker.org/node/consensus1/consensus1.tls.crt
+  # Rate limit settings for subscriber
+  subscriber:
+    ratelimit:
+      token_per_second: 100
+      token_bucket_size: 100
+    send_pool:
+      enable: true
+      size: 5
+    filter_pool:
+      # deprecated filter pool enable
+      enable: true
+      # Pool size = cpu core number * size
+      size: 4
 
 tx_filter:
   # default(store) 0; bird's nest 1; map 2; 3 sharding bird's nest

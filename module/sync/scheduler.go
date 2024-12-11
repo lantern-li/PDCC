@@ -8,6 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 package sync
 
 import (
+	"chainmaker.org/chainmaker-go/module/txfilter/filtercommon"
 	"fmt"
 	"math"
 	"sort"

@@ -9,6 +9,8 @@ package rpcserver
 
 import (
 	"context"
+	"chainmaker.org/chainmaker-go/module/subscriber/model"
+	"context"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -74,6 +76,8 @@ func (s *ApiService) Subscribe(req *commonPb.TxRequest, server apiPb.RpcNode_Sub
 		return s.dealTxSubscription(tx, server)
 	case syscontract.SubscribeFunction_SUBSCRIBE_CONTRACT_EVENT.String():
 		return s.dealContractEventSubscription(tx, server)
+	case syscontract.SubscribeFunction_SUBSCRIBE_BLOCK_WITH_RULE.String():
+		return s.dealBlockSubscription(tx, server)
 	}
 
 	return nil
@@ -84,17 +88,12 @@ func (s *ApiService) checkAndGetLastBlockHeight(store protocol.BlockchainStore,
 
 	var (
 		err             error
-		errMsg          string
-		errCode         commonErr.ErrCode
 		lastBlock       *commonPb.Block
 		lastBlockHeight uint64
 	)
 
 	if lastBlock, err = store.GetLastBlock(); err != nil {
-		errCode = commonErr.ERR_CODE_GET_LAST_BLOCK
-		errMsg = s.getErrMsg(errCode, err)
-		s.log.Error(errMsg)
-		return -1, status.Error(codes.Internal, errMsg)
+		return -1, s.errorResultByCode(codes.Internal, commonErr.ERR_CODE_GET_LAST_BLOCK, err)
 	}
 
 	lastBlockHeight = lastBlock.Header.BlockHeight
@@ -105,6 +104,8 @@ func (s *ApiService) checkAndGetLastBlockHeight(store protocol.BlockchainStore,
 
 		s.log.Warn(errMsg)
 		return int64(lastBlock.Header.BlockHeight), status.Error(codes.InvalidArgument, errMsg)
+		return -1, s.errorResultByMessage(codes.InvalidArgument, "payload start block height:%d >  last block "+
+			"height:%d", payloadStartBlockHeight, lastBlockHeight)
 	}
 
 	return int64(lastBlock.Header.BlockHeight), nil
@@ -141,16 +142,53 @@ func (s *ApiService) checkSubscribeBlockHeight(startBlockHeight, endBlockHeight 
 func (s *ApiService) getRoleFromTx(tx *commonPb.Transaction) (protocol.Role, error) {
 	bc, err := s.chainMakerServer.GetBlockchain(tx.Payload.ChainId)
 	if err != nil {
-		errCode := commonErr.ERR_CODE_GET_BLOCKCHAIN
-		errMsg := s.getErrMsg(errCode, err)
-		s.log.Error(errMsg)
-		return "", err
+		return "", s.errorResultByCode(codes.Internal, commonErr.ERR_CODE_GET_BLOCKCHAIN, err)
 	}
 
 	ac := bc.GetAccessControl()
 	return utils.GetRoleFromTx(tx, ac)
 }
 
+// todo sz logic
+func (s *ApiService) startSubscribeBlockEvent(ctx context.Context, lastBlockHeight *int64, chainId string,
+	dataC chan model.NewBlockEvent) error {
+	db, err := s.chainMakerServer.GetStore(chainId)
+	if err != nil {
+		return fmt.Errorf("get block failed. error: %s", err)
+	}
+	lastBlock, err := db.GetLastBlock()
+	if err != nil {
+		return fmt.Errorf("get last block failed. error: %s", err)
+	}
+	atomic.StoreInt64(lastBlockHeight, int64(lastBlock.Header.BlockHeight))
+
+	blockEventC := make(chan model.NewBlockEvent, 1)
+	eventSubscriber, err := s.chainMakerServer.GetEventSubscribe(chainId)
+	if err != nil {
+		return fmt.Errorf("get event subscribe. error: %s", err)
+	}
+
+	go func() {
+		sub := eventSubscriber.SubscribeBlockEvent(blockEventC)
+		defer sub.Unsubscribe()
+
+		for {
+			select {
+			case ev := <-blockEventC:
+				atomic.StoreInt64(lastBlockHeight, int64(ev.BlockInfo.Block.Header.BlockHeight))
+				select {
+				case dataC <- ev:
+				default:
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return nil
+}
+
+// todo 236 logic
 func (s *ApiService) startSubscribeBlockEvent(ctx context.Context, lastBlockHeight *int64, chainId string,
 	dataC chan model.NewBlockEvent) error {
 	db, err := s.chainMakerServer.GetStore(chainId)

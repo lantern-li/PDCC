@@ -21,6 +21,13 @@ import (
 	"chainmaker.org/chainmaker/utils/v2"
 )
 
+func ShowLog(funcName string, txId string, start time.Time, log protocol.Logger) {
+	since := time.Since(start)
+	if since.Milliseconds() > 100 {
+		log.Warnf("The [%s] method takes too long. txid: %s, costs: %v", funcName, txId, since)
+	}
+}
+
 // ChaseBlockHeight Chase high block
 func ChaseBlockHeight(store protocol.BlockchainStore, filter protocol.TxFilter, log protocol.Logger) error {
 	cost := time.Now()

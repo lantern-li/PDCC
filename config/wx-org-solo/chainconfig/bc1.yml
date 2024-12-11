@@ -72,7 +72,7 @@ consensus:
   nodes:
     - org_id: "wx-org.chainmaker.org"
       node_id:
-        - "Qmbh5QRj9zMXPJH8BYkh6nPgztji3geU8fKEuuzDJ7KS5k"
+        - "QmP6rr61xV9zGWR7UVX8BNASfWdnUiQbYbCaB5nH8BqcFp"
   ext_config: # 扩展字段，记录难度、奖励等其他类共识算法配置
     - key: aa
       value: chain01_ext11

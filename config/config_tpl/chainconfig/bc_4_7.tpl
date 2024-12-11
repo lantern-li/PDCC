@@ -60,21 +60,23 @@ vm:
 block:
   # To enable this attribute, ensure that the clock of the node is consistent
   # Verify the transaction timestamp or not
-  tx_timestamp_verify: true
+  tx_timestamp_verify: false
 
   # Transaction timeout, in second.
   # if abs(now - tx_timestamp) > tx_timeout, the transaction is invalid.
   tx_timeout: 600
 
   # Max transaction count in a block.
-  block_tx_capacity: 1000
+  block_tx_capacity: 10000
+#  block_tx_capacity: 15000
+#  block_tx_capacity: 20000
 
   # Max block size, in MB, Default unlimited, Use block_tx_capacity to limit block size
   block_size: 500
 
   # The interval of block proposing attempts, in millisecond.
   # should be within the range of [10,10000]
-  block_interval: 200
+  block_interval: 10
 
   # To enable this attribute, ensure that the clock of the node is consistent
   # Verify the block timestamp or not

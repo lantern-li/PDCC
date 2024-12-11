@@ -198,26 +198,26 @@ func (v *BlockVerifierImpl) VerifyBlock(block *commonpb.Block, mode protocol.Ver
 		return err
 	}
 
-	snapshot := v.snapshotManager.GetSnapshot(lastBlock, newBlock)
-	if coinbasemgr.IsOptimizeChargeGasEnabled(v.chainConf) {
-		if err = scheduler.VerifyOptimizeChargeGasTx(newBlock, snapshot, v.ac, blockVersion); err != nil {
-			v.log.Warnf("verify failed [%d](%x), %s", newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
-			if protocol.CONSENSUS_VERIFY == mode {
-				v.msgBus.Publish(msgbus.VerifyResult, parseVerifyResult(newBlock, false, txRWSetMap, rwSetVerifyFailTx))
-			}
-			return err
-		}
-	}
+	//snapshot := v.snapshotManager.GetSnapshot(lastBlock, newBlock)
+	//if coinbasemgr.IsOptimizeChargeGasEnabled(v.chainConf) {
+	//	if err = scheduler.VerifyOptimizeChargeGasTx(newBlock, snapshot, v.ac, blockVersion); err != nil {
+	//		v.log.Warnf("verify failed [%d](%x), %s", newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
+	//		if protocol.CONSENSUS_VERIFY == mode {
+	//			v.msgBus.Publish(msgbus.VerifyResult, parseVerifyResult(newBlock, false, txRWSetMap, rwSetVerifyFailTx))
+	//		}
+	//		return err
+	//	}
+	//}
 
 	// sync mode, need to verify consensus vote signature
 	beginConsensCheck := utils.CurrentTimeMillisSeconds()
-	if protocol.SYNC_VERIFY == mode {
-		if err = v.verifyVoteSig(newBlock); err != nil {
-			v.log.Warnf("verify failed [%d](%x), vote sig %s",
-				newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
-			return err
-		}
-	}
+	//if protocol.SYNC_VERIFY == mode {
+	//	if err = v.verifyVoteSig(newBlock); err != nil {
+	//		v.log.Warnf("verify failed [%d](%x), vote sig %s",
+	//			newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
+	//		return err
+	//	}
+	//}
 	consensusCheckUsed := utils.CurrentTimeMillisSeconds() - beginConsensCheck
 
 	// verify success, cache block and read write set
@@ -312,13 +312,13 @@ func (v *BlockVerifierImpl) VerifyBlockWithRwSets(block *commonpb.Block,
 
 	// sync mode, need to verify consensus vote signature
 	beginConsensCheck := utils.CurrentTimeMillisSeconds()
-	if mode == protocol.SYNC_VERIFY {
-		if err = v.verifyVoteSig(newBlock); err != nil {
-			v.log.Warnf("verify failed [%d](%x), votesig %s",
-				newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
-			return err
-		}
-	}
+	//if mode == protocol.SYNC_VERIFY {
+	//	if err = v.verifyVoteSig(newBlock); err != nil {
+	//		v.log.Warnf("verify failed [%d](%x), votesig %s",
+	//			newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
+	//		return err
+	//	}
+	//}
 	consensusCheckUsed := utils.CurrentTimeMillisSeconds() - beginConsensCheck
 
 	// verify success, cache block and read write set
@@ -396,11 +396,14 @@ func (v *BlockVerifierImpl) validateBlock(block, lastBlock *commonpb.Block, mode
 	timeLasts := make(map[string]int64)
 	var err error
 	var txCapacity uint32
-	if coinbasemgr.IsOptimizeChargeGasEnabled(v.chainConf) {
-		txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity + 1
-	} else {
-		txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity
-	}
+
+	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity
+
+	//if coinbasemgr.IsOptimizeChargeGasEnabled(v.chainConf) {
+	//	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity + 1
+	//} else {
+	//	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity
+	//}
 	if block.Header.TxCount > txCapacity {
 		return nil, nil, timeLasts, nil, fmt.Errorf("txcapacity expect <= %d, got %d)", txCapacity, block.Header.TxCount)
 	}

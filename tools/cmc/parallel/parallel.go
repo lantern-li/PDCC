@@ -76,6 +76,7 @@ var (
 	contractName       string
 	version            string
 	wasmPath           string
+	aliasName          string
 
 	caPaths      []string
 	hosts        []string
@@ -195,18 +196,23 @@ func ParallelCMD() *cobra.Command {
 			}
 
 			nodeNum = len(hosts)
+			var (
+				bytes []byte
+				err   error
+			)
 			if len(pairsFile) != 0 {
-				bytes, err := ioutil.ReadFile(pairsFile)
+				bytes, err = ioutil.ReadFile(pairsFile)
 				if err != nil {
 					panic(err)
 				}
 				pairsString = string(bytes)
 			}
-			var err error
+
 			globalPairs, err = getPairInfos()
 			if err != nil {
 				panic(err)
 			}
+
 			fmt.Println("tx content: ", pairsString)
 		},
 	}
@@ -241,6 +247,7 @@ func ParallelCMD() *cobra.Command {
 	flags.Uint32Var(&authTypeUint32, "auth-type", 1, "chainmaker auth type. PermissionedWithCert:1,PermissionedWithKey:2,Public:3")
 	flags.Uint64Var(&gasLimit, "gas-limit", 0, "gas limit in uint64 type")
 	flags.StringVarP(&hostnamesString, "tls-host-names", "", "", "specify hostname, the sequence is the same as --hosts")
+	flags.StringVarP(&aliasName, "alias", "", "", "specify alias, --alias -A")
 
 	cmd.AddCommand(invokeCMD())
 	cmd.AddCommand(queryCMD())
@@ -881,6 +888,12 @@ func sendRequest(sk3 crypto.PrivateKey, client apiPb.RpcNodeClient, msg *Invoker
 				OrgId:      orgId,
 				MemberInfo: *certId,
 				MemberType: acPb.MemberType_CERT_HASH,
+			}
+		} else if len(aliasName) > 0 {
+			sender = &acPb.Member{
+				OrgId:      orgId,
+				MemberInfo: []byte(aliasName),
+				MemberType: acPb.MemberType_ALIAS,
 			}
 		} else {
 			sender = &acPb.Member{

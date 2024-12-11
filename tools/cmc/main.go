@@ -8,6 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
+	"chainmaker.org/chainmaker-go/tools/cmc/subscriber"
 	"strings"
 
 	"chainmaker.org/chainmaker-go/tools/cmc/address"
@@ -62,10 +63,12 @@ For detailed logs, please see ./sdk.log
 	mainCmd.AddCommand(commandutil.NewUtilCMD())
 	mainCmd.AddCommand(consensus.NewConsensusCMD())
 	mainCmd.AddCommand(node.NewNodeCMD())
+	mainCmd.AddCommand(subscriber.TxAssignCMD())
 
 	// 后续改成go-sdk
 	//mainCmd.AddCommand(payload.PayloadCMD())
 	//mainCmd.AddCommand(log.LogCMD())
 
-	mainCmd.Execute()
+	// todo
+	_ = mainCmd.Execute()
 }

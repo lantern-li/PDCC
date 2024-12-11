@@ -12,13 +12,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/panjf2000/ants/v2"
+	"runtime"
 	"strings"
 	"time"
 
 	"chainmaker.org/chainmaker-go/module/rpcserver/rateLimiter"
-
-	"chainmaker.org/chainmaker/pb-go/v2/consensus"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"chainmaker.org/chainmaker-go/module/blockchain"
 	"chainmaker.org/chainmaker-go/module/snapshot"
@@ -29,6 +28,7 @@ import (
 	apiPb "chainmaker.org/chainmaker/pb-go/v2/api"
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
 	configPb "chainmaker.org/chainmaker/pb-go/v2/config"
+	"chainmaker.org/chainmaker/pb-go/v2/consensus"
 	syncPb "chainmaker.org/chainmaker/pb-go/v2/sync"
 	txpoolPb "chainmaker.org/chainmaker/pb-go/v2/txpool"
 	"chainmaker.org/chainmaker/protocol/v2"
@@ -37,6 +37,9 @@ import (
 	native "chainmaker.org/chainmaker/vm-native/v2"
 	"chainmaker.org/chainmaker/vm/v2"
 	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 const (
@@ -61,6 +64,7 @@ type ApiService struct {
 	metricSubscribeInterruptedCounter *prometheus.CounterVec
 	metricSubscribeActiveCounter      *prometheus.GaugeVec
 	ctx                               context.Context
+	subscribeFilterPool         *ants.Pool
 }
 
 // NewApiService - new ApiService object
@@ -75,6 +79,11 @@ func NewApiService(ctx context.Context, chainMakerServer *blockchain.ChainMakerS
 		subscriberRateLimiter: rateLimiter.NewSubscriberRateLimiter(log),
 		ctx:                   ctx,
 	}
+	subscribeFilterPool, err := ants.NewPool(localconf.ChainMakerConfig.RpcConfig.SubscriberConfig.FilterPool.Size)
+	if err != nil {
+		panic(fmt.Errorf("init subscribe filter pool fail. error: %v", err))
+	}
+	apiService.subscribeFilterPool = subscribeFilterPool
 
 	if localconf.ChainMakerConfig.MonitorConfig.Enabled {
 		apiService.metricQueryCounter = monitor.NewCounterVec(monitor.SUBSYSTEM_RPCSERVER, "metric_query_request_counter",
@@ -225,6 +234,24 @@ func (s *ApiService) validate(tx *commonPb.Transaction) (errCode commonErr.ErrCo
 
 func (s *ApiService) getErrMsg(errCode commonErr.ErrCode, err error) string {
 	return fmt.Sprintf("%s, %s", errCode.String(), err.Error())
+}
+
+func (s *ApiService) errorResultByCode(c codes.Code, code commonErr.ErrCode, err error) error {
+	errMsg := s.getErrMsg(code, err)
+	s.log.Error(errMsg)
+	return status.Error(c, errMsg)
+}
+
+func (s *ApiService) errorResultByMessage(c codes.Code, format string, args ...interface{}) error {
+	message := fmt.Sprintf(format, args...)
+	s.log.Error(message)
+	return status.Error(c, message)
+}
+
+func (s *ApiService) errorResultByError(c codes.Code, err error) error {
+	message := err.Error()
+	s.log.Error(message)
+	return status.Error(c, message)
 }
 
 // invoke contract according to TxType

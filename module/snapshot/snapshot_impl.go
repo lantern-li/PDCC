@@ -348,6 +348,16 @@ func (s *SnapshotImpl) ApplyTxSimContext(txSimContext protocol.TxSimContext, spe
 	if !applySpecialTx && s.IsSealed() {
 		return false, s.GetSnapshotSize()
 	}
+
+	// todo here
+	//if _, ok := SZContractList[tx.Payload.ContractName]; ok {
+	//	return s.dealSZTx(txSimContext, specialTxType,
+	//		runVmSuccess, applySpecialTx, tx)
+	//}
+	//
+	//return s.dealNormalTx(txSimContext, specialTxType,
+	//	runVmSuccess, applySpecialTx, tx)
+
 	// 乐观处理，以所有交易都不冲突的情况进行优先处理
 	txExecSeq := txSimContext.GetTxExecSeq()
 	var txRWSet *commonPb.TxRWSet
@@ -560,6 +570,30 @@ func (s *SnapshotImpl) Seal() {
 		s.applyConflictTime.Load(), s.applyAddReadTime.Load(), s.applyAddWriteTime.Load())
 }
 
+// todo here
+//func (s *SnapshotImpl) BuildDAG(isSql bool, txRWSetTable []*commonPb.TxRWSet) *commonPb.DAG {
+//	txs := s.GetTxTable()
+//	for _, tx := range txs {
+//		if _, ok := SZContractList[tx.Payload.ContractName]; !ok {
+//			return s.buildNormalDag(isSql, txRWSetTable)
+//		}
+//	}
+//
+//	return genDefaultDag(len(txs))
+//}
+//
+//func genDefaultDag(txCount int) *commonPb.DAG {
+//	vertexes := make([]*commonPb.DAG_Neighbor, txCount)
+//	for i := 0; i < txCount; i++ {
+//		vertexes[i] = &commonPb.DAG_Neighbor{
+//			Neighbors: make([]uint32, 0, 1),
+//		}
+//	}
+//	return &commonPb.DAG{
+//		Vertexes: vertexes,
+//	}
+//}
+
 // BuildDAG build the block dag according to the read-write table
 func (s *SnapshotImpl) BuildDAG(isSql bool, txRWSetTable []*commonPb.TxRWSet) *commonPb.DAG {
 	s.lock.RLock()
@@ -711,4 +745,95 @@ func (s *SnapshotImpl) SetBlockFingerprint(fp utils.BlockFingerPrint) {
 // GetBlockFingerprint returns current block fingerprint
 func (s *SnapshotImpl) GetBlockFingerprint() string {
 	return s.blockFingerprint
+}
+
+func (s *SnapshotImpl) dealNormalTx(txSimContext protocol.TxSimContext, specialTxType protocol.ExecOrderTxType,
+	runVmSuccess, applySpecialTx bool, tx *commonPb.Transaction) (bool, int) {
+	s.log.Infof("what??? deal normal Tx, contractName: %s", tx.Payload.ContractName)
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	// it is necessary to check sealed secondly
+	if !applySpecialTx && s.IsSealed() {
+		return false, len(s.txTable)
+	}
+
+	txExecSeq := txSimContext.GetTxExecSeq()
+	var txRWSet *commonPb.TxRWSet
+	var txResult *commonPb.Result
+
+	if !applySpecialTx && specialTxType == protocol.ExecOrderTxTypeIterator {
+		s.specialTxTable = append(s.specialTxTable, tx)
+		return true, len(s.txTable) + len(s.specialTxTable)
+	}
+
+	// Only when the virtual machine is running normally can the read-write set be saved, or write fake conflicted key
+	txRWSet = txSimContext.GetTxRWSet(runVmSuccess)
+	txResult = txSimContext.GetTxResult()
+
+	if specialTxType == protocol.ExecOrderTxTypeIterator || txExecSeq >= len(s.txTable) {
+		s.apply(tx, txRWSet, txResult, runVmSuccess)
+		return true, len(s.txTable)
+	}
+
+	// Check whether the dependent state has been modified during the running it
+	for _, txRead := range txRWSet.TxReads {
+		finalKey := constructKey(txRead.ContractName, txRead.Key)
+		if sv, ok := s.writeTable[finalKey]; ok {
+			if sv.seq >= txExecSeq {
+				s.log.Debugf("Key Conflicted %+v-%+v, tx id:%s", sv.seq, txExecSeq, tx.Payload.TxId)
+				return false, len(s.txTable)
+			}
+		}
+	}
+
+	s.apply(tx, txRWSet, txResult, runVmSuccess)
+	return true, len(s.txTable)
+}
+
+func (s *SnapshotImpl) dealSZTx(txSimContext protocol.TxSimContext, specialTxType protocol.ExecOrderTxType,
+	runVmSuccess, applySpecialTx bool, tx *commonPb.Transaction) (bool, int) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	// it is necessary to check sealed secondly
+	if !applySpecialTx && s.IsSealed() {
+		return false, len(s.txTable)
+	}
+
+	txExecSeq := txSimContext.GetTxExecSeq()
+	var txRWSet *commonPb.TxRWSet
+	var txResult *commonPb.Result
+
+	//txRWSet = &commonPb.TxRWSet{
+	//	TxId:     txSimContext.GetTx().Payload.TxId,
+	//	TxReads:  []*commonPb.TxRead{},
+	//	TxWrites: []*commonPb.TxWrite{},
+	//}
+	if !applySpecialTx && specialTxType == protocol.ExecOrderTxTypeIterator {
+		s.specialTxTable = append(s.specialTxTable, tx)
+		return true, len(s.txTable) + len(s.specialTxTable)
+	}
+
+	// Only when the virtual machine is running normally can the read-write set be saved, or write fake conflicted key
+	// TODO disable getting read/write sets from txSimContext
+	txRWSet = txSimContext.GetTxRWSet(runVmSuccess)
+	txResult = txSimContext.GetTxResult()
+
+	if specialTxType == protocol.ExecOrderTxTypeIterator || txExecSeq >= len(s.txTable) {
+		s.apply(tx, txRWSet, txResult, runVmSuccess)
+		return true, len(s.txTable)
+	}
+
+	// Check whether the dependent state has been modified during the running it
+	for _, txRead := range txRWSet.TxReads {
+		finalKey := constructKey(txRead.ContractName, txRead.Key)
+		if sv, ok := s.writeTable[finalKey]; ok {
+			if sv.seq >= txExecSeq {
+				s.log.Debugf("Key Conflicted %+v-%+v, tx id:%s", sv.seq, txExecSeq, tx.Payload.TxId)
+				return false, len(s.txTable)
+			}
+		}
+	}
+
+	s.apply(tx, txRWSet, txResult, runVmSuccess)
+	return true, len(s.txTable)
 }

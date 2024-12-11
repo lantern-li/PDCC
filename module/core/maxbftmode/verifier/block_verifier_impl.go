@@ -236,18 +236,18 @@ func (v *BlockVerifierImpl) verifyBlock(block *commonpb.Block, mode protocol.Ver
 		return verifyResult, err
 	}
 
-	snapshot := v.snapshotManager.GetSnapshot(lastBlock, newBlock)
-	if coinbasemgr.IsOptimizeChargeGasEnabled(v.chainConf) {
-		if err = scheduler.VerifyOptimizeChargeGasTx(newBlock, snapshot, v.ac, blockVersion); err != nil {
-			v.log.Warnf("verify failed [%d](%x), %s",
-				newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
-			verifyResult = parseVerifyResult(newBlock, true, txRWSetMap, rwSetVerifyFailTx)
-			if protocol.CONSENSUS_VERIFY == mode {
-				v.msgBus.Publish(msgbus.VerifyResult, verifyResult)
-			}
-			return verifyResult, err
-		}
-	}
+	//snapshot := v.snapshotManager.GetSnapshot(lastBlock, newBlock)
+	//if coinbasemgr.IsOptimizeChargeGasEnabled(v.chainConf) {
+	//	if err = scheduler.VerifyOptimizeChargeGasTx(newBlock, snapshot, v.ac, blockVersion); err != nil {
+	//		v.log.Warnf("verify failed [%d](%x), %s",
+	//			newBlock.Header.BlockHeight, newBlock.Header.BlockHash, err.Error())
+	//		verifyResult = parseVerifyResult(newBlock, true, txRWSetMap, rwSetVerifyFailTx)
+	//		if protocol.CONSENSUS_VERIFY == mode {
+	//			v.msgBus.Publish(msgbus.VerifyResult, verifyResult)
+	//		}
+	//		return verifyResult, err
+	//	}
+	//}
 
 	// sync mode, need to verify consensus vote signature
 	beginConsensCheck := utils.CurrentTimeMillisSeconds()
@@ -420,11 +420,14 @@ func (v *BlockVerifierImpl) validateBlock(block,
 	timeLasts := make(map[string]int64)
 	var err error
 	var txCapacity uint32
-	if coinbasemgr.IsOptimizeChargeGasEnabled(v.chainConf) {
-		txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity + 1
-	} else {
-		txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity
-	}
+
+	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity
+	// todo coinbase 是否需要注释掉？待确认！
+	//if coinbasemgr.IsOptimizeChargeGasEnabled(v.chainConf) {
+	//	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity + 1
+	//} else {
+	//	txCapacity = v.chainConf.ChainConfig().Block.BlockTxCapacity
+	//}
 
 	if block.Header.TxCount > txCapacity {
 		return nil, nil, timeLasts, nil, fmt.Errorf("txcapacity expect <= %d, got %d)", txCapacity, block.Header.TxCount)

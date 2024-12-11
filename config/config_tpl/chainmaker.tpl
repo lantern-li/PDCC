@@ -25,7 +25,7 @@ crypto_engine: tjfoc # [*]
 
 # Chains the node currently joined in
 blockchain:
-  # chain id and its genesis block file path.
+# chain id and its genesis block file path.
 #  - chainId: chain1
 #    genesis: ../config/{org_path1}/chainconfig/bc1.yml
 #  - chainId: chain2
@@ -34,6 +34,10 @@ blockchain:
 #    genesis: ../config/{org_path3}/chainconfig/bc3.yml
 #  - chainId: chain4
 #    genesis: ../config/{org_path4}/chainconfig/bc4.yml
+
+core:
+  # 1 quick schedule
+  scheduler_type: 1
 
 # Blockchain node settings
 node:

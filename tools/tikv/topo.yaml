@@ -1,0 +1,23 @@
+global:
+  user: "root"
+  ssh_port: 22
+  deploy_dir: "/data/tikv/deploy"
+  data_dir: "/data/tikv/data"
+server_configs:
+  tikv:
+  pd:
+    replication.location-labels: [ "host" ]
+    replication.max-replicas: 1
+
+pd_servers:
+  - host: 127.0.0.1
+
+tikv_servers:
+  - host: 127.0.0.1
+    port: 20160
+    status_port: 20180
+    deploy_dir: "/data/tikv/tikv1/deploy"
+    data_dir: "/data/tikv/tikv1/data"
+    log_dir: "/data/tikv/tikv1/log"
+    config:
+      server.labels: { host: "logic-host-1" }

@@ -104,6 +104,8 @@ var (
 	respResultToString               bool
 
 	multiSignEnableManualRun bool
+
+	txRequest string
 )
 
 const (
@@ -180,6 +182,9 @@ const (
 	flagPermissionResourcePolicyRoleList = "permission-resource-policy-roleList"
 	flagRespResultToString               = "result-to-string"
 	flagMultiSignEnableManualRun         = "multi-sign-enable-manual-run"
+
+	// test
+	flagTxRequest						 = "tx-request"
 )
 
 // ClientCMD new client series command
@@ -319,6 +324,9 @@ func init() {
 		flagMultiSignEnableManualRun,
 		false,
 		"enable or disable manual run feature of multi-sign")
+
+	flags.StringVar(&txRequest, flagTxRequest, "", "tx request")
+
 	flags.StringVar(&truncateModel,
 		flagTruncateModel,
 		"",

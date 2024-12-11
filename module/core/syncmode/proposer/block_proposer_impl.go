@@ -430,8 +430,7 @@ func (bp *BlockProposerImpl) OnReceiveProposeStatusChange(proposeStatus bool) {
 
 // OnReceiveMaxBFTProposal, to check if this proposer should propose a new block
 // Only for maxbft consensus
-func (bp *BlockProposerImpl) OnReceiveMaxBFTProposal(proposal *maxbft.BuildProposal) {
-
+func (bp *BlockProposerImpl) OnReceiveMaxBFTProposal(*maxbft.BuildProposal) {
 }
 
 // OnReceiveYieldProposeSignal, receive yield propose signal
@@ -607,8 +606,7 @@ func (bp *BlockProposerImpl) isSelfProposer() bool {
 	return bp.isProposer
 }
 
-func (bp *BlockProposerImpl) ProposeBlock(proposal *maxbft.BuildProposal) (*consensuspb.ProposalBlock, error) {
-
+func (bp *BlockProposerImpl) ProposeBlock(*maxbft.BuildProposal) (*consensuspb.ProposalBlock, error) {
 	return nil, nil
 }
 
@@ -756,6 +754,8 @@ func (bp *BlockProposerImpl) dealProposalRequestWithProposalCache(
 			bp.proposalCache.SetProposedAt(height)
 			_, txsRwSet, _ := bp.proposalCache.GetProposedBlock(selfProposedBlock)
 			common.ProposeRepeatTimerMap.Store(string(blockFinger), utils.CurrentTimeMillisSeconds())
+
+			common.ProposeRepeatTimerMap.Store(blockFinger, utils.CurrentTimeMillisSeconds())
 
 			cutBlock := new(commonpb.Block)
 			if common.IfOpenConsensusMessageTurbo(bp.chainConf) ||

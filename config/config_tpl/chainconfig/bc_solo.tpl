@@ -52,9 +52,6 @@ vm:
     - "evm"
     - "dockergo"
     - "wxvm"
-  native:
-      multisign:
-        enable_manual_run: true
 
 # Block proposing related settings
 block:
@@ -74,7 +71,7 @@ block:
 
   # The interval of block proposing attempts, in millisecond.
   # should be within the range of [10,10000]
-  block_interval: 200
+  block_interval: 10
 
   # To enable this attribute, ensure that the clock of the node is consistent
   # Verify the block timestamp or not

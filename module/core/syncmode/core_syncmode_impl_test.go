@@ -8,6 +8,10 @@ SPDX-License-Identifier: Apache-2.0
 package syncmode
 
 import (
+	"chainmaker.org/chainmaker/utils/v2"
+	"encoding/hex"
+	"fmt"
+	"github.com/gogo/protobuf/proto"
 	"reflect"
 	"testing"
 
@@ -605,4 +609,33 @@ func TestCoreEngine_GetMaxbftHelper(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestKey(t *testing.T) {
+
+	s, err := hex.DecodeString("0aa7010a06636861696e311a403137323439323662346431616134383463616131386636353761636335333337306132633736626133663435343937646265326538636338613865363538363820bfaf979b06320a44504f535f45524332303a085452414e5346455242320a02746f122c33344c4b71656573696b476556316b71414157774741784d706d596a44574a416f4551704d3576316d683743420b0a0576616c7565120231301287010a3c0a1677782d6f7267312e636861696e6d616b65722e6f726710011a20613dec208b007a32f1da215b1b94471850e717a790c4ab8934a5a9e29fd59bea12473045022100f40e672d97c432835933d197d08e60c76df6fefc02b52fc29747d972d6a70fbe0220126b34b3a43ba54d6d870062782d46929bdbf7e1e1a4c392e569eb320fc0041c")
+	if err != nil {
+		panic(err)
+	}
+
+	tq := new(commonpb.TxRequest)
+	err = proto.Unmarshal(s, tq)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("原交易内容:%s \n", tq)
+
+	tq.Payload.Timestamp = utils.CurrentTimeMillisSeconds()
+
+	fmt.Printf("更改后的交易内容:%s \n", tq)
+
+	s2, err := proto.Marshal(tq)
+	if err != nil {
+		panic(err)
+	}
+
+	s3 := hex.EncodeToString(s2)
+	fmt.Printf("编码：%s", s3)
+
 }

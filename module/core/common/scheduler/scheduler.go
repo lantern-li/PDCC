@@ -49,6 +49,11 @@ const (
 	ErrMsgOfGasLimitNotSet = "field `GasLimit` must be set in payload."
 )
 
+var (
+	SZContractList = map[string]struct{}{
+		"REAL_ESTATE": {}, "RECEPIT": {}, "DECLARATION": {}, "EXPORT_REBATE": {}, "SOCIAL_SECURITY": {}, "ENDORSEMENT": {}}
+)
+
 // TxScheduler transaction scheduler structure
 type TxScheduler struct {
 	lock            sync.Mutex
@@ -62,6 +67,9 @@ type TxScheduler struct {
 	ledgerCache     protocol.LedgerCache
 	contractCache   *sync.Map
 	ac              protocol.AccessControlProvider
+
+	metricVMRunTime             *prometheus.HistogramVec
+	metricContractInvokeCounter *prometheus.CounterVec
 }
 
 // Transaction dependency in adjacency table representation
@@ -75,6 +83,12 @@ type applyResult struct {
 	txIndex        int
 	isApplySuccess bool
 	applySize      int
+}
+
+// todo 确认一下
+type value struct {
+	TxId  string
+	Nonce int
 }
 
 // Schedule according to a batch of transactions,
@@ -122,6 +136,38 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	enableConflictsBitWindow, conflictsBitWindow := ts.initOptimizeTools(txBatch)
 	var senderGroup *SenderGroup
 	var senderCollection *SenderCollection
+
+	// 税总合约走快速调度，其余合约走正常调度。快速调度需要在chainmaker.yml中把调度模式变更为快速调度0为正常，1为快速调度。
+	if localconf.ChainMakerConfig.CoreConfig.SchedulerType == 1 &&
+		canUseQuickSchedule(txBatch) {
+
+		txRWSetMap := make(map[string]*commonPb.TxRWSet, len(txBatch))
+		contractEventMap := make(map[string][]*commonPb.ContractEvent, 0)
+		createTime := time.Since(startTime)
+		paramMap := make(map[string][]byte)
+
+		for _, tx := range txBatch {
+			start := time.Now()
+			// 执行合约
+			ts.runContract(tx, txRWSetMap, snapshot, block, paramMap)
+			if localconf.ChainMakerConfig.MonitorConfig.Enabled {
+				ts.metricVMRunTime.WithLabelValues(tx.Payload.ChainId).Observe(time.Since(start).Seconds())
+				// count user contract invoke times
+				ts.metricContractInvokeCounter.WithLabelValues(ts.chainConf.ChainConfig().ChainId, tx.Payload.ContractName, commonPb.RuntimeType_NATIVE.String(), "true").Inc()
+			}
+		}
+		putMapTime := time.Since(startTime)
+		// 将交易填充进区块（此时交易的执行结果已经写入）
+		block.Txs = txBatch
+		// 生成无冲突DAG，因为交易都是串行的执行的，所以都是无冲突DAG
+		block.Dag = genDefaultDag(len(txBatch))
+		entTime := time.Since(startTime)
+		ts.log.Infof("schedule tx batch finished, block:%d, serial, save, success %d, time[create:%v, put:%v, dag:%v, total:%v]",
+			block.Header.BlockHeight, len(txBatch),
+			createTime, putMapTime-createTime, entTime-putMapTime, entTime)
+		return txRWSetMap, contractEventMap, nil
+	}
+
 	if enableOptimizeChargeGas {
 		ts.log.Debugf("before prepare `SenderCollection` ")
 		senderCollection = ts.NewSenderCollection(txBatch, snapshot, ts.ac, blockVersion, ts.log)
@@ -281,6 +327,40 @@ func (ts *TxScheduler) handleSpecialTxs(blockVersion uint32, block *commonPb.Blo
 				block, serialTxsNum, senderCollection)
 		}
 	}
+}
+
+func (ts *TxScheduler) runContract(
+	tx *commonPb.Transaction, txRWSetMap map[string]*commonPb.TxRWSet,
+	snapshot protocol.Snapshot, block *commonPb.Block, paramMap map[string][]byte) {
+
+	txSimContext := vm.NewTxSimContext(ts.VmManager, snapshot, tx, block.Header.BlockVersion, ts.log)
+	switch tx.Payload.Method {
+	// 上链接口走默认处理逻辑，无需逻辑判断以及无读写集
+	case "Save", "Endorse":
+		tx.Result = genDefaultTxResult()
+		txId := tx.Payload.TxId
+		txRWSetMap[txId] = genDefaultTxRWSet(txId)
+
+	// 更新接口，需要有版本号的判断，所以需要有读写集
+	case "Update":
+		update(tx, txSimContext, txRWSetMap, paramMap, ts.log)
+
+	default:
+		ts.log.Error("Invalid sz contract method: %s", tx.Payload.Method)
+	}
+}
+
+func getSimContextKey(bizId, businessType string) []byte {
+	simContextKey := bizId + businessType
+	return []byte(simContextKey)
+}
+
+func getErrResult(txResult *commonPb.Result, errMsg string, log protocol.Logger) {
+	txResult.ContractResult.Message = errMsg
+	txResult.Code = commonPb.TxStatusCode_CONTRACT_FAIL
+	txResult.ContractResult.Code = uint32(1)
+
+	log.Error(errMsg)
 }
 
 // handleTx: run tx and apply tx sim context to snapshot
@@ -453,6 +533,34 @@ func (ts *TxScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.
 		return txRWSetMap, snapshot.GetTxResultMap(), nil
 	}
 	ts.log.Infof("simulate with dag start, size %d", len(block.Txs))
+
+	if localconf.ChainMakerConfig.CoreConfig.SchedulerType == 1 &&
+		canUseQuickSchedule(block.Txs) {
+		txBatch := block.Txs
+		txResultMap := make(map[string]*commonPb.Result, len(txBatch))
+		createTime := time.Since(startTime)
+		paramMap := make(map[string][]byte)
+
+		for _, tx := range txBatch {
+			ts.runContract(tx, txRWSetMap, snapshot, block, paramMap)
+			txResultMap[tx.Payload.TxId] = tx.Result
+			if localconf.ChainMakerConfig.MonitorConfig.Enabled {
+				// count user contract invoke times
+				ts.metricContractInvokeCounter.WithLabelValues(ts.chainConf.ChainConfig().ChainId, tx.Payload.ContractName,
+					commonPb.RuntimeType_NATIVE.String(), "true").Inc()
+			}
+		}
+
+		putMapTime := time.Since(startTime)
+		block.Txs = txBatch
+		block.Dag = genDefaultDag(len(txBatch))
+		endTime := time.Since(startTime)
+		ts.log.Infof("simulate with dag finished, block:%d, txs:%d, serial, time[create:%v, put:%v, dag:%v, total:%v]",
+			block.Header.BlockHeight, len(txBatch),
+			createTime, putMapTime-createTime, endTime-putMapTime, endTime)
+		return txRWSetMap, txResultMap, nil
+	}
+
 	txMapping := make(map[int]*commonPb.Transaction, len(block.Txs))
 	for index, tx := range block.Txs {
 		txMapping[index] = tx
@@ -1309,6 +1417,7 @@ func (ts *TxScheduler) dispatchTxsInSenderCollection(
 	for addr, txCollection := range senderCollection.txsMap {
 		balance := txCollection.accountBalance
 		for _, tx := range txCollection.txs {
+			// todo 确认，此处税总分支都是注释掉了的
 			ts.log.Debugf("dispatch sender collection tx => %s", tx.Payload)
 			var gasLimit int64
 			limit := tx.Payload.Limit
@@ -1803,9 +1912,9 @@ func (ts *TxScheduler) compareDag(block *commonPb.Block, snapshot protocol.Snaps
 		appendSpecialTxsToDag(dag, txExecOrderIteratorCount)
 	}
 	// snapshot.GetSnapshotSize() > 0 prevent snapshot.GetSnapshotSize() - 1 overflow
-	if coinbasemgr.IsOptimizeChargeGasEnabled(ts.chainConf) && snapshot.GetSnapshotSize() > 0 {
-		ts.appendChargeGasTxToDAG(dag, snapshot)
-	}
+	//if coinbasemgr.IsOptimizeChargeGasEnabled(ts.chainConf) && snapshot.GetSnapshotSize() > 0 {
+	//	ts.appendChargeGasTxToDAG(dag, snapshot)
+	//}
 	equal, err := utils.IsDagEqual(block.Dag, dag)
 	if err != nil {
 		return err
@@ -1848,4 +1957,153 @@ func appendSpecialTxsToDag(dag *commonPb.DAG, txExecOrderSpecialCount uint32) {
 		dagNeighbors.Neighbors = append(dagNeighbors.Neighbors, txExecOrderNormalCount+i-1)
 		dag.Vertexes = append(dag.Vertexes, dagNeighbors)
 	}
+}
+
+func genDefaultTxResult() *commonPb.Result {
+	return &commonPb.Result{
+		Code: commonPb.TxStatusCode_SUCCESS,
+		ContractResult: &commonPb.ContractResult{
+			Code:    uint32(0),
+			Result:  nil,
+			Message: "OK",
+		},
+		RwSetHash: nil,
+	}
+}
+
+func genDefaultTxRWSet(txId string) *commonPb.TxRWSet {
+	return &commonPb.TxRWSet{
+		TxId:     txId,
+		TxReads:  nil,
+		TxWrites: nil,
+	}
+}
+
+func genDefaultDag(txCount int) *commonPb.DAG {
+	vertexes := make([]*commonPb.DAG_Neighbor, txCount)
+	for i := 0; i < txCount; i++ {
+		vertexes[i] = &commonPb.DAG_Neighbor{
+			Neighbors: make([]uint32, 0, 1),
+		}
+	}
+	return &commonPb.DAG{
+		Vertexes: vertexes,
+	}
+}
+
+// 判断是不是税总合约
+func canUseQuickSchedule(txs []*commonPb.Transaction) bool {
+	for _, tx := range txs {
+		if _, ok := SZContractList[tx.Payload.ContractName]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func update(
+	tx *commonPb.Transaction, txSimContext protocol.TxSimContext,
+	txRWSetMap map[string]*commonPb.TxRWSet, paramMap map[string][]byte,
+	log protocol.Logger) {
+	// 获取参数
+	bizId, businessType, nonce := getUpdateParam(tx, paramMap)
+
+	// 设置交易初始结果
+	tx.Result = genDefaultTxResult()
+	key := getSimContextKey(bizId, businessType)
+	valueByte, err := txSimContext.Get(tx.Payload.ContractName, key)
+
+	// 获取读写集（避免交易失败后未赋值读写集）
+	txReads := []*commonPb.TxRead{{
+		Key:          key,
+		Value:        valueByte,
+		ContractName: tx.Payload.ContractName,
+	}}
+
+	txRWSetMap[tx.Payload.TxId] = &commonPb.TxRWSet{
+		TxId:    tx.Payload.TxId,
+		TxReads: txReads,
+	}
+
+	if err != nil {
+		errMsg := fmt.Sprintf("sz update fail txSimContext get err:%s contract:%s,bizId:%s，businessType：%s",
+			err.Error(), tx.Payload.ContractName, bizId, businessType)
+		getErrResult(tx.Result, errMsg, log)
+
+		return
+	}
+
+	// 第一次更新数据，当前版本号就是0
+	var lastNonce int
+	if valueByte == nil || len(valueByte) == 0 {
+		lastNonce = 0
+	} else {
+		lastNonce, err = strconv.Atoi(string(valueByte))
+		if err != nil {
+			errMsg := fmt.Sprintf("sz update fail strconv Atoi err:%s,contract:%s,bizId:%s，businessType：%s",
+				err.Error(), tx.Payload.ContractName, bizId, businessType)
+			getErrResult(tx.Result, errMsg, log)
+
+			return
+		}
+	}
+
+	// 传参中没传nonce，就当前nonce+1，否则用传入的nonce（需要和旧nonce比较）。
+	var noncePair int
+	if len(nonce) == 0 {
+		// update nonce
+		noncePair = lastNonce + 1
+	} else {
+		nonceInt, err := strconv.Atoi(nonce)
+		if err != nil {
+			errMsg := fmt.Sprintf("sz update fail strconv Atoi err:%s,contract:%s,bizId:%s，businessType：%s",
+				err.Error(), tx.Payload.ContractName, bizId, businessType)
+			getErrResult(tx.Result, errMsg, log)
+
+			return
+		}
+
+		if lastNonce >= nonceInt {
+			errMsg := fmt.Sprintf("sz update fail nonce invalid request nonce should be more than the last, "+
+				"contract:%s, nonce:%s, currentNonce:%d", tx.Payload.ContractName, nonce, lastNonce)
+			getErrResult(tx.Result, errMsg, log)
+			return
+		}
+		noncePair = nonceInt
+	}
+
+	val := []byte(fmt.Sprint(noncePair))
+	err = txSimContext.Put(tx.Payload.ContractName, key, val)
+	if err != nil {
+		errMsg := fmt.Sprintf("sz update fail,err: %s "+
+			"contract:%s", err.Error(), tx.Payload.ContractName)
+		getErrResult(tx.Result, errMsg, log)
+
+		return
+	}
+
+	// 返回交易执行结果
+	tx.Result.ContractResult.Result = []byte(fmt.Sprint(noncePair))
+
+	// 将成功交易的写集写入
+	txWrites := []*commonPb.TxWrite{{
+		Key:          key,
+		Value:        val,
+		ContractName: tx.Payload.ContractName,
+	}}
+
+	txRWSetMap[tx.Payload.TxId] = &commonPb.TxRWSet{
+		TxId:     tx.Payload.TxId,
+		TxReads:  txReads,
+		TxWrites: txWrites,
+	}
+}
+
+func getUpdateParam(tx *commonPb.Transaction, paramMap map[string][]byte) (string, string, string) {
+	// 获取参数
+	for _, v := range tx.Payload.Parameters {
+		paramMap[v.Key] = v.Value
+	}
+
+	return string(paramMap["bizId"]), string(paramMap["businessType"]), string(paramMap["nonce"])
 }
