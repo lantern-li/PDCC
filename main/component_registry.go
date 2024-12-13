@@ -40,29 +40,29 @@ func init() {
 	// vm
 	vm.RegisterVmProvider(
 		"GASM",
-		func(chainId string, configs map[string]interface{}) (protocol.VmInstancesManager, error) {
+		func(chainId string, configs map[string]interface{}, kmsProviders map[string]protocol.KMSProvider) (protocol.VmInstancesManager, error) {
 			return &gasm.InstancesManager{}, nil
 		})
 	vm.RegisterVmProvider(
 		"WASMER",
-		func(chainId string, configs map[string]interface{}) (protocol.VmInstancesManager, error) {
-			return wasmer.NewInstancesManager(chainId), nil
+		func(chainId string, configs map[string]interface{}, kmsProviders map[string]protocol.KMSProvider) (protocol.VmInstancesManager, error) {
+			return wasmer.NewInstancesManager(chainId, localconf.ChainMakerConfig.VMConfig.Wasmer, kmsProviders), nil
 		})
 	vm.RegisterVmProvider(
 		"WXVM",
-		func(chainId string, configs map[string]interface{}) (protocol.VmInstancesManager, error) {
+		func(chainId string, configs map[string]interface{}, kmsProviders map[string]protocol.KMSProvider) (protocol.VmInstancesManager, error) {
 			return &wxvm.InstancesManager{}, nil
 		})
 	vm.RegisterVmProvider(
 		"EVM",
-		func(chainId string, configs map[string]interface{}) (protocol.VmInstancesManager, error) {
+		func(chainId string, configs map[string]interface{}, kmsProviders map[string]protocol.KMSProvider) (protocol.VmInstancesManager, error) {
 			return &evm.InstancesManager{}, nil
 		})
 
 	// chainId string, logger protocol.Logger, vmConfig map[string]interface{}
 	vm.RegisterVmProvider(
 		"DOCKERGO",
-		func(chainId string, configs map[string]interface{}) (protocol.VmInstancesManager, error) {
+		func(chainId string, configs map[string]interface{}, kmsProviders map[string]protocol.KMSProvider) (protocol.VmInstancesManager, error) {
 			return dockergo.NewDockerManager(
 				chainId,
 				localconf.ChainMakerConfig.VMConfig.DockerVMGo,
@@ -72,11 +72,12 @@ func init() {
 	// chainId string, logger protocol.Logger, vmConfig map[string]interface{}
 	vm.RegisterVmProvider(
 		"GO",
-		func(chainId string, configs map[string]interface{}) (protocol.VmInstancesManager, error) {
+		func(chainId string, configs map[string]interface{}, kmsProviders map[string]protocol.KMSProvider) (protocol.VmInstancesManager, error) {
 			return goEngine.NewInstancesManager(
 				chainId,
 				logger.GetLoggerByChain(logger.MODULE_VM, chainId),
 				localconf.ChainMakerConfig.VMConfig.Go,
+				kmsProviders,
 			)
 		})
 

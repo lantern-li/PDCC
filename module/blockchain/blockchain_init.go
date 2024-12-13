@@ -8,6 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 package blockchain
 
 import (
+	"chainmaker.org/chainmaker-go/module/core/kms"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -73,6 +74,8 @@ func (bc *Blockchain) Init() (err error) {
 		{moduleNameChainConf: bc.initChainConf},
 		// init tx filter , must latter than store module
 		{moduleNameTxFilter: bc.initTxFilter},
+		// init kms
+		{moduleNameKMS: bc.initKMS},
 	}
 
 	if err := bc.initBaseModules(baseModules); err != nil {
@@ -137,6 +140,8 @@ func (bc *Blockchain) InitForRebuildDbs() (err error) {
 		{moduleNameChainConf: bc.initChainConf},
 		// init tx filter , must latter than store module
 		{moduleNameTxFilter: bc.initTxFilter},
+		// init kms
+		{moduleNameKMS: bc.initKMS},
 	}
 	if err := bc.initBaseModules(baseModules); err != nil {
 		return err
@@ -568,6 +573,21 @@ func (bc *Blockchain) initTxPool() (err error) {
 	return nil
 }
 
+func (bc *Blockchain) initKMS() (err error) {
+	_, ok := bc.initModules[moduleNameKMS]
+	if ok {
+		bc.log.Infof("kms module existed, ignore.")
+		return nil
+	}
+	kmsProviders, err := kms.InitKMSProviders(localconf.ChainMakerConfig.KMSConfig, bc.log)
+	if err != nil {
+		return err
+	}
+	bc.kmsProviders = kmsProviders
+	bc.initModules[moduleNameKMS] = struct{}{}
+	return nil
+}
+
 func (bc *Blockchain) initVM() (err error) {
 	_, ok := bc.initModules[moduleNameVM]
 	if ok {
@@ -608,12 +628,12 @@ func (bc *Blockchain) initVM() (err error) {
 		supportedVmManagerList := make(map[common.RuntimeType]protocol.VmInstancesManager)
 
 		for _, vmType := range chainConfig.Vm.SupportList {
-			err = bc.addVmManager(vmType, supportedVmManagerList)
+			err = bc.addVmManager(vmType, supportedVmManagerList, bc.kmsProviders)
 			if err != nil {
 				return err
 			}
 			if componentVm.VmTypeToRunTimeType[strings.ToUpper(vmType)] == common.RuntimeType_DOCKER_GO {
-				err = bc.addVmManager(componentVm.RunTimeTypeToVmType[common.RuntimeType_GO], supportedVmManagerList)
+				err = bc.addVmManager(componentVm.RunTimeTypeToVmType[common.RuntimeType_GO], supportedVmManagerList, bc.kmsProviders)
 				if err != nil {
 					return err
 				}
@@ -661,12 +681,12 @@ func (bc *Blockchain) initVM() (err error) {
 		supportedVmManagerList := make(map[common.RuntimeType]protocol.VmInstancesManager)
 
 		for _, vmType := range chainConfig.Vm.SupportList {
-			err = bc.addVmManager(vmType, supportedVmManagerList)
+			err = bc.addVmManager(vmType, supportedVmManagerList, bc.kmsProviders)
 			if err != nil {
 				return err
 			}
 			if componentVm.VmTypeToRunTimeType[strings.ToUpper(vmType)] == common.RuntimeType_DOCKER_GO {
-				err = bc.addVmManager(componentVm.RunTimeTypeToVmType[common.RuntimeType_GO], supportedVmManagerList)
+				err = bc.addVmManager(componentVm.RunTimeTypeToVmType[common.RuntimeType_GO], supportedVmManagerList, bc.kmsProviders)
 				if err != nil {
 					return err
 				}
@@ -696,9 +716,10 @@ func (bc *Blockchain) initVMNative() {
 }
 
 func (bc *Blockchain) addVmManager(vmType string,
-	supportedVmManagerList map[common.RuntimeType]protocol.VmInstancesManager) error {
+	supportedVmManagerList map[common.RuntimeType]protocol.VmInstancesManager,
+	kmsProviders map[string]protocol.KMSProvider) error {
 	vmInstancesManagerProvider := componentVm.GetVmProvider(vmType)
-	vmInstancesManager, err := vmInstancesManagerProvider(bc.chainId, nil)
+	vmInstancesManager, err := vmInstancesManagerProvider(bc.chainId, nil, kmsProviders)
 	if err != nil {
 		bc.log.Errorf("create instance manager failed, %v", err)
 		return err

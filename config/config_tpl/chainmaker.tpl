@@ -655,8 +655,17 @@ storage:
 
 # Contract Virtual Machine(VM) configs
 vm:
+  # Wasmer config
+  wasmer:
+    kms:
+      enable: true
+      id: sz_kms
   # Golang runtime in docker container
   go:
+    # kms config
+    kms:
+     enable: true
+     id: sz_kms
     # Enable docker go virtual machine, default: false
     enable: {enable_vm_go}
 
@@ -709,3 +718,27 @@ vm:
 
       # Max number of connection created to connect docker vm service
       max_connection: 5
+
+kms:
+  # Mark the kms id and enable it for other modules
+  - kms_id: sz_kms
+    # enable or not to check if available
+    enabled: true
+    # plugin / tencentcloudkms or other service provider
+    source: bwmmfw
+    # KMS SecretId
+    secret_id: "11000009h0g4vyo4"
+    # KMS SecretKey
+    secret_key: "ceshi_01"
+    # KMS server address, ip or dns
+    address: "192.168.2.55:20009"
+    # env / lib path
+    library: "../lib/kms/amd/bwmmfw.so"
+    # Public cloud or private cloud
+    is_public: true
+    # KMS server region
+    region: "ap-guangzhou"
+    # KMS sdk scheme, http or https
+    sdk_scheme: "https"
+    # Optional settings，style "{k1:v1, k2:v2}".
+    ext_params: ""
