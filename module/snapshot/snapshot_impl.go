@@ -778,7 +778,7 @@ func (s *SnapshotImpl) dealNormalTx(txSimContext protocol.TxSimContext, specialT
 	// Check whether the dependent state has been modified during the running it
 	for _, txRead := range txRWSet.TxReads {
 		finalKey := constructKey(txRead.ContractName, txRead.Key)
-		if sv, ok := s.writeTable[finalKey]; ok {
+		if sv, ok := s.writeTable.getByLock(finalKey); ok {
 			if sv.seq >= txExecSeq {
 				s.log.Debugf("Key Conflicted %+v-%+v, tx id:%s", sv.seq, txExecSeq, tx.Payload.TxId)
 				return false, len(s.txTable)
@@ -826,7 +826,7 @@ func (s *SnapshotImpl) dealSZTx(txSimContext protocol.TxSimContext, specialTxTyp
 	// Check whether the dependent state has been modified during the running it
 	for _, txRead := range txRWSet.TxReads {
 		finalKey := constructKey(txRead.ContractName, txRead.Key)
-		if sv, ok := s.writeTable[finalKey]; ok {
+		if sv, ok := s.writeTable.getByLock(finalKey); ok {
 			if sv.seq >= txExecSeq {
 				s.log.Debugf("Key Conflicted %+v-%+v, tx id:%s", sv.seq, txExecSeq, tx.Payload.TxId)
 				return false, len(s.txTable)

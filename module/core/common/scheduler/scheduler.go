@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"regexp"
 	"strconv"
 	"sync"

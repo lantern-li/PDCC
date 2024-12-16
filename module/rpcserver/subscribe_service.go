@@ -8,7 +8,6 @@ SPDX-License-Identifier: Apache-2.0
 package rpcserver
 
 import (
-	"context"
 	"chainmaker.org/chainmaker-go/module/subscriber/model"
 	"context"
 	"errors"
@@ -17,7 +16,6 @@ import (
 
 	"chainmaker.org/chainmaker-go/module/rpcserver/rateLimiter"
 
-	"chainmaker.org/chainmaker-go/module/subscriber/model"
 	commonErr "chainmaker.org/chainmaker/common/v2/errors"
 	apiPb "chainmaker.org/chainmaker/pb-go/v2/api"
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
@@ -99,11 +97,12 @@ func (s *ApiService) checkAndGetLastBlockHeight(store protocol.BlockchainStore,
 	lastBlockHeight = lastBlock.Header.BlockHeight
 
 	if int64(lastBlockHeight) < payloadStartBlockHeight {
-		errMsg = fmt.Sprintf("payload start block height:%d > last block height:%d",
+		errMsg := fmt.Sprintf("payload start block height:%d > last block height:%d",
 			payloadStartBlockHeight, lastBlockHeight)
 
 		s.log.Warn(errMsg)
-		return int64(lastBlock.Header.BlockHeight), status.Error(codes.InvalidArgument, errMsg)
+
+		//return int64(lastBlock.Header.BlockHeight), status.Error(codes.InvalidArgument, errMsg) 236 是这段代码，但是考虑到税总已投入使用且此处影响不大，继续沿用下面原税总处理逻辑
 		return -1, s.errorResultByMessage(codes.InvalidArgument, "payload start block height:%d >  last block "+
 			"height:%d", payloadStartBlockHeight, lastBlockHeight)
 	}
@@ -166,45 +165,6 @@ func (s *ApiService) startSubscribeBlockEvent(ctx context.Context, lastBlockHeig
 	eventSubscriber, err := s.chainMakerServer.GetEventSubscribe(chainId)
 	if err != nil {
 		return fmt.Errorf("get event subscribe. error: %s", err)
-	}
-
-	go func() {
-		sub := eventSubscriber.SubscribeBlockEvent(blockEventC)
-		defer sub.Unsubscribe()
-
-		for {
-			select {
-			case ev := <-blockEventC:
-				atomic.StoreInt64(lastBlockHeight, int64(ev.BlockInfo.Block.Header.BlockHeight))
-				select {
-				case dataC <- ev:
-				default:
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return nil
-}
-
-// todo 236 logic
-func (s *ApiService) startSubscribeBlockEvent(ctx context.Context, lastBlockHeight *int64, chainId string,
-	dataC chan model.NewBlockEvent) error {
-	db, err := s.chainMakerServer.GetStore(chainId)
-	if err != nil {
-		return err
-	}
-	lastBlock, err := db.GetLastBlock()
-	if err != nil {
-		return err
-	}
-	atomic.StoreInt64(lastBlockHeight, int64(lastBlock.Header.BlockHeight))
-
-	blockEventC := make(chan model.NewBlockEvent, 1)
-	eventSubscriber, err := s.chainMakerServer.GetEventSubscribe(chainId)
-	if err != nil {
-		return err
 	}
 
 	go func() {

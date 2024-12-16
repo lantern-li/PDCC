@@ -4,20 +4,20 @@ go 1.16
 
 require (
 	chainmaker.org/chainmaker/chainconf/v2 v2.3.4
-	chainmaker.org/chainmaker/common/v2 v2.3.6
+	chainmaker.org/chainmaker/common/v2 v2.3.7-0.20241203082500-9a8320a4c44e
 	chainmaker.org/chainmaker/consensus-dpos/v2 v2.3.5
 	chainmaker.org/chainmaker/consensus-raft/v2 v2.3.5
 	chainmaker.org/chainmaker/consensus-solo/v2 v2.3.5
 	chainmaker.org/chainmaker/consensus-utils/v2 v2.3.5
-	chainmaker.org/chainmaker/localconf/v2 v2.3.5
+	chainmaker.org/chainmaker/localconf/v2 v2.3.6-0.20241203083220-9debd05d9ac7
 	chainmaker.org/chainmaker/logger/v2 v2.3.4
 	chainmaker.org/chainmaker/net-common v1.2.6
 	chainmaker.org/chainmaker/net-libp2p v1.2.7
 	chainmaker.org/chainmaker/net-liquid v1.1.3
-	chainmaker.org/chainmaker/pb-go/v2 v2.3.6
-	chainmaker.org/chainmaker/protocol/v2 v2.3.7
-	chainmaker.org/chainmaker/sdk-go/v2 v2.3.7
-	chainmaker.org/chainmaker/store/v2 v2.3.7
+	chainmaker.org/chainmaker/pb-go/v2 v2.3.7-0.20241202091911-6b378861d569
+	chainmaker.org/chainmaker/protocol/v2 v2.3.8-0.20241203082841-962e2e89ac3c
+	chainmaker.org/chainmaker/sdk-go/v2 v2.3.8-0.20241213072826-fa5a522851d0
+	chainmaker.org/chainmaker/store/v2 v2.3.8-0.20241206092415-5b0a51f725d9
 	chainmaker.org/chainmaker/utils/v2 v2.3.6
 	chainmaker.org/chainmaker/vm-docker-go/v2 v2.3.6
 	chainmaker.org/chainmaker/vm-engine/v2 v2.3.7
@@ -26,7 +26,7 @@ require (
 	chainmaker.org/chainmaker/vm-native/v2 v2.3.6
 	chainmaker.org/chainmaker/vm-wasmer/v2 v2.3.6
 	chainmaker.org/chainmaker/vm-wxvm/v2 v2.3.6
-	chainmaker.org/chainmaker/vm/v2 v2.3.7
+	chainmaker.org/chainmaker/vm/v2 v2.3.8-0.20241206094307-804dbb4b7bbc
 	code.cloudfoundry.org/bytefmt v0.0.0-20211005130812-5bb3c17173e5
 	github.com/Rican7/retry v0.1.0
 	github.com/Workiva/go-datastructures v1.0.53
@@ -63,7 +63,7 @@ require (
 require (
 	chainmaker.org/chainmaker/consensus-maxbft/v2 v2.3.5
 	chainmaker.org/chainmaker/consensus-tbft/v2 v2.3.5
-	chainmaker.org/chainmaker/txpool-batch/v2 v2.3.4
+	chainmaker.org/chainmaker/txpool-batch/v2 v2.3.1-0.20241209072400-ef4a1617e63a
 	chainmaker.org/chainmaker/txpool-normal/v2 v2.3.4
 	chainmaker.org/chainmaker/txpool-single/v2 v2.3.4
 	github.com/go-echarts/go-echarts/v2 v2.2.4
@@ -93,6 +93,3 @@ replace (
 	github.com/syndtr/goleveldb => chainmaker.org/third_party/goleveldb v1.1.0
 	github.com/tikv/client-go => chainmaker.org/third_party/tikv-client-go v1.0.0
 )
-
-// sz replace
-replace chainmaker.org/chainmaker/pb-go/v2 => ../../pb-go

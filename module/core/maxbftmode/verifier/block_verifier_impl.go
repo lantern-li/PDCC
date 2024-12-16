@@ -14,7 +14,6 @@ import (
 	"chainmaker.org/chainmaker-go/module/consensus"
 	"chainmaker.org/chainmaker-go/module/core/common"
 	"chainmaker.org/chainmaker-go/module/core/common/coinbasemgr"
-	"chainmaker.org/chainmaker-go/module/core/common/scheduler"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 	commonErrors "chainmaker.org/chainmaker/common/v2/errors"
 	"chainmaker.org/chainmaker/common/v2/monitor"
@@ -176,7 +175,7 @@ func (v *BlockVerifierImpl) VerifyBlockSync(block *commonpb.Block,
 func (v *BlockVerifierImpl) verifyBlock(block *commonpb.Block, mode protocol.VerifyMode) (
 	result *consensuspb.VerifyResult, err error) {
 
-	blockVersion := block.Header.BlockVersion
+	//blockVersion := block.Header.BlockVersion
 	startTick := utils.CurrentTimeMillisSeconds()
 	if err = utils.IsEmptyBlock(block); err != nil {
 		v.log.Error(err)
