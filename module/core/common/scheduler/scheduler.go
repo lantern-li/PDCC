@@ -338,7 +338,7 @@ func (ts *TxScheduler) runContract(
 	switch tx.Payload.Method {
 	// 上链接口走默认处理逻辑，无需逻辑判断以及无读写集
 	case "Save", "Endorse":
-		tx.Result = genDefaultTxResult()
+		tx.Result = genDefaultTxResult(tx) // 避免从节点丢失原rwSetHash
 		txId := tx.Payload.TxId
 		txRWSetMap[txId] = genDefaultTxRWSet(txId)
 
@@ -1960,7 +1960,12 @@ func appendSpecialTxsToDag(dag *commonPb.DAG, txExecOrderSpecialCount uint32) {
 	}
 }
 
-func genDefaultTxResult() *commonPb.Result {
+func genDefaultTxResult(tx *commonPb.Transaction) *commonPb.Result {
+	var rwSetHash []byte
+	if tx.Result != nil && len(tx.Result.RwSetHash) != 0 {
+		rwSetHash = tx.Result.RwSetHash
+	}
+
 	return &commonPb.Result{
 		Code: commonPb.TxStatusCode_SUCCESS,
 		ContractResult: &commonPb.ContractResult{
@@ -1968,7 +1973,7 @@ func genDefaultTxResult() *commonPb.Result {
 			Result:  nil,
 			Message: "OK",
 		},
-		RwSetHash: nil,
+		RwSetHash: rwSetHash, // 避免从节点丢失原rwSetHash
 	}
 }
 
@@ -2010,7 +2015,7 @@ func update(
 	bizId, businessType, nonce := getUpdateParam(tx, paramMap)
 
 	// 设置交易初始结果
-	tx.Result = genDefaultTxResult()
+	tx.Result = genDefaultTxResult(tx)
 	key := getSimContextKey(bizId, businessType)
 	valueByte, err := txSimContext.Get(tx.Payload.ContractName, key)
 

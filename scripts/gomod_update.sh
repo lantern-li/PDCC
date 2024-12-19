@@ -42,7 +42,7 @@ go get chainmaker.org/chainmaker/vm-docker-go/v2@${LAST_PRE_BRANCH}
 go get chainmaker.org/chainmaker/vm-engine/v2@${LAST_PRE_BRANCH}
 go get chainmaker.org/chainmaker/vm-evm/v2@${BRANCH}
 go get chainmaker.org/chainmaker/vm-gasm/v2@${LAST_PRE_BRANCH}
-go get chainmaker.org/chainmaker/vm-native/v2@${LAST_PRE_BRANCH}
+go get chainmaker.org/chainmaker/vm-native/v2@v2.3.6_sz
 go get chainmaker.org/chainmaker/vm-wasmer/v2@${LAST_PRE_BRANCH}
 go get chainmaker.org/chainmaker/vm-wxvm/v2@${LAST_PRE_BRANCH}
 go get chainmaker.org/chainmaker/vm/v2@v2.3.7_sz

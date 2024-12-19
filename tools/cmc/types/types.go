@@ -46,3 +46,12 @@ type ContractResult struct {
 	*common.ContractResult
 	Result string `json:"result"`
 }
+
+// Transaction extends of *common.Transaction
+type Transaction struct {
+	*common.Transaction
+	Result *struct {
+		*common.Result
+		ContractResult *ContractResult `json:"contract_result"`
+	} `json:"result"`
+}

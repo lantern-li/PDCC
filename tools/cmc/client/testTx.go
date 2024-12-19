@@ -80,7 +80,7 @@ func createTx() error {
 	)
 
 	client, err := util.CreateChainClient(sdkConfPath, chainId, orgId, userTlsCrtFilePath, userTlsKeyFilePath,
-		userSignCrtFilePath, userSignKeyFilePath)
+		userSignCrtFilePath, userSignKeyFilePath, false)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func invokeTx() error {
 	)
 
 	client, err := util.CreateChainClient(sdkConfPath, chainId, orgId, userTlsCrtFilePath, userTlsKeyFilePath,
-		userSignCrtFilePath, userSignKeyFilePath)
+		userSignCrtFilePath, userSignKeyFilePath, false)
 	if err != nil {
 		return err
 	}

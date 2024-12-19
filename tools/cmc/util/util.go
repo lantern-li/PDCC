@@ -73,3 +73,25 @@ func PrintPrettyJson(data interface{}) {
 	}
 	fmt.Println(string(output))
 }
+
+// TxResultToString convert result from bytes to string
+// @param tx
+// @return interface{}
+func TxResultToString(tx *common.Transaction) interface{} {
+	if tx == nil || tx.Result == nil || tx.Result.ContractResult == nil {
+		return tx
+	}
+	return types.Transaction{
+		Transaction: tx,
+		Result: &struct {
+			*common.Result
+			ContractResult *types.ContractResult `json:"contract_result"`
+		}{
+			Result: tx.Result,
+			ContractResult: &types.ContractResult{
+				ContractResult: tx.Result.ContractResult,
+				Result:         string(tx.Result.ContractResult.Result),
+			},
+		},
+	}
+}

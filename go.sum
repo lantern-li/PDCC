@@ -79,10 +79,8 @@ chainmaker.org/chainmaker/vm-evm/v2 v2.3.7 h1:k77ndVJ/+luL3wiG9AlwDFzt4gnreUFDZy
 chainmaker.org/chainmaker/vm-evm/v2 v2.3.7/go.mod h1:Z7sC7QZQIXygaPE3dZ7mDsz6ZzCJh44LdjQ1b+u7iZ0=
 chainmaker.org/chainmaker/vm-gasm/v2 v2.3.6 h1:pOsAjA1sEULouHD6o+C0LLTpp4L3Qq/yztI6IQNvcC0=
 chainmaker.org/chainmaker/vm-gasm/v2 v2.3.6/go.mod h1:0CV2xY+evIBZSfVtZs1LisN+r2y/uIjVi2KHEMD3WAY=
+chainmaker.org/chainmaker/vm-native/v2 v2.3.2-0.20241205062615-82b43d5007da h1:kWYBsDWqJkBNm2SzT0/t80pBVm6Wbe+U3HHQnrQ2TLw=
 chainmaker.org/chainmaker/vm-native/v2 v2.3.2-0.20241205062615-82b43d5007da/go.mod h1:69w80meTTWLftEpMgYruuWPI/JKlfdruWnaQIzU2HSI=
-chainmaker.org/chainmaker/vm-native/v2 v2.3.5/go.mod h1:2ZS71TqxeLPTVf3YqyZomyOQpXs4B/9LOr2BfiWVe90=
-chainmaker.org/chainmaker/vm-native/v2 v2.3.6 h1:ofcVpEHWOjzUX09OhMaxrP4DSvYCjYvm2ht+b3hkRWI=
-chainmaker.org/chainmaker/vm-native/v2 v2.3.6/go.mod h1:r7hsPOc9RKpEReDABIBEZj5rvTV4MXL6X4U2RyeTCTc=
 chainmaker.org/chainmaker/vm-wasmer/v2 v2.3.6 h1:Dh0ehTqYdumWcJChm4ds20zfRNjBmXIUu+Nhj5D0wbs=
 chainmaker.org/chainmaker/vm-wasmer/v2 v2.3.6/go.mod h1:R9JKHNaPbDqFrYjevuYsShlkJbhOHExd5yxBCW2XzJE=
 chainmaker.org/chainmaker/vm-wxvm/v2 v2.3.6 h1:kfPePOF/ckz08OppNsUx6Q8lZklzH5C5UgkP6bFyajU=

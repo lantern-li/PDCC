@@ -44,7 +44,8 @@ function check_env() {
 function build() {
     cd $PROJECT_PATH
     echo "build chainmaker ${PROJECT_PATH}..."
-    make vendor-build
+#    make vendor-build
+    make
 }
 
 function package() {
