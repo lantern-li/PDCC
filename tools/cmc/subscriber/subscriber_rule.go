@@ -14,10 +14,50 @@ import (
 	"context"
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
-// newSubBlockWithRuleCMD new sub block with rule
-func newSubBlockWithRuleCMD() *cobra.Command {
+var (
+	sdkConfPath  string
+	startBlock   int64
+	endBlock     int64
+	withRWSet    bool
+	onlyHeader   bool
+	ruleType     int32
+	contractName string
+	method       string
+)
+
+const (
+	flagSdkConfPath  = "sdk-conf-path"
+	flagStartBlock   = "start"
+	flagEndBlock     = "end"
+	flagWithRWSet    = "with-rwset"
+	flagOnlyHeader   = "only-header"
+	flagRuleType     = "rule-type"
+	flagContractName = "contract-name"
+	flagMethod       = "method"
+
+	timeFormat1 = "2006-01-02 15:04:05.000"
+)
+
+var flags *pflag.FlagSet
+
+func init() {
+	flags = &pflag.FlagSet{}
+
+	flags.StringVar(&sdkConfPath, flagSdkConfPath, "", "specify sdk config path")
+	flags.Int64Var(&startBlock, flagStartBlock, -1, "specify subscriber start block height")
+	flags.Int64Var(&endBlock, flagEndBlock, -1, "specify subscriber end block height")
+	flags.BoolVar(&withRWSet, flagWithRWSet, false, "specify subscriber result with RWSet")
+	flags.BoolVar(&onlyHeader, flagOnlyHeader, false, "specify subscriber result only header")
+	flags.Int32Var(&ruleType, flagRuleType, 0, "specify subscriber rule type")
+	flags.StringVar(&contractName, flagContractName, "T", "specify subscriber contract name")
+	flags.StringVar(&method, flagMethod, "P", "specify subscriber method")
+}
+
+// NewSubBlockWithRuleCMD new sub block with rule
+func NewSubBlockWithRuleCMD() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "block-with-rule",
 		Short: "subscribe real-time/history blocks with rule",
