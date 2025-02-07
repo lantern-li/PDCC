@@ -727,7 +727,7 @@ kms:
     # plugin / tencentcloudkms or other service provider
     source: bwmmfw
     # KMS SecretId
-    secret_id: "11000009h0g4vyo4"
+    secret_id: "1113100oxppp0za4"
     # KMS SecretKey
     secret_key: "ceshi_01"
     # KMS server address, ip or dns

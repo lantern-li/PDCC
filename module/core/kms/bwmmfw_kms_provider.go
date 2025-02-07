@@ -21,11 +21,9 @@ func (c *BWMMFWKMSClient) init() error {
 }
 
 func (c *BWMMFWKMSClient) Encrypt(data []byte) ([]byte, error) {
-	c.log.Infof("BWMMFWKMSClient encrypt [%v]", data)
 	return c.client.EncryptData(data)
 }
 
 func (c *BWMMFWKMSClient) Decrypt(data []byte) ([]byte, error) {
-	c.log.Info("BWMMFWKMSClient Decrypt [%v]", data)
 	return c.client.DecryptData(data)
 }

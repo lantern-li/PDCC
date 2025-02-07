@@ -59,10 +59,10 @@ func newKMSClient(config localconf.KMSBasicConfig, log *logger.CMLogger) (KMSCli
 		return client, nil
 	case string(Tencentcloudkms):
 		// todo implement
-		return nil, nil
+		return nil, fmt.Errorf("not implement")
 	case string(Plugin):
 		// todo implement
-		return nil, nil
+		return nil, fmt.Errorf("not implement")
 	default:
 		return nil, fmt.Errorf("unsupported KMS source: %s", config.Source)
 	}
