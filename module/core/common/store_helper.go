@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package common
 
 import (
+	"chainmaker.org/chainmaker/localconf/v2"
 	"runtime"
 
 	"chainmaker.org/chainmaker/pb-go/v2/syscontract"
@@ -34,7 +35,12 @@ func (kv *KVStoreHelper) BeginDbTransaction(blockchainStore protocol.BlockchainS
 }
 
 func (kv *KVStoreHelper) GetPoolCapacity() int {
-	return runtime.NumCPU() * 4
+	maxConcurrency := localconf.ChainMakerConfig.SchedulerConfig.MaxConcurrency
+	if maxConcurrency == 0 {
+		return runtime.NumCPU() * 4
+	}
+
+	return maxConcurrency
 }
 
 type SQLStoreHelper struct {
