@@ -148,7 +148,6 @@ func (s *ApiService) getRoleFromTx(tx *commonPb.Transaction) (protocol.Role, err
 	return utils.GetRoleFromTx(tx, ac)
 }
 
-// todo sz logic
 func (s *ApiService) startSubscribeBlockEvent(ctx context.Context, lastBlockHeight *int64, chainId string,
 	dataC chan model.NewBlockEvent) error {
 	db, err := s.chainMakerServer.GetStore(chainId)

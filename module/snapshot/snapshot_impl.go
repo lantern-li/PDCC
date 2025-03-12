@@ -346,6 +346,12 @@ func (s *SnapshotImpl) ApplyTxSimContext(txSimContext protocol.TxSimContext, spe
 			specialTxType, runVmSuccess, applySpecialTx)
 	})
 
+	// 税总合约从这退出
+	if _, ok := SZContractList[tx.Payload.ContractName]; ok {
+		return s.dealSZTx(txSimContext, specialTxType,
+			runVmSuccess, applySpecialTx, tx)
+	}
+
 	if !applySpecialTx && s.IsSealed() {
 		return false, s.GetSnapshotSize()
 	}
@@ -356,15 +362,6 @@ func (s *SnapshotImpl) ApplyTxSimContext(txSimContext protocol.TxSimContext, spe
 			s.blockHeight, txId, tx.Payload.ContractName, tx.Payload.Method)
 		return false, s.GetSnapshotSize()
 	}
-
-	// todo here
-	//if _, ok := SZContractList[tx.Payload.ContractName]; ok {
-	//	return s.dealSZTx(txSimContext, specialTxType,
-	//		runVmSuccess, applySpecialTx, tx)
-	//}
-	//
-	//return s.dealNormalTx(txSimContext, specialTxType,
-	//	runVmSuccess, applySpecialTx, tx)
 
 	// 乐观处理，以所有交易都不冲突的情况进行优先处理
 	txExecSeq := txSimContext.GetTxExecSeq()
