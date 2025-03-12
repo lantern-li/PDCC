@@ -340,12 +340,20 @@ func (s *SnapshotImpl) ApplyTxSimContext(txSimContext protocol.TxSimContext, spe
 	runVmSuccess bool, applySpecialTx bool) (bool, int) {
 
 	tx := txSimContext.GetTx()
+	txId := tx.Payload.TxId
 	s.log.DebugDynamic(func() string {
 		return fmt.Sprintf("apply tx: %s, execOrderTxType:%d, runVmSuccess:%v, applySpecialTx:%v", tx.Payload.TxId,
 			specialTxType, runVmSuccess, applySpecialTx)
 	})
 
 	if !applySpecialTx && s.IsSealed() {
+		return false, s.GetSnapshotSize()
+	}
+
+	// 判断交易是否超时，如果交易超时，则尝试放回重执行。待调度超时后，通过调度超时的方式将交易放回交易池
+	if !runVmSuccess && txSimContext.GetTxResult().ContractResult.Message == "time out"{
+		s.log.Warnf("execute tx[height:%d, txId:%s, contractName:%s, method:%s] time out, try to execute again",
+			s.blockHeight, txId, tx.Payload.ContractName, tx.Payload.Method)
 		return false, s.GetSnapshotSize()
 	}
 
