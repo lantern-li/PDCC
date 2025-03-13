@@ -80,6 +80,9 @@ require (
 )
 
 replace (
+	// for sz genesis block
+	chainmaker.org/chainmaker/utils/v2 => chainmaker.org/chainmaker/utils/v2 v2.3.7-0.20250313093010-a6d3b7a89940
+
 	chainmaker.org/chainmaker/vm-native/v2 => chainmaker.org/chainmaker/vm-native/v2 v2.3.2-0.20241205062615-82b43d5007da
 	github.com/RedisBloom/redisbloom-go => chainmaker.org/third_party/redisbloom-go v1.0.0
 	github.com/dgraph-io/badger/v3 => chainmaker.org/third_party/badger/v3 v3.0.0
