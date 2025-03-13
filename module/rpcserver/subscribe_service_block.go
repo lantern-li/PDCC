@@ -9,6 +9,7 @@ package rpcserver
 import (
 	"chainmaker.org/chainmaker-go/module/rpcserver/helper"
 	rpcRes "chainmaker.org/chainmaker-go/module/rpcserver/result"
+	"chainmaker.org/chainmaker/pb-go/v2/accesscontrol"
 	"context"
 	"encoding/json"
 	"errors"
@@ -68,7 +69,7 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction,
 		err             error
 		errMsg          string
 		errCode         commonErr.ErrCode
-		store              protocol.BlockchainStore
+		store           protocol.BlockchainStore
 		lastBlockHeight int64
 		startBlock      int64
 		endBlock        int64
@@ -216,7 +217,7 @@ func (s *ApiService) sendBlock(tx *commonPb.Transaction,
 	server apiPb.RpcNode_SubscribeServer, endBlockHeight int64, startBlock int64,
 	senderAddr string, helper0 helper.Helper, subscribeResult rpcRes.SubscribeResult) error {
 
-	var(
+	var (
 		txId = tx.Payload.TxId
 	)
 
@@ -266,8 +267,8 @@ func (s *ApiService) sendNewBlock(tx *commonPb.Transaction,
 		lastBlockHeight int64
 		chainId         = tx.Payload.ChainId
 		txId            = tx.Payload.TxId
-		blockC = make(chan model.NewBlockEvent, 1)
-		base = helper0.GetBaseHelper()
+		blockC          = make(chan model.NewBlockEvent, 1)
+		base            = helper0.GetBaseHelper()
 	)
 
 	updaterCtx, cancelUpdater := context.WithCancel(context.Background())
@@ -316,6 +317,11 @@ func (s *ApiService) sendNewBlock(tx *commonPb.Transaction,
 }
 
 func (s *ApiService) getTxSenderAddress(store protocol.BlockchainStore, tx *commonPb.Transaction) (string, error) {
+	// compatible sz alias
+	if tx.Sender.GetSigner().MemberType == accesscontrol.MemberType_ALIAS {
+		return string(tx.Sender.GetSigner().MemberInfo), nil
+	}
+
 	bcChain, err := s.chainMakerServer.GetBlockchain(tx.Payload.ChainId)
 	if err != nil {
 		return "", err
@@ -343,7 +349,7 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer,
 	var (
 		err    error
 		errMsg string
-		res *commonPb.SubscribeResult
+		res    *commonPb.SubscribeResult
 		stat   *rpcRes.Stat
 	)
 
@@ -496,4 +502,3 @@ func (s *ApiService) getBlockInfoFromStore(store protocol.BlockchainStore, curbl
 
 	return blockInfo, -1, nil
 }
-
