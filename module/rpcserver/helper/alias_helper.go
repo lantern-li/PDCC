@@ -105,6 +105,8 @@ func (h *AliasHelper) FiltTxs(current *commonPb.Block) (result []*commonPb.Trans
 		if filterRule == nil {
 			continue
 		}
+
+		// todo 优化一下，应该每次只关注一个规则即可，而不是遍历。在有规则update的时候，进行更新即可
 		for _, rule0 := range filterRule.Alias {
 			if checkRules(height, rule0.Rule, h.helper.Log, aliasPrefix) {
 				rules[method] = rule0
@@ -176,7 +178,7 @@ MatchSuccessfulToVerifyTheNextTransaction:
 
 		for _, name := range strings.Split(rule.Name, sep) {
 			// Get the aliasValueString in the current transaction parameter based on the rule field name
-			aliasValueString, err := getParameterString(tx.Payload.Parameters, name)
+			aliasValueString, err := getParameterString(tx.Payload.Parameters, name) // name = “param1，param2”
 			if err != nil {
 				log.DebugDynamic(func() string {
 					ruleJson, _ := json.Marshal(rule)

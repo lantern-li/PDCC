@@ -165,11 +165,12 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction,
 	}
 
 	// get filter rule from db
-	rule, err := helper0.FilterRule(false)
+	rule, err := helper0.FilterRule(false) // todo 待优化
 	if err != nil {
 		return err
 	}
 
+	// 当时需求如此，必须注册清分规则后，才允许清分
 	if rule == nil {
 		parameters, _ := json.Marshal(tx.Payload.Parameters)
 		return s.errorResultByMessage(codes.InvalidArgument, "%v rule, filter rule not found, parameters: %v",

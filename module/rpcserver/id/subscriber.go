@@ -42,6 +42,19 @@ func NewSubscriberId(id string) (SubscriberId, error) {
 		typ: id[:1],
 	}
 
+	// todo 将获取SubscriberId和业务逻辑过于糅合，不好理解，待优化
+
+	/**
+			可读参与方   （000000000， 1 14 10 10 ， 1 15 11 000， 2 15 12 00 00 ）
+			可写参与方   （000000000， 1 14 00 00 ， 1 15 11 000）
+
+			订阅发起方的别名  000000000， 2 15 12 00 00
+
+						 1 14 00 00   能拿到当前省级的所有交易，    1 14 10 00   能拿到当前省级的所有交易  1 14 10 10
+						index ， 偏移量
+
+	 */
+
 	// 全匹配： 国家税务总局 0 外部政府机构 2 企业 3 自然人 4
 	if subscriberId.typ == TaxationAdministrationCode ||
 		subscriberId.typ == GovernmentBodyCode ||
@@ -55,7 +68,7 @@ func NewSubscriberId(id string) (SubscriberId, error) {
 	// 省市区匹配 00，找出对应的前缀
 	var index int
 	for i := 1; i < len(id)-2; i += 2 {
-		if id[i:i+2] == DoubleZero {
+		if id[i:i+2] == DoubleZero { //todo 有没有更好的处理逻辑
 			index = i
 			break
 		}
@@ -66,6 +79,10 @@ func NewSubscriberId(id string) (SubscriberId, error) {
 	if index == 0 || index > 7 {
 		index = 7
 	}
+
+	// todo 注意 1 10 00 00 0000 这种跨层级的00情况
+
+	// 1 43 00 00 0000
 
 	if index%2 == 0 {
 		return nil, errors.New("subscriberId identifier is invalid, the identifier format is incorrect")
