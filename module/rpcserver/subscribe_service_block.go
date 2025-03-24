@@ -11,7 +11,6 @@ import (
 	rpcRes "chainmaker.org/chainmaker-go/module/rpcserver/result"
 	"chainmaker.org/chainmaker/pb-go/v2/accesscontrol"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -153,34 +152,15 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction,
 
 	//reqSenderOrgId := tx.Sender.Signer.OrgId
 
-	// new helper
-	helper0, err := helper.NewHelper(tx, store, reqSender, s.log, s.subscribeFilterPool)
+	subscribeFilter, err := helper.InitSubscribeFilter(tx, store, reqSender, s.log, s.subscribeFilterPool)
 	if err != nil {
 		return s.errorResultByError(codes.InvalidArgument, err)
-	}
-
-	err = helper0.Validate()
-	if err != nil {
-		return s.errorResultByMessage(codes.InvalidArgument, "validate parameter fail, error: %v", err)
-	}
-
-	// get filter rule from db
-	rule, err := helper0.FilterRule(false) // todo 待优化
-	if err != nil {
-		return err
-	}
-
-	// 当时需求如此，必须注册清分规则后，才允许清分
-	if rule == nil {
-		parameters, _ := json.Marshal(tx.Payload.Parameters)
-		return s.errorResultByMessage(codes.InvalidArgument, "%v rule, filter rule not found, parameters: %v",
-			helper0.GetType().String(), parameters)
 	}
 
 	resultType := rpcRes.GetResultType(onlyHeader, withRWSet)
 	subscribeResult := rpcRes.NewSubscribeResult(resultType, store, s.log)
 
-	return s.sendBlock(tx, server, endBlock, startBlock, senderAddr, helper0, subscribeResult)
+	return s.sendBlock(tx, server, endBlock, startBlock, senderAddr, subscribeFilter, subscribeResult)
 
 	//if startBlock == -1 && endBlock == -1 {
 	//	return s.sendNewBlock(store, tx, server, endBlock, withRWSet, onlyHeader,
@@ -216,32 +196,31 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction,
 
 func (s *ApiService) sendBlock(tx *commonPb.Transaction,
 	server apiPb.RpcNode_SubscribeServer, endBlockHeight int64, startBlock int64,
-	senderAddr string, helper0 helper.Helper, subscribeResult rpcRes.SubscribeResult) error {
+	senderAddr string, subscribeFilter helper.Helper, subscribeResult rpcRes.SubscribeResult) error {
 
 	var (
 		txId = tx.Payload.TxId
 	)
 
-	base := helper0.GetBaseHelper()
+	base := subscribeFilter.GetBaseHelper()
 	if base.Start == -1 && base.End == -1 {
 		// send new block
 		return s.sendNewBlock(tx, server, endBlockHeight, -1,
-			senderAddr, helper0, subscribeResult)
+			senderAddr, subscribeFilter, subscribeResult)
 	}
 
 	if base.End != -1 && base.End <= int64(base.LastBlockHeight) {
 		// send history block
-		_, err := s.sendHistoryBlock(server, startBlock, endBlockHeight, txId, senderAddr, helper0, subscribeResult)
+		_, err := s.sendHistoryBlock(server, startBlock, endBlockHeight, txId, senderAddr, subscribeFilter, subscribeResult)
 		if err != nil {
 			s.log.Warnf("sendHistoryBlock failed:%s, [txId:%s, sender:%s].", err, txId, senderAddr)
 			return err
 		}
-
 		return status.Error(codes.OK, "OK")
 	}
 
 	alreadySendHistoryBlockHeight, err := s.sendHistoryBlock(server, startBlock, endBlockHeight,
-		txId, senderAddr, helper0, subscribeResult)
+		txId, senderAddr, subscribeFilter, subscribeResult)
 
 	if err != nil {
 		s.log.Warnf("sendHistoryBlock failed:%s", err)
@@ -252,14 +231,14 @@ func (s *ApiService) sendBlock(tx *commonPb.Transaction,
 		alreadySendHistoryBlockHeight, tx.Payload.TxId, senderAddr)
 
 	return s.sendNewBlock(tx, server, endBlockHeight, alreadySendHistoryBlockHeight,
-		senderAddr, helper0, subscribeResult)
+		senderAddr, subscribeFilter, subscribeResult)
 }
 
 // sendNewBlock - send new block to subscriber
 func (s *ApiService) sendNewBlock(tx *commonPb.Transaction,
 	server apiPb.RpcNode_SubscribeServer,
 	endBlockHeight int64, alreadySendHistoryBlockHeight int64,
-	senderAddress string, helper0 helper.Helper, subscribeResult rpcRes.SubscribeResult) error {
+	senderAddress string, subscribeFilter helper.Helper, subscribeResult rpcRes.SubscribeResult) error {
 
 	var (
 		errCode         commonErr.ErrCode
@@ -269,7 +248,7 @@ func (s *ApiService) sendNewBlock(tx *commonPb.Transaction,
 		chainId         = tx.Payload.ChainId
 		txId            = tx.Payload.TxId
 		blockC          = make(chan model.NewBlockEvent, 1)
-		base            = helper0.GetBaseHelper()
+		base            = subscribeFilter.GetBaseHelper()
 	)
 
 	updaterCtx, cancelUpdater := context.WithCancel(context.Background())
@@ -301,7 +280,7 @@ func (s *ApiService) sendNewBlock(tx *commonPb.Transaction,
 
 			if alreadySendHistoryBlockHeight < atomic.LoadInt64(&lastBlockHeight) {
 				alreadySendHistoryBlockHeight, err = s.sendHistoryBlock(server, alreadySendHistoryBlockHeight+1,
-					endBlockHeight, txId, senderAddress, helper0, subscribeResult)
+					endBlockHeight, txId, senderAddress, subscribeFilter, subscribeResult)
 				if err != nil {
 					s.log.Warnf("send history block failed:%s[txId:%s, sender:%s].", err, txId, senderAddress)
 					return err
@@ -344,7 +323,8 @@ func (s *ApiService) getTxSenderAddress(store protocol.BlockchainStore, tx *comm
 
 // sendHistoryBlock - send history block to subscriber
 func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer,
-	startBlockHeight, endBlockHeight int64, txId, senderAddress string, helper0 helper.Helper,
+	startBlockHeight, endBlockHeight int64, txId, senderAddress string,
+	subscribeFilter helper.Helper,
 	subscribeResult rpcRes.SubscribeResult) (int64, error) {
 
 	var (
@@ -376,7 +356,7 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer,
 			}
 
 			// 如果未查询到返回 (nil,nil,nil)
-			res, stat, err = subscribeResult.GetResultByHeight(uint64(i), helper0.FiltTxs)
+			res, stat, err = subscribeResult.GetResultByHeight(uint64(i), subscribeFilter.FiltTxs)
 			if err != nil {
 				return -1, s.errorResultByMessage(codes.Internal, "get result fail, error: %v", err)
 			}
@@ -397,7 +377,7 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer,
 
 			s.log.Infof("send block info by history[height:%d], [txId:%s, sender:%s, subscriber:%v,data:%d]"+
 				"costs[getTokenCost:%d,db:%d,filter:%d,marshal:%d, sendCost:%d, total:%d].",
-				i, txId, senderAddress, string(helper0.GetBaseHelper().Tx.Sender.Signer.MemberInfo),
+				i, txId, senderAddress, string(subscribeFilter.GetBaseHelper().Tx.Sender.Signer.MemberInfo),
 				len(res.Data), getTokenCost, stat.GetBlockElapsed,
 				stat.FilterElapsed, stat.MarshalElapsed, sendCost, totalCost)
 			i++

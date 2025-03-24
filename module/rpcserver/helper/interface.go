@@ -8,7 +8,6 @@ SPDX-License-Identifier: Apache-2.0
 package helper
 
 import (
-	"chainmaker.org/chainmaker-go/module/rpcserver/id"
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
 	"chainmaker.org/chainmaker/pb-go/v2/txassign"
 	"chainmaker.org/chainmaker/protocol/v2"
@@ -32,11 +31,11 @@ type Helper interface {
 	// getKey get key
 	getKey(method string) string
 	// FiltTxs filt txs by block
-	FiltTxs(block *commonPb.Block) (result []*commonPb.Transaction, count int)
+	FiltTxs(block *commonPb.Block, withTxId bool) (result []*commonPb.Transaction, count int)
 	// GetBaseHelper get *BaseHelper
 	GetBaseHelper() *BaseHelper
 
-	GetSubscriber() id.SubscriberId
+	GetSubscriber() *IdentityCode
 
 	GetType() txassign.RuleType
 

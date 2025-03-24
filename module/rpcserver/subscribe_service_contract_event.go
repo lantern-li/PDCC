@@ -8,6 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 package rpcserver
 
 import (
+	"chainmaker.org/chainmaker-go/module/rpcserver/helper"
 	"context"
 	"errors"
 	"fmt"
@@ -141,7 +142,18 @@ func (s *ApiService) dealContractEventSubscription(tx *commonPb.Transaction,
 		"Recv contract event subscribe request: [start:%d]/[end:%d]/[contractName:%s]/[topic:%s]/[txId:%s]",
 		startBlock, endBlock, contractName, topic, txId)
 
-	return s.doSendContractEvent(tx, db, server, startBlock, endBlock, contractName, topic)
+	reqSender, err := s.getRoleFromTx(tx)
+	if err != nil {
+		s.log.Warnf("getRoleFromTx failed:%s, [txId:%s, sender:%s].", err, txId, senderAddr)
+		return err
+	}
+
+	subscribeFilter, err := helper.InitSubscribeFilter(tx, db, reqSender, s.log, s.subscribeFilterPool)
+	if err != nil {
+		return s.errorResultByError(codes.InvalidArgument, err)
+	}
+
+	return s.doSendContractEvent(tx, db, server, startBlock, endBlock, contractName, topic, senderAddr, subscribeFilter)
 }
 
 func (s *ApiService) checkSubscribeContractEventPayload(startBlockHeight, endBlockHeight int64) error {
@@ -157,19 +169,13 @@ func (s *ApiService) checkSubscribeContractEventPayload(startBlockHeight, endBlo
 
 func (s *ApiService) doSendContractEvent(tx *commonPb.Transaction, db protocol.BlockchainStore,
 	server apiPb.RpcNode_SubscribeServer, startBlock, endBlock int64,
-	contractName string, topic string) error {
+	contractName string, topic string, senderAddr string, subscribeFilter helper.Helper) error {
 
 	var (
 		alreadySendHistoryBlockHeight int64
 		err                           error
 		txId                          = tx.Payload.TxId
 	)
-
-	senderAddr, err := s.getTxSenderAddress(db, tx)
-	if err != nil {
-		s.log.Warnf(err.Error() + fmt.Sprintf("txId:%s", txId))
-		return err
-	}
 
 	if startBlock == -1 && endBlock == 0 {
 		s.log.Infof("send contract event: [sender:%s] [contractName:%s] [topic:%s] "+
@@ -182,12 +188,12 @@ func (s *ApiService) doSendContractEvent(tx *commonPb.Transaction, db protocol.B
 	// == 0 for compatibility
 	if (startBlock == -1 && endBlock == -1) || (startBlock == 0 && endBlock == 0) {
 		return s.sendNewContractEvent(db, tx, server, startBlock, endBlock,
-			contractName, topic, -1, senderAddr)
+			contractName, topic, -1, senderAddr, subscribeFilter)
 	}
 
 	if startBlock != -1 {
 		if alreadySendHistoryBlockHeight, err = s.doSendHistoryContractEvent(db, server, startBlock, endBlock,
-			contractName, topic, txId, senderAddr); err != nil {
+			contractName, topic, txId, senderAddr, subscribeFilter); err != nil {
 			s.log.Warnf(err.Error() + fmt.Sprintf("[txId:%s, addr:%s, contractName:%s, topic:%s]",
 				txId, senderAddr, contractName, topic))
 			return err
@@ -203,11 +209,11 @@ func (s *ApiService) doSendContractEvent(tx *commonPb.Transaction, db protocol.B
 	}
 
 	return s.sendNewContractEvent(db, tx, server, startBlock, endBlock, contractName, topic,
-		alreadySendHistoryBlockHeight, senderAddr)
+		alreadySendHistoryBlockHeight, senderAddr, subscribeFilter)
 }
 
 func (s *ApiService) doSendHistoryContractEvent(db protocol.BlockchainStore, server apiPb.RpcNode_SubscribeServer,
-	startBlock, endBlock int64, contractName, topic, txId, senderAddr string) (int64, error) {
+	startBlock, endBlock int64, contractName, topic, txId, senderAddr string, subscribeFilter helper.Helper) (int64, error) {
 
 	var (
 		err             error
@@ -234,7 +240,7 @@ func (s *ApiService) doSendHistoryContractEvent(db protocol.BlockchainStore, ser
 	// only send history contract event
 	if endBlock > 0 && endBlock <= lastBlockHeight {
 		_, err = s.sendHistoryContractEvent(db, server, startBlock, endBlock,
-			contractName, topic, txId, senderAddr)
+			contractName, topic, txId, senderAddr, subscribeFilter)
 
 		if err != nil {
 			s.log.Warnf(
@@ -247,7 +253,7 @@ func (s *ApiService) doSendHistoryContractEvent(db protocol.BlockchainStore, ser
 	}
 
 	alreadySendHistoryBlockHeight, err := s.sendHistoryContractEvent(db, server, startBlock, endBlock,
-		contractName, topic, txId, senderAddr)
+		contractName, topic, txId, senderAddr, subscribeFilter)
 
 	if err != nil {
 		s.log.Warnf("sendHistoryContractEvent failed:%s, [txId:%s, senderAddr:%s, contractName:%s, topic:%s]",
@@ -265,7 +271,7 @@ func (s *ApiService) doSendHistoryContractEvent(db protocol.BlockchainStore, ser
 func (s *ApiService) sendHistoryContractEvent(store protocol.BlockchainStore,
 	server apiPb.RpcNode_SubscribeServer,
 	startBlockHeight, endBlockHeight int64,
-	contractName, topic, txId, senderAddr string) (int64, error) {
+	contractName, topic, txId, senderAddr string, subscribeFilter helper.Helper) (int64, error) {
 
 	var (
 		err    error
@@ -315,7 +321,7 @@ func (s *ApiService) sendHistoryContractEvent(store protocol.BlockchainStore,
 
 			sendSubscribeContractEventStick := utils.CurrentTimeMillisSeconds()
 			// get evenInfo list from block
-			evenList := s.getSubscribeContractEvent(block, contractName, topic)
+			evenList := s.getSubscribeContractEvent(block, contractName, topic, subscribeFilter)
 			// send evenInfo list to subscriber
 			if err = s.doSendSubscribeContractEvent(server, evenList); err != nil {
 				errMsg = fmt.Sprintf("send subscribe tx failed, %s", err)
@@ -343,13 +349,19 @@ For example:
   - If `contract_name` is empty, an error will be raised, as it is no longer supported.
 */
 func (s *ApiService) getSubscribeContractEvent(
-	block *commonPb.Block, contractName, topic string) []*commonPb.ContractEventInfo {
+	block *commonPb.Block, contractName, topic string, subscribeFilter helper.Helper) []*commonPb.ContractEventInfo {
 
 	var (
 		contractEvents []*commonPb.ContractEventInfo
 	)
 
-	for _, tx := range block.Txs {
+	// 筛选符合条件的交易
+	filterTx, _ := subscribeFilter.FiltTxs(block, true)
+
+	for _, tx := range filterTx {
+		if tx.Result.ContractResult == nil {
+			continue
+		}
 		for idx, event := range tx.Result.ContractResult.ContractEvent {
 			if contractName == event.ContractName {
 				if topic == "" || topic == event.Topic {
@@ -414,7 +426,8 @@ func (s *ApiService) doSendSubscribeContractEvent(server apiPb.RpcNode_Subscribe
 
 func (s *ApiService) sendNewContractEvent(store protocol.BlockchainStore, tx *commonPb.Transaction,
 	server apiPb.RpcNode_SubscribeServer, startBlock, endBlock int64,
-	contractName string, topic string, alreadySendHistoryBlockHeight int64, senderAddr string) error {
+	contractName string, topic string, alreadySendHistoryBlockHeight int64,
+	senderAddr string, subscribeFilter helper.Helper) error {
 
 	var (
 		errCode         commonErr.ErrCode
@@ -455,7 +468,7 @@ func (s *ApiService) sendNewContractEvent(store protocol.BlockchainStore, tx *co
 
 			if alreadySendHistoryBlockHeight < atomic.LoadInt64(&lastBlockHeight) {
 				alreadySendHistoryBlockHeight, err = s.sendHistoryContractEvent(store, server,
-					alreadySendHistoryBlockHeight+1, endBlock, contractName, topic, txId, senderAddr)
+					alreadySendHistoryBlockHeight+1, endBlock, contractName, topic, txId, senderAddr, subscribeFilter)
 				if err != nil {
 					s.log.Warnf("send history contract event failed:%s,[txId:%s, sender:%s, "+
 						"contractName:%s, topic:%s].", err.Error(), txId, senderAddr, contractName, topic)

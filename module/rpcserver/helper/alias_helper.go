@@ -8,7 +8,6 @@ SPDX-License-Identifier: Apache-2.0
 package helper
 
 import (
-	"chainmaker.org/chainmaker-go/module/rpcserver/id"
 	"chainmaker.org/chainmaker-go/module/txfilter/filtercommon"
 	"errors"
 	"fmt"
@@ -36,7 +35,7 @@ type AliasHelper struct {
 	// contract methods
 	methods []string
 	// subscriberId 订阅者（别名ID）
-	subscriberId id.SubscriberId
+	subscriberId *IdentityCode
 
 	pool *ants.Pool
 }
@@ -59,10 +58,11 @@ func newAliasHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, ro
 	if err != nil {
 		return nil, err
 	}
-	subscriberId, err := id.NewSubscriberId(string(tx.Sender.Signer.MemberInfo))
+	subscriberId, err := GetIdentityCode(string(tx.Sender.Signer.MemberInfo))
 	if err != nil {
 		return nil, fmt.Errorf("%v, subscriberId: %v", err, string(tx.Sender.Signer.MemberInfo))
 	}
+
 	return &AliasHelper{
 		contractName: contractName,
 		methods:      strings.Split(method, sep),
@@ -77,12 +77,12 @@ func (h *AliasHelper) GetBaseHelper() *BaseHelper {
 	return h.helper
 }
 
-func (h *AliasHelper) GetSubscriber() id.SubscriberId {
+func (h *AliasHelper) GetSubscriber() *IdentityCode {
 	return h.subscriberId
 }
 
 // FiltTxs filt txs by block
-func (h *AliasHelper) FiltTxs(current *commonPb.Block) (result []*commonPb.Transaction, count int) {
+func (h *AliasHelper) FiltTxs(current *commonPb.Block, withTxId bool) (result []*commonPb.Transaction, count int) {
 	txs := current.Txs
 	height := current.Header.BlockHeight
 	filterRules, err := h.FilterRule(true)
@@ -106,7 +106,6 @@ func (h *AliasHelper) FiltTxs(current *commonPb.Block) (result []*commonPb.Trans
 			continue
 		}
 
-		// todo 优化一下，应该每次只关注一个规则即可，而不是遍历。在有规则update的时候，进行更新即可
 		for _, rule0 := range filterRule.Alias {
 			if checkRules(height, rule0.Rule, h.helper.Log, aliasPrefix) {
 				rules[method] = rule0
@@ -134,7 +133,7 @@ func (h *AliasHelper) FiltTxs(current *commonPb.Block) (result []*commonPb.Trans
 			method1 := method
 			h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("[%v] run batch, total:%v,batch:%v,startIndex:%v,endIndex:%v", height, total, batch, startIndex, endIndex))
 			err = h.pool.Submit(func() {
-				verifyTxs(wg, h.helper.Log, height, rules[method1], txs, method1, h.contractName, h.subscriberId, matchTxsIndex, total, batch, startIndex, endIndex)
+				verifyTxs(wg, h.helper, height, rules[method1], txs, method1, h.contractName, h.subscriberId, matchTxsIndex, total, batch, startIndex, endIndex)
 			})
 			if err != nil {
 				h.helper.Log.Errorf("subscribe pool submit fail. error: %v", err)
@@ -150,25 +149,31 @@ func (h *AliasHelper) FiltTxs(current *commonPb.Block) (result []*commonPb.Trans
 			resultTxCount++
 			transactions = append(transactions, txs[i])
 		} else {
-			// not match tx
-			transactions = append(transactions, &commonPb.Transaction{
-				Payload: &commonPb.Payload{
-					TxId: txs[i].Payload.TxId,
-				},
-				Result: &commonPb.Result{RwSetHash: txs[i].Result.RwSetHash},
-			})
+			if withTxId {
+				// not match tx
+				transactions = append(transactions, &commonPb.Transaction{
+					Payload: &commonPb.Payload{
+						TxId: txs[i].Payload.TxId,
+					},
+					Result: &commonPb.Result{RwSetHash: txs[i].Result.RwSetHash},
+				})
+			}
 		}
 	}
 	return transactions, resultTxCount
 }
 
-func verifyTxs(wg *sync.WaitGroup, log protocol.Logger, height uint64, rule *txassign.AliasRule, txs []*commonPb.Transaction, method, contractName string, subscriberId id.SubscriberId, matchTxsIndex []bool, total, batch, startIndex, endIndex int) {
-	log.DebugDynamic(filtercommon.LoggingFixLengthFunc("run batch, total:%v,batch:%v,startIndex:%v,endIndex:%v", total, batch, startIndex, endIndex))
+func verifyTxs(wg *sync.WaitGroup, helper *BaseHelper, height uint64, rule *txassign.AliasRule, txs []*commonPb.Transaction, method, contractName string, subscriberId *IdentityCode, matchTxsIndex []bool, total, batch, startIndex, endIndex int) {
+	helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("run batch, total:%v,batch:%v,startIndex:%v,endIndex:%v", total, batch, startIndex, endIndex))
 MatchSuccessfulToVerifyTheNextTransaction:
 	for index := startIndex; index < endIndex; index++ {
 		tx := txs[index]
+
+		// 更新rule缓存
+		helper.updateRuleCache(tx, height)
+
 		if contractName != tx.Payload.ContractName || method != tx.Payload.Method {
-			log.DebugDynamic(func() string {
+			helper.Log.DebugDynamic(func() string {
 				bytes, _ := json.Marshal(rule)
 				return fmt.Sprintf("%s %s [%s] [%v] [%v] contract name or methods do not match, contract_name(tx:%v,rule:%v), "+
 					"methods(tx:%v,rule:%v), rule: %v", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, tx.Payload.ContractName, contractName, tx.Payload.Method, method, string(bytes))
@@ -180,7 +185,7 @@ MatchSuccessfulToVerifyTheNextTransaction:
 			// Get the aliasValueString in the current transaction parameter based on the rule field name
 			aliasValueString, err := getParameterString(tx.Payload.Parameters, name) // name = “param1，param2”
 			if err != nil {
-				log.DebugDynamic(func() string {
+				helper.Log.DebugDynamic(func() string {
 					ruleJson, _ := json.Marshal(rule)
 					return fmt.Sprintf("%s %s [%s] [%v] [%v] get string parameter by rule name fail, rule: %v, error: %v", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, string(ruleJson), err)
 				})
@@ -188,7 +193,7 @@ MatchSuccessfulToVerifyTheNextTransaction:
 			}
 			// 判断总体
 			if rule.Index+rule.Offset > uint32(len(aliasValueString)) {
-				log.DebugDynamic(func() string {
+				helper.Log.DebugDynamic(func() string {
 					ruleJson, _ := json.Marshal(rule)
 					return fmt.Sprintf("%s %s [%s] [%v] [%v] all rule value bounds out of range, value: %v, rule: %v", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, aliasValueString, string(ruleJson))
 				})
@@ -196,8 +201,15 @@ MatchSuccessfulToVerifyTheNextTransaction:
 			}
 			aliasValues := strings.Split(aliasValueString, sep)
 			for i, aliasValue := range aliasValues {
-				if id.IdentityMatchInstance.Match(subscriberId, aliasValue) {
-					log.DebugDynamic(func() string {
+
+				//if id.IdentityMatchInstance.Match(subscriberId, aliasValue) {
+
+				participantId, err := GetIdentityCode(aliasValue)
+				if err != nil {
+					continue MatchSuccessfulToVerifyTheNextTransaction
+				}
+				if subscriberId.Match(participantId) {
+					helper.Log.DebugDynamic(func() string {
 						ruleJson, _ := json.Marshal(rule)
 						return fmt.Sprintf("%s %s [%s] [%v] [%v] rule value match, i: %v, aliasValue: %v, "+
 							"subscriberId: %v, rule: %v, ", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, i, aliasValue, subscriberId, string(ruleJson))
@@ -205,7 +217,7 @@ MatchSuccessfulToVerifyTheNextTransaction:
 					matchTxsIndex[index] = true
 					continue MatchSuccessfulToVerifyTheNextTransaction
 				} else {
-					log.DebugDynamic(func() string {
+					helper.Log.DebugDynamic(func() string {
 						ruleJson, _ := json.Marshal(rule)
 						return fmt.Sprintf("%s %s [%s] [%v] [%v] rule value don't match, i: %v, aliasValue: %v, "+
 							"subscriberId: %v, rule: %v, ", ruleHelperPrefix, aliasPrefix, method, height, tx.Payload.TxId, i, aliasValue, subscriberId, string(ruleJson))

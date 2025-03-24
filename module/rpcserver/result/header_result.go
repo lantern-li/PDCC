@@ -46,7 +46,7 @@ func (b BlockHeaderSubscribeResult) GetResultByBlockInfo(blockInfo *commonPb.Blo
 }
 
 // GetResultByHeight get result by height
-func (b BlockHeaderSubscribeResult) GetResultByHeight(height uint64, _ func(*commonPb.Block) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error) {
+func (b BlockHeaderSubscribeResult) GetResultByHeight(height uint64, _ func(*commonPb.Block, bool) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error) {
 	start := time.Now()
 	header, err := b.store.GetBlockHeaderByHeight(height)
 	getBlockElapsed := time.Since(start)

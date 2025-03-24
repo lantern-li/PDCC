@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package rpcserver
 
 import (
+	"chainmaker.org/chainmaker-go/module/rpcserver/helper"
 	"context"
 	"errors"
 	"fmt"
@@ -141,15 +142,21 @@ func (s *ApiService) dealTxSubscription(tx *commonPb.Transaction, server apiPb.R
 		return err
 	}
 	reqSenderOrgId := tx.Sender.Signer.OrgId
+
+	subscribeFilter, err := helper.InitSubscribeFilter(tx, db, reqSender, s.log, s.subscribeFilterPool)
+	if err != nil {
+		return s.errorResultByError(codes.InvalidArgument, err)
+	}
+
 	return s.doSendTx(tx, db, server, startBlock, endBlock, contractName, txIds,
 		preAlias, preTxId, preOrgId,
-		reqSender, reqSenderOrgId, senderAddr)
+		reqSender, reqSenderOrgId, senderAddr, subscribeFilter)
 }
 
 func (s *ApiService) doSendTx(tx *commonPb.Transaction, db protocol.BlockchainStore,
 	server apiPb.RpcNode_SubscribeServer, startBlock, endBlock int64, contractName string,
 	txIds []string, preAlias string, preTxId string, preOrgId string,
-	reqSender protocol.Role, reqSenderOrgId, senderAddr string) error {
+	reqSender protocol.Role, reqSenderOrgId, senderAddr string, subscribeFilter helper.Helper) error {
 
 	var (
 		txIdsMap                      = make(map[string]struct{})
@@ -164,14 +171,14 @@ func (s *ApiService) doSendTx(tx *commonPb.Transaction, db protocol.BlockchainSt
 	if startBlock == -1 && endBlock == -1 {
 		return s.sendNewTx(db, tx, server, startBlock, endBlock, contractName, txIds,
 			preAlias, preTxId, preOrgId,
-			txIdsMap, -1, reqSender, reqSenderOrgId, senderAddr)
+			txIdsMap, -1, reqSender, reqSenderOrgId, senderAddr, subscribeFilter)
 
 	}
 
 	if alreadySendHistoryBlockHeight, err = s.doSendHistoryTx(db, server, startBlock, endBlock,
 		contractName, txIds,
 		preAlias, preTxId, preOrgId,
-		txIdsMap, reqSender, reqSenderOrgId, tx.Payload.TxId, senderAddr); err != nil {
+		txIdsMap, reqSender, reqSenderOrgId, tx.Payload.TxId, senderAddr, subscribeFilter); err != nil {
 		return err
 	}
 
@@ -181,13 +188,14 @@ func (s *ApiService) doSendTx(tx *commonPb.Transaction, db protocol.BlockchainSt
 
 	return s.sendNewTx(db, tx, server, startBlock, endBlock, contractName, txIds,
 		preAlias, preTxId, preOrgId, txIdsMap,
-		alreadySendHistoryBlockHeight, reqSender, reqSenderOrgId, senderAddr)
+		alreadySendHistoryBlockHeight, reqSender, reqSenderOrgId, senderAddr, subscribeFilter)
 }
 
 func (s *ApiService) doSendHistoryTx(db protocol.BlockchainStore, server apiPb.RpcNode_SubscribeServer,
 	startBlock, endBlock int64, contractName string, txIds []string,
 	preAlias string, preTxId string, preOrgId string,
-	txIdsMap map[string]struct{}, reqSender protocol.Role, reqSenderOrgId, reqTxId, senderAddr string) (int64, error) {
+	txIdsMap map[string]struct{}, reqSender protocol.Role, reqSenderOrgId, reqTxId, senderAddr string,
+	subscribeFilter helper.Helper) (int64, error) {
 
 	var (
 		err             error
@@ -215,7 +223,7 @@ func (s *ApiService) doSendHistoryTx(db protocol.BlockchainStore, server apiPb.R
 	if endBlock != -1 && endBlock <= lastBlockHeight {
 		_, err = s.sendHistoryTx(db, server, startBlock, endBlock, contractName,
 			txIds, preAlias, preTxId, preOrgId,
-			txIdsMap, reqSender, reqSenderOrgId, reqTxId, senderAddr)
+			txIdsMap, reqSender, reqSenderOrgId, reqTxId, senderAddr, subscribeFilter)
 
 		if err != nil {
 			s.log.Warnf("sendHistoryTx failed, %s. [reqTxId:%s, sender:%s]",
@@ -233,7 +241,7 @@ func (s *ApiService) doSendHistoryTx(db protocol.BlockchainStore, server apiPb.R
 	}
 
 	alreadySendHistoryBlockHeight, err := s.sendHistoryTx(db, server, startBlock, endBlock, contractName,
-		txIds, preAlias, preTxId, preOrgId, txIdsMap, reqSender, reqSenderOrgId, reqTxId, senderAddr)
+		txIds, preAlias, preTxId, preOrgId, txIdsMap, reqSender, reqSenderOrgId, reqTxId, senderAddr, subscribeFilter)
 
 	if err != nil {
 		s.log.Warnf("sendHistoryTx failed, %s. [reqTxId:%s, sender:%s]", err, reqTxId, senderAddr)
@@ -257,7 +265,7 @@ func (s *ApiService) sendNewTx(store protocol.BlockchainStore, tx *commonPb.Tran
 	server apiPb.RpcNode_SubscribeServer, startBlock, endBlock int64, contractName string,
 	txIds []string, preAlias string, preTxId string, preOrgId string,
 	txIdsMap map[string]struct{}, alreadySendHistoryBlockHeight int64,
-	reqSender protocol.Role, reqSenderOrgId, senderAddr string) error {
+	reqSender protocol.Role, reqSenderOrgId, senderAddr string, subscribeFilter helper.Helper) error {
 
 	var (
 		errCode         commonErr.ErrCode
@@ -299,7 +307,7 @@ func (s *ApiService) sendNewTx(store protocol.BlockchainStore, tx *commonPb.Tran
 				alreadySendHistoryBlockHeight, err = s.sendHistoryTx(store, server, alreadySendHistoryBlockHeight+1,
 					endBlock, contractName, txIds,
 					preAlias, preTxId, preOrgId,
-					txIdsMap, reqSender, reqSenderOrgId, txId, senderAddr)
+					txIdsMap, reqSender, reqSenderOrgId, txId, senderAddr, subscribeFilter)
 				if err != nil {
 					s.log.Warnf("send history block failed, err:%s,[txId:%s, sender:%s].",
 						err, txId, senderAddr)
@@ -337,7 +345,8 @@ func (s *ApiService) sendHistoryTx(store protocol.BlockchainStore,
 	contractName string, txIds []string,
 	preAlias string, preTxId string, preOrgId string,
 	txIdsMap map[string]struct{},
-	reqSender protocol.Role, reqSenderOrgId, txId, senderAddr string) (int64, error) {
+	reqSender protocol.Role, reqSenderOrgId, txId, senderAddr string,
+	subscribeFilter helper.Helper) (int64, error) {
 
 	var (
 		err    error
@@ -391,7 +400,11 @@ func (s *ApiService) sendHistoryTx(store protocol.BlockchainStore,
 
 			s.log.Infof("get block[%d] finish.[txId:%s, sender:%s, contractName:%s]",
 				i, txId, senderAddr, contractName)
-			if err := s.sendSubscribeTx(server, block.Txs, contractName, txIds,
+
+			// 根据注册的规则，筛选交易
+			filterTxs, _ := subscribeFilter.FiltTxs(block, true)
+
+			if err := s.sendSubscribeTx(server, filterTxs, contractName, txIds,
 				preAlias, preTxId, preOrgId,
 				txIdsMap,
 				reqSender, reqSenderOrgId); err != nil {

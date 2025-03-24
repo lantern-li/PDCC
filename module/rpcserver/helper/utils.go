@@ -100,6 +100,19 @@ func getParameter(parameters []*commonPb.KeyValuePair, key string) ([]byte, erro
 	return nil, fmt.Errorf("\"%v\" is not found", key)
 }
 
+// GetParameter gets a value from the parameters based on the key
+func getRuleDetail(parameters []*commonPb.KeyValuePair, key string) ([]byte, error) {
+	for _, parameter := range parameters {
+		if parameter.Key == "rule" {
+			if parameter.Value == nil {
+				return nil, fmt.Errorf("\"%v\" cannot be nil", key)
+			}
+			return parameter.Value, nil
+		}
+	}
+	return nil, fmt.Errorf("\"%v\" is not found", key)
+}
+
 func checkRules(height uint64, rule *txassign.Rule, logger protocol.Logger, typ string) bool {
 	if height >= rule.StartHeight && (height <= rule.EndHeight || 0 == rule.EndHeight) {
 		if rule.Status == txassign.RuleStatus_Enabled {

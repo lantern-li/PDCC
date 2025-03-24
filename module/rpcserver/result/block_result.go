@@ -59,7 +59,7 @@ func (b BlockSubscribeResult) GetResultByBlockInfo(blockInfo *commonPb.BlockInfo
 }
 
 // GetResultByHeight get result by height
-func (b BlockSubscribeResult) GetResultByHeight(height uint64, filter func(*commonPb.Block) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error) {
+func (b BlockSubscribeResult) GetResultByHeight(height uint64, filter func(*commonPb.Block, bool) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error) {
 	start := time.Now()
 	block, err := b.store.GetBlock(height)
 	if err != nil {
@@ -71,7 +71,7 @@ func (b BlockSubscribeResult) GetResultByHeight(height uint64, filter func(*comm
 	getBlockElapsed := time.Since(start)
 
 	start = time.Now()
-	transactions, count := filter(block)
+	transactions, count := filter(block, true)
 	filterElapsed := time.Since(start)
 	start = time.Now()
 	data, err := proto.Marshal(&commonPb.BlockInfo{

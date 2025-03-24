@@ -54,7 +54,7 @@ func (b *BlockWithRWSetSubscribeResult) GetResultByBlockInfo(blockInfo *commonPb
 }
 
 // GetResultByHeight get result by height
-func (b *BlockWithRWSetSubscribeResult) GetResultByHeight(height uint64, filter func(*commonPb.Block) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error) {
+func (b *BlockWithRWSetSubscribeResult) GetResultByHeight(height uint64, filter func(*commonPb.Block, bool) (result []*commonPb.Transaction, count int)) (*commonPb.SubscribeResult, *Stat, error) {
 	start := time.Now()
 	blockWithRWSet, err := b.store.GetBlockWithRWSets(height)
 	getBlockElapsed := time.Since(start)
@@ -67,7 +67,7 @@ func (b *BlockWithRWSetSubscribeResult) GetResultByHeight(height uint64, filter 
 		return nil, nil, nil
 	}
 	start = time.Now()
-	txs, count := filter(blockWithRWSet.Block)
+	txs, count := filter(blockWithRWSet.Block, true)
 	filterElapsed := time.Since(start)
 
 	start = time.Now()
