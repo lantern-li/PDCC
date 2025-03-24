@@ -579,10 +579,7 @@ func (bc *Blockchain) initKMS() (err error) {
 		bc.log.Infof("kms module existed, ignore.")
 		return nil
 	}
-	kmsProviders, err := kms.InitKMSProviders(localconf.ChainMakerConfig.KMSConfig, bc.log)
-	if err != nil {
-		return err
-	}
+	kmsProviders := kms.InitKMSProviders(localconf.ChainMakerConfig.KMSConfig, bc.log)
 	bc.kmsProviders = kmsProviders
 	bc.initModules[moduleNameKMS] = struct{}{}
 	return nil

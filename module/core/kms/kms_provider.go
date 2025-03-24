@@ -5,7 +5,6 @@ import (
 	"chainmaker.org/chainmaker/localconf/v2"
 	"chainmaker.org/chainmaker/logger/v2"
 	"chainmaker.org/chainmaker/protocol/v2"
-	"errors"
 	"fmt"
 )
 
@@ -22,7 +21,7 @@ const (
 	Tencentcloudkms KmsSource = "tencentcloudkms "
 )
 
-func InitKMSProviders(kmsConfigs []localconf.KMSBasicConfig, log *logger.CMLogger) (map[string]protocol.KMSProvider, error) {
+func InitKMSProviders(kmsConfigs []localconf.KMSBasicConfig, log *logger.CMLogger) map[string]protocol.KMSProvider {
 	kmsClients := make(map[string]protocol.KMSProvider)
 	for _, config := range kmsConfigs {
 		if !config.Enabled {
@@ -30,14 +29,14 @@ func InitKMSProviders(kmsConfigs []localconf.KMSBasicConfig, log *logger.CMLogge
 		}
 		client, err := newKMSClient(config, log)
 		if err != nil || client == nil {
-			msg := fmt.Sprintf("Failed to initialize KMS (ID: %s): %v", config.KMSID, err)
-			log.Errorf(msg)
-			return nil, errors.New(msg)
+			// 为了不影响链的正常启动，这里只打印错误信息，不返回错误
+			log.Errorf("failed to init KMS (ID: %s): %v", config.KMSID, err)
+		} else {
+			log.Infof("init KMS provider [ID: %s] success", config.KMSID)
+			kmsClients[config.KMSID] = client
 		}
-		log.Infof("init kms provider [id: %v]", config.KMSID)
-		kmsClients[config.KMSID] = client
 	}
-	return kmsClients, nil
+	return kmsClients
 }
 
 // NewKMSClient 根据 source 创建对应的 KMS 实例
