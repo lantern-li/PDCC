@@ -20,11 +20,11 @@ require (
 	chainmaker.org/chainmaker/store/v2 v2.3.8-0.20250325075642-0929f852a223
 	chainmaker.org/chainmaker/utils/v2 v2.3.7-0.20250313093010-a6d3b7a89940 // for sz genesis block
 	chainmaker.org/chainmaker/vm-docker-go/v2 v2.3.6
-	chainmaker.org/chainmaker/vm-engine/v2 v2.3.8-0.20250324080950-8be4e46d6d6e
+	chainmaker.org/chainmaker/vm-engine/v2 v2.3.8-0.20250120031416-1aceaffd918d
 	chainmaker.org/chainmaker/vm-evm/v2 v2.3.7
 	chainmaker.org/chainmaker/vm-gasm/v2 v2.3.6
 	chainmaker.org/chainmaker/vm-native/v2 v2.3.7-0.20250325073253-2b4e88ba3783 // v2.3.6_qc_sz
-	chainmaker.org/chainmaker/vm-wasmer/v2 v2.3.7-0.20250324081047-4fbfa862b7d8
+	chainmaker.org/chainmaker/vm-wasmer/v2 v2.3.7-0.20250120062002-5bfc32757cce
 	chainmaker.org/chainmaker/vm-wxvm/v2 v2.3.6
 	chainmaker.org/chainmaker/vm/v2 v2.3.8-0.20250325071553-df4d7c03dfe0
 	code.cloudfoundry.org/bytefmt v0.0.0-20211005130812-5bb3c17173e5
