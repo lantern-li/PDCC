@@ -18,15 +18,15 @@ require (
 	chainmaker.org/chainmaker/protocol/v2 v2.3.8-0.20250312082651-332dd635b1fc
 	chainmaker.org/chainmaker/sdk-go/v2 v2.3.8-0.20241213072826-fa5a522851d0
 	chainmaker.org/chainmaker/store/v2 v2.3.8-0.20241206092415-5b0a51f725d9
-	chainmaker.org/chainmaker/utils/v2 v2.3.6
+	chainmaker.org/chainmaker/utils/v2 v2.3.7-0.20250313093010-a6d3b7a89940 // for sz genesis block
 	chainmaker.org/chainmaker/vm-docker-go/v2 v2.3.6
 	chainmaker.org/chainmaker/vm-engine/v2 v2.3.8-0.20250324080950-8be4e46d6d6e
 	chainmaker.org/chainmaker/vm-evm/v2 v2.3.7
 	chainmaker.org/chainmaker/vm-gasm/v2 v2.3.6
-	chainmaker.org/chainmaker/vm-native/v2 v2.3.6
+	chainmaker.org/chainmaker/vm-native/v2 v2.3.7-0.20250325073253-2b4e88ba3783 // v2.3.6_qc_sz
 	chainmaker.org/chainmaker/vm-wasmer/v2 v2.3.7-0.20250324081047-4fbfa862b7d8
 	chainmaker.org/chainmaker/vm-wxvm/v2 v2.3.6
-	chainmaker.org/chainmaker/vm/v2 v2.3.8-0.20250312081554-64d5b797631b
+	chainmaker.org/chainmaker/vm/v2 v2.3.8-0.20250325071553-df4d7c03dfe0
 	code.cloudfoundry.org/bytefmt v0.0.0-20211005130812-5bb3c17173e5
 	github.com/Rican7/retry v0.1.0
 	github.com/Workiva/go-datastructures v1.0.53
@@ -80,10 +80,6 @@ require (
 )
 
 replace (
-	// for sz genesis block
-	chainmaker.org/chainmaker/utils/v2 => chainmaker.org/chainmaker/utils/v2 v2.3.7-0.20250313093010-a6d3b7a89940
-
-	chainmaker.org/chainmaker/vm-native/v2 => chainmaker.org/chainmaker/vm-native/v2 v2.3.2-0.20241205062615-82b43d5007da
 	github.com/RedisBloom/redisbloom-go => chainmaker.org/third_party/redisbloom-go v1.0.0
 	github.com/dgraph-io/badger/v3 => chainmaker.org/third_party/badger/v3 v3.0.0
 	github.com/libp2p/go-conn-security-multistream v0.2.0 => chainmaker.org/third_party/go-conn-security-multistream v1.0.5
