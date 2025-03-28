@@ -18,7 +18,7 @@ require (
 	chainmaker.org/chainmaker/protocol/v2 v2.3.8-0.20250312082651-332dd635b1fc
 	chainmaker.org/chainmaker/sdk-go/v2 v2.3.8-0.20250328014526-68fbfc62372e
 	chainmaker.org/chainmaker/store/v2 v2.3.8-0.20250325075642-0929f852a223
-	chainmaker.org/chainmaker/utils/v2 v2.3.7-0.20250313093010-a6d3b7a89940 // for sz genesis block
+	chainmaker.org/chainmaker/utils/v2 v2.3.7-0.20250328034818-47f6fead061a // for sz genesis block
 	chainmaker.org/chainmaker/vm-docker-go/v2 v2.3.6
 	chainmaker.org/chainmaker/vm-engine/v2 v2.3.8-0.20250120031416-1aceaffd918d
 	chainmaker.org/chainmaker/vm-evm/v2 v2.3.7
