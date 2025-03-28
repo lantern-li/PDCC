@@ -114,6 +114,7 @@ func (h *AliasHelper) FiltTxs(current *commonPb.Block, withTxId bool) (result []
 		}
 	}
 	if len(rules) != len(h.methods) {
+		fmt.Printf(">>> len(rules) != len(h.methods): %v,%v \n", len(rules), len(h.methods))
 		h.helper.Log.DebugDynamic(filtercommon.LoggingFixLengthFunc("%s %s no rules available, ", ruleHelperPrefix, aliasPrefix))
 		return
 	}

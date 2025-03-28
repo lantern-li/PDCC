@@ -63,7 +63,7 @@ For detailed logs, please see ./sdk.log
 	mainCmd.AddCommand(commandutil.NewUtilCMD())
 	mainCmd.AddCommand(consensus.NewConsensusCMD())
 	mainCmd.AddCommand(node.NewNodeCMD())
-	mainCmd.AddCommand(subscribe.NewSubBlockWithRuleCMD())
+	mainCmd.AddCommand(subscribe.NewSubCMD())
 
 	// 后续改成go-sdk
 	//mainCmd.AddCommand(payload.PayloadCMD())

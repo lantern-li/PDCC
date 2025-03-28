@@ -153,6 +153,7 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction,
 	//reqSenderOrgId := tx.Sender.Signer.OrgId
 
 	subscribeFilter, err := helper.InitSubscribeFilter(tx, store, reqSender, s.log, s.subscribeFilterPool)
+	fmt.Printf(">>> err == nil = %v\n", err == nil)
 	if err != nil {
 		return s.errorResultByError(codes.InvalidArgument, err)
 	}

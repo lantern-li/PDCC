@@ -145,20 +145,25 @@ func (h *BaseHelper) getFilterRule(key string, cache bool) (*txassign.FilterRule
 	// Does not exist in cache, query DB
 	bytes, err := h.store.ReadObject(syscontract.SystemContract_TX_ASSIGN.String(), []byte(key))
 	if err != nil {
+		fmt.Printf(">>> ReadObject error: %v \n", err.Error())
 		return nil, err
 	}
 	// There is no return nil in DB
 	if bytes == nil {
+		fmt.Printf(">>> ReadObject bytes nil \n")
 		return nil, nil
 	}
+	fmt.Printf(">>> ReadObject: %v, %v\n", h.LastBlockHeight, height)
 	if h.LastBlockHeight > height {
 		// If present in DB, deserialize to object
 		filterRule = &txassign.FilterRule{}
 		err = proto.Unmarshal(bytes, filterRule)
 		if err != nil {
+			fmt.Printf(">>> ReadObject nil \n")
 			return nil, err
 		}
 		// 更新缓存
+		fmt.Printf(">>> catch put111: %v, %v,%v \n", h.LastBlockHeight, key, filterRule)
 		h.ruleCache.Put(h.LastBlockHeight, key, filterRule)
 	}
 	return filterRule, nil
