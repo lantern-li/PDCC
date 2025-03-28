@@ -5,7 +5,7 @@ SPDX-License-Identifier: Apache-2.0
 */
 
 // Package helper base test
-package helper
+package subscribefilter
 
 import (
 	"chainmaker.org/chainmaker/common/v2/bytehelper"
@@ -22,7 +22,7 @@ import (
 	"testing"
 )
 
-func TestNewBaseHelper(t *testing.T) {
+func TestNewFilterManagement(t *testing.T) {
 	bytes, err := bytehelper.Int64ToBytes(1)
 	if err != nil {
 		t.Errorf("%v", err)
@@ -42,7 +42,7 @@ func TestNewBaseHelper(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *BaseHelper
+		want    *SubscribeFilterManager
 		wantErr bool
 	}{
 		{
@@ -101,8 +101,8 @@ func TestNewBaseHelper(t *testing.T) {
 				role:  protocol.RoleAdmin,
 				log:   logger.NewLogPrinter("TEST"),
 			},
-			want: func() *BaseHelper {
-				helper, err := newBaseHelper(&commonPb.Transaction{
+			want: func() *SubscribeFilterManager {
+				helper, err := newSubscribeFilterManager(&commonPb.Transaction{
 					Payload: &commonPb.Payload{Parameters: []*commonPb.KeyValuePair{
 						{Key: syscontract.SubscribeBlock_END_BLOCK.String(), Value: bytes},
 						{Key: syscontract.SubscribeBlock_START_BLOCK.String(), Value: bytes},
@@ -118,7 +118,7 @@ func TestNewBaseHelper(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := newBaseHelper(tt.args.tx, tt.args.store, tt.args.role, tt.args.log)
+			got, err := newSubscribeFilterManager(tt.args.tx, tt.args.store, tt.args.role, tt.args.log)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("newBaseHelper() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -231,7 +231,7 @@ func Test_baseHelper_getFilterRule(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &BaseHelper{
+			h := &SubscribeFilterManager{
 				Start:           tt.fields.Start,
 				End:             tt.fields.End,
 				LastBlockHeight: tt.fields.LastBlockHeight,
@@ -310,7 +310,7 @@ func Test_baseHelper_validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := BaseHelper{
+			h := SubscribeFilterManager{
 				Start:           tt.fields.Start,
 				End:             tt.fields.End,
 				LastBlockHeight: tt.fields.LastBlockHeight,

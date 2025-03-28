@@ -687,13 +687,13 @@ vm:
   # Wasmer config
   wasmer:
     kms:
-      enable: true
+      enable: false
       id: sz_kms
   # Golang runtime in docker container
   go:
     # kms config
     kms:
-     enable: true
+     enable: false
      id: sz_kms
     # Enable docker go virtual machine, default: false
     enable: {enable_vm_go}
@@ -752,7 +752,7 @@ kms:
   # Mark the kms id and enable it for other modules
   - kms_id: sz_kms
     # enable or not to check if available
-    enabled: true
+    enabled: false
     # plugin / tencentcloudkms or other service provider
     source: bwmmfw
     # KMS SecretId

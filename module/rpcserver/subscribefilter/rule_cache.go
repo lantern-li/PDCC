@@ -5,7 +5,7 @@ SPDX-License-Identifier: Apache-2.0
 */
 
 // Package helper rules cache
-package helper
+package subscribefilter
 
 import (
 	"sync"

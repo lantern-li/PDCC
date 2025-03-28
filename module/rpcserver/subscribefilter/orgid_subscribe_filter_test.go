@@ -5,7 +5,7 @@ SPDX-License-Identifier: Apache-2.0
 */
 
 // Package helper orgid test
-package helper
+package subscribefilter
 
 import (
 	"chainmaker.org/chainmaker/net-liquid/logger"
@@ -23,7 +23,7 @@ import (
 func TestOrgIdHelper_FilterRule(t *testing.T) {
 	filter := &txassign.FilterRule{Id: txassign.RuleType_Alias}
 	type fields struct {
-		helper *BaseHelper
+		filterManager *SubscribeFilterManager
 	}
 	type args struct {
 		cache bool
@@ -38,8 +38,8 @@ func TestOrgIdHelper_FilterRule(t *testing.T) {
 		{
 			name: "正常流",
 			fields: fields{
-				helper: func() *BaseHelper {
-					helper, err := newBaseHelper(&commonPb.Transaction{
+				filterManager: func() *SubscribeFilterManager {
+					helper, err := newSubscribeFilterManager(&commonPb.Transaction{
 						Payload: &commonPb.Payload{Parameters: []*commonPb.KeyValuePair{
 							{Key: syscontract.SubscribeBlock_END_BLOCK.String(), Value: end},
 							{Key: syscontract.SubscribeBlock_START_BLOCK.String(), Value: start},
@@ -69,8 +69,8 @@ func TestOrgIdHelper_FilterRule(t *testing.T) {
 		{
 			name: "正常流",
 			fields: fields{
-				helper: func() *BaseHelper {
-					helper, err := newBaseHelper(&commonPb.Transaction{
+				filterManager: func() *SubscribeFilterManager {
+					helper, err := newSubscribeFilterManager(&commonPb.Transaction{
 						Payload: &commonPb.Payload{Parameters: []*commonPb.KeyValuePair{
 							{Key: syscontract.SubscribeBlock_END_BLOCK.String(), Value: end},
 							{Key: syscontract.SubscribeBlock_START_BLOCK.String(), Value: start},
@@ -102,8 +102,8 @@ func TestOrgIdHelper_FilterRule(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &OrgIdHelper{
-				helper: tt.fields.helper,
+			h := &OrgIdSubscriberFilter{
+				filterManager: tt.fields.filterManager,
 			}
 
 			got, err := h.FilterRule(tt.args.cache)
@@ -121,7 +121,7 @@ func TestOrgIdHelper_GetBaseHelper(t *testing.T) {
 
 func TestOrgIdHelper_GetType(t *testing.T) {
 	type fields struct {
-		helper *BaseHelper
+		filterManager *SubscribeFilterManager
 	}
 	tests := []struct {
 		name   string
@@ -130,14 +130,14 @@ func TestOrgIdHelper_GetType(t *testing.T) {
 	}{
 		{
 			name:   "正常流",
-			fields: fields{helper: &BaseHelper{}},
+			fields: fields{filterManager: &SubscribeFilterManager{}},
 			want:   txassign.RuleType_OrgId,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &OrgIdHelper{
-				helper: tt.fields.helper,
+			h := &OrgIdSubscriberFilter{
+				filterManager: tt.fields.filterManager,
 			}
 			assert.Equalf(t, tt.want, h.GetType(), "GetType()")
 		})
@@ -150,7 +150,7 @@ func TestOrgIdHelper_Validate(t *testing.T) {
 
 func TestOrgIdHelper_Verify(t *testing.T) {
 	type fields struct {
-		helper *BaseHelper
+		helper *SubscribeFilterManager
 	}
 	type args struct {
 		current *commonPb.Block

@@ -4,8 +4,8 @@ Copyright (C) BABEC. All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package helper base
-package helper
+// Package subscribefilter Package subscribe filter
+package subscribefilter
 
 import (
 	"encoding/json"
@@ -24,8 +24,8 @@ import (
 
 const nameRule = "rule"
 
-// BaseHelper base helper
-type BaseHelper struct {
+// SubscribeFilterManager subscription filter manager
+type SubscribeFilterManager struct {
 	// Start height
 	Start int64
 	// End height
@@ -44,9 +44,9 @@ type BaseHelper struct {
 	role protocol.Role
 }
 
-// newBaseHelper new base helper
-func newBaseHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, role protocol.Role, log protocol.Logger) (
-	*BaseHelper, error) {
+// newSubscribeFilterManager new subscriber filter manager
+func newSubscribeFilterManager(tx *commonPb.Transaction, store protocol.BlockchainStore, role protocol.Role, log protocol.Logger) (
+	*SubscribeFilterManager, error) {
 	start, err := GetParameterInt64(tx.Payload.Parameters, syscontract.SubscribeBlock_START_BLOCK.String())
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func newBaseHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, rol
 	if err != nil {
 		return nil, err
 	}
-	return &BaseHelper{
+	return &SubscribeFilterManager{
 		Start:           start,
 		End:             end,
 		LastBlockHeight: block.Header.BlockHeight,
@@ -76,48 +76,48 @@ func InitSubscribeFilter(tx *commonPb.Transaction,
 	store protocol.BlockchainStore,
 	role protocol.Role,
 	log protocol.Logger,
-	pool *ants.Pool) (Helper, error) {
+	pool *ants.Pool) (SubscribeFilter, error) {
 	// new helper
-	helper0, err := NewHelper(tx, store, role, log, pool)
+	filter, err := NewSubscribeFilter(tx, store, role, log, pool)
 	if err != nil {
 		return nil, err
 	}
-	err = helper0.Validate()
+	err = filter.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("validate parameter fail, error: %v", err)
 	}
 	// get filter rule from db
-	rule, err := helper0.FilterRule(false)
+	rule, err := filter.FilterRule(false)
 	if err != nil {
 		return nil, err
 	}
 	// 需求如此，必须注册清分规则后，才允许清分
 	if rule == nil {
 		parameters, _ := json.Marshal(tx.Payload.Parameters)
-		return nil, fmt.Errorf("%v rule, filter rule not found, parameters: %v", helper0.GetType().String(), parameters)
+		return nil, fmt.Errorf("%v rule, filter rule not found, parameters: %v", filter.GetType().String(), parameters)
 	}
-	return helper0, nil
+	return filter, nil
 }
 
-// NewHelper new helper
-func NewHelper(tx *commonPb.Transaction, store protocol.BlockchainStore, role protocol.Role, log protocol.Logger, pool *ants.Pool) (Helper, error) {
+// NewSubscribeFilter new susbcribe filter
+func NewSubscribeFilter(tx *commonPb.Transaction, store protocol.BlockchainStore, role protocol.Role, log protocol.Logger, pool *ants.Pool) (SubscribeFilter, error) {
 	ruleType, err := getRuleType(tx.Payload.Parameters)
 	if err != nil {
 		return nil, err
 	}
 	switch ruleType {
 	case txassign.RuleType_OrgId:
-		return newOrgIdHelper(tx, store, role, log)
+		return newOrgIdSubscriberFilter(tx, store, role, log)
 		//return nil, fmt.Errorf("rule type %v not support", ruleType)
 	case txassign.RuleType_Alias:
-		return newAliasHelper(tx, store, role, log, pool)
+		return newAliasSubscribeFilter(tx, store, role, log, pool)
 	default:
 		return nil, fmt.Errorf("rule type %v not support", ruleType)
 	}
 }
 
 // validate parameter
-func (h BaseHelper) validate() error {
+func (h SubscribeFilterManager) validate() error {
 	if h.Start < -1 || h.End < -1 || (h.End != -1 && h.Start > h.End) {
 		return errors.New("invalid Start block height or End block height")
 	}
@@ -128,7 +128,7 @@ func (h BaseHelper) validate() error {
 }
 
 // getFilterRule Get *txassign.FilterRule from cache or DB based on key
-func (h *BaseHelper) getFilterRule(key string, cache bool) (*txassign.FilterRule, error) {
+func (h *SubscribeFilterManager) getFilterRule(key string, cache bool) (*txassign.FilterRule, error) {
 	var (
 		filterRule *txassign.FilterRule
 		height     uint64
@@ -136,7 +136,6 @@ func (h *BaseHelper) getFilterRule(key string, cache bool) (*txassign.FilterRule
 	h.ruleCache.l.Lock()
 	defer h.ruleCache.l.Unlock()
 	if cache {
-		fmt.Printf(">>> catch get: %v \n", key)
 		filterRule, height = h.ruleCache.Get(key)
 		if filterRule != nil {
 			return filterRule, nil
@@ -145,32 +144,27 @@ func (h *BaseHelper) getFilterRule(key string, cache bool) (*txassign.FilterRule
 	// Does not exist in cache, query DB
 	bytes, err := h.store.ReadObject(syscontract.SystemContract_TX_ASSIGN.String(), []byte(key))
 	if err != nil {
-		fmt.Printf(">>> ReadObject error: %v \n", err.Error())
 		return nil, err
 	}
 	// There is no return nil in DB
-	if bytes == nil {
-		fmt.Printf(">>> ReadObject bytes nil \n")
+	if bytes == nil || len(bytes) == 0 {
 		return nil, nil
 	}
-	fmt.Printf(">>> ReadObject: %v, %v\n", h.LastBlockHeight, height)
 	if h.LastBlockHeight > height {
 		// If present in DB, deserialize to object
 		filterRule = &txassign.FilterRule{}
 		err = proto.Unmarshal(bytes, filterRule)
 		if err != nil {
-			fmt.Printf(">>> ReadObject nil \n")
 			return nil, err
 		}
 		// 更新缓存
-		fmt.Printf(">>> catch put111: %v, %v,%v \n", h.LastBlockHeight, key, filterRule)
 		h.ruleCache.Put(h.LastBlockHeight, key, filterRule)
 	}
 	return filterRule, nil
 }
 
-// updateRuleCache update rule cache
-func (h *BaseHelper) updateRuleCache(tx *commonPb.Transaction, height uint64) error {
+// updateAliasRuleCache update alias rule cache
+func (h *SubscribeFilterManager) updateAliasRuleCache(tx *commonPb.Transaction, height uint64) error {
 	contract := tx.Payload.ContractName
 	method := tx.Payload.Method
 	if tx.Result.ContractResult.Code == 0 &&
@@ -198,7 +192,7 @@ func (h *BaseHelper) updateRuleCache(tx *commonPb.Transaction, height uint64) er
 		if err != nil {
 			return fmt.Errorf("read rule [%v] error: %v", key, err.Error())
 		}
-		if bytes == nil {
+		if bytes == nil || len(bytes) == 0 {
 			return fmt.Errorf("read rule [%v] empty", key)
 		}
 		filterRule := &txassign.FilterRule{}
@@ -207,7 +201,48 @@ func (h *BaseHelper) updateRuleCache(tx *commonPb.Transaction, height uint64) er
 			return fmt.Errorf("unmarshall rule error: %v", err.Error())
 		}
 		// 更新缓存
-		fmt.Printf(">>> update: %v, %v, %v \n", height, key, filterRule)
+		h.ruleCache.Put(height, key, filterRule)
+	}
+	return nil
+}
+
+// updateOrgIdRuleCache update orgId rule cache
+func (h *SubscribeFilterManager) updateOrgIdRuleCache(tx *commonPb.Transaction, height uint64) error {
+	contract := tx.Payload.ContractName
+	method := tx.Payload.Method
+	if tx.Result.ContractResult.Code == 0 &&
+		contract == syscontract.SystemContract_TX_ASSIGN.String() &&
+		(method == syscontract.TxAssignFunction_RegisterRule.String() ||
+			method == syscontract.TxAssignFunction_UpdateRuleByHeight.String()) {
+
+		rule := &txassign.Rule{}
+		for _, kv := range tx.Payload.Parameters {
+			if kv.Key == nameRule {
+				err := json.Unmarshal(kv.Value, rule)
+				if err != nil {
+					return fmt.Errorf("unmarshall %v error: %v", nameRule, err.Error())
+				}
+			}
+		}
+		h.ruleCache.l.Lock()
+		defer h.ruleCache.l.Unlock()
+		format := strconv.FormatInt(int64(txassign.RuleType_OrgId), 10)
+		key := path.Join(RulePrefix, format)
+
+		bytes, err := h.store.ReadObject(syscontract.SystemContract_TX_ASSIGN.String(), []byte(key))
+		if err != nil {
+			return fmt.Errorf("read rule [%v] error: %v", key, err.Error())
+		}
+		if bytes == nil || len(bytes) == 0 {
+			return fmt.Errorf("read rule [%v] empty", key)
+		}
+
+		filterRule := &txassign.FilterRule{}
+		err = proto.Unmarshal(bytes, filterRule)
+		if err != nil {
+			return fmt.Errorf("unmarshall rule error: %v", err.Error())
+		}
+		// 更新缓存
 		h.ruleCache.Put(height, key, filterRule)
 	}
 	return nil

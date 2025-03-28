@@ -5,7 +5,7 @@ SPDX-License-Identifier: Apache-2.0
 */
 
 // Package helper utils
-package helper
+package subscribefilter
 
 import (
 	"chainmaker.org/chainmaker/utils/v2"
@@ -91,19 +91,6 @@ func GetParameterInt64(parameters []*commonPb.KeyValuePair, key string) (int64, 
 func getParameter(parameters []*commonPb.KeyValuePair, key string) ([]byte, error) {
 	for _, parameter := range parameters {
 		if parameter.Key == key {
-			if parameter.Value == nil {
-				return nil, fmt.Errorf("\"%v\" cannot be nil", key)
-			}
-			return parameter.Value, nil
-		}
-	}
-	return nil, fmt.Errorf("\"%v\" is not found", key)
-}
-
-// GetParameter gets a value from the parameters based on the key
-func getRuleDetail(parameters []*commonPb.KeyValuePair, key string) ([]byte, error) {
-	for _, parameter := range parameters {
-		if parameter.Key == "rule" {
 			if parameter.Value == nil {
 				return nil, fmt.Errorf("\"%v\" cannot be nil", key)
 			}

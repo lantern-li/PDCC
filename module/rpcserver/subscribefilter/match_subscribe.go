@@ -1,6 +1,9 @@
-package helper
+package subscribefilter
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const (
 	AdminCode         string = "0"
@@ -30,11 +33,12 @@ type IdentityCode struct {
 }
 
 // GetIdentityCode 转换身份编码
-func GetIdentityCode(id string) (*IdentityCode, error) {
+func GetIdentityCode(rawId string) (*IdentityCode, error) {
+	id := strings.ReplaceAll(rawId, " ", "")
 	length := len(id)
 	// 位数判断
 	if length != 11 && length != 19 {
-		return nil, fmt.Errorf("unexpected id length")
+		return nil, fmt.Errorf("unexpected id length, id: [%v]", rawId)
 	}
 	ic := &IdentityCode{
 		Raw:          id,
@@ -50,19 +54,23 @@ func GetIdentityCode(id string) (*IdentityCode, error) {
 	}
 
 	if !ic.verify() {
-		return nil, fmt.Errorf("unexpected id format")
+		return nil, fmt.Errorf("unexpected id format, id: [%v]", rawId)
 	}
 	return ic, nil
 }
 
 func (ic *IdentityCode) Match(participantIdCode *IdentityCode) bool {
-	// todo 如果是乱填的内容，是否应该订阅到？ 需要订阅到
+	if ic == nil {
+		return false
+	}
+	// AdminCode 要订阅所有内容，即使是alias无关的内容
+	if ic.CodeType == AdminCode {
+		return true
+	}
 	if participantIdCode == nil {
 		return false
 	}
 	switch ic.CodeType {
-	case AdminCode:
-		return true
 	case RegionCode:
 		// 类型 "1" 为省局、市局或区局
 		// 如果市和区均为 "00"，视为省局，匹配时只比较省编码
@@ -92,6 +100,9 @@ func (ic *IdentityCode) verify() bool {
 	if ic == nil {
 		return false
 	}
+	if !IsValidCodeType(ic.CodeType) {
+		return false
+	}
 	if ic.CodeType == AdminCode {
 		return ic.ProvinceCode == RootCode &&
 			ic.CityCode == RootCode &&
@@ -101,4 +112,13 @@ func (ic *IdentityCode) verify() bool {
 		return false
 	}
 	return true
+}
+
+func IsValidCodeType(codeType string) bool {
+	switch codeType {
+	case AdminCode, RegionCode, ExternalGovCode, EnterpriseCode, NaturalPersonCode:
+		return true
+	default:
+		return false
+	}
 }

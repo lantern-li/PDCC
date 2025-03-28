@@ -7,8 +7,8 @@ SPDX-License-Identifier: Apache-2.0
 package rpcserver
 
 import (
-	"chainmaker.org/chainmaker-go/module/rpcserver/helper"
 	rpcRes "chainmaker.org/chainmaker-go/module/rpcserver/result"
+	"chainmaker.org/chainmaker-go/module/rpcserver/subscribefilter"
 	"chainmaker.org/chainmaker/pb-go/v2/accesscontrol"
 	"context"
 	"errors"
@@ -152,8 +152,7 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction,
 
 	//reqSenderOrgId := tx.Sender.Signer.OrgId
 
-	subscribeFilter, err := helper.InitSubscribeFilter(tx, store, reqSender, s.log, s.subscribeFilterPool)
-	fmt.Printf(">>> err == nil = %v\n", err == nil)
+	subscribeFilter, err := subscribefilter.InitSubscribeFilter(tx, store, reqSender, s.log, s.subscribeFilterPool)
 	if err != nil {
 		return s.errorResultByError(codes.InvalidArgument, err)
 	}
@@ -197,20 +196,20 @@ func (s *ApiService) dealBlockSubscription(tx *commonPb.Transaction,
 
 func (s *ApiService) sendBlock(tx *commonPb.Transaction,
 	server apiPb.RpcNode_SubscribeServer, endBlockHeight int64, startBlock int64,
-	senderAddr string, subscribeFilter helper.Helper, subscribeResult rpcRes.SubscribeResult) error {
+	senderAddr string, subscribeFilter subscribefilter.SubscribeFilter, subscribeResult rpcRes.SubscribeResult) error {
 
 	var (
 		txId = tx.Payload.TxId
 	)
 
-	base := subscribeFilter.GetBaseHelper()
-	if base.Start == -1 && base.End == -1 {
+	filterManagement := subscribeFilter.GetSubscribeFilterManagement()
+	if filterManagement.Start == -1 && filterManagement.End == -1 {
 		// send new block
 		return s.sendNewBlock(tx, server, endBlockHeight, -1,
 			senderAddr, subscribeFilter, subscribeResult)
 	}
 
-	if base.End != -1 && base.End <= int64(base.LastBlockHeight) {
+	if filterManagement.End != -1 && filterManagement.End <= int64(filterManagement.LastBlockHeight) {
 		// send history block
 		_, err := s.sendHistoryBlock(server, startBlock, endBlockHeight, txId, senderAddr, subscribeFilter, subscribeResult)
 		if err != nil {
@@ -239,17 +238,17 @@ func (s *ApiService) sendBlock(tx *commonPb.Transaction,
 func (s *ApiService) sendNewBlock(tx *commonPb.Transaction,
 	server apiPb.RpcNode_SubscribeServer,
 	endBlockHeight int64, alreadySendHistoryBlockHeight int64,
-	senderAddress string, subscribeFilter helper.Helper, subscribeResult rpcRes.SubscribeResult) error {
+	senderAddress string, subscribeFilter subscribefilter.SubscribeFilter, subscribeResult rpcRes.SubscribeResult) error {
 
 	var (
-		errCode         commonErr.ErrCode
-		err             error
-		errMsg          string
-		lastBlockHeight int64
-		chainId         = tx.Payload.ChainId
-		txId            = tx.Payload.TxId
-		blockC          = make(chan model.NewBlockEvent, 1)
-		base            = subscribeFilter.GetBaseHelper()
+		errCode          commonErr.ErrCode
+		err              error
+		errMsg           string
+		lastBlockHeight  int64
+		chainId          = tx.Payload.ChainId
+		txId             = tx.Payload.TxId
+		blockC           = make(chan model.NewBlockEvent, 1)
+		filterManagement = subscribeFilter.GetSubscribeFilterManagement()
 	)
 
 	updaterCtx, cancelUpdater := context.WithCancel(context.Background())
@@ -272,7 +271,7 @@ func (s *ApiService) sendNewBlock(tx *commonPb.Transaction,
 			// 首先判断是否结束发送数据。
 			// 注意：当且仅当 endBlockHeight != -1 时，才有可能结束发送数据。
 			// 当 endBlockHeight == -1 时，永不结束。
-			if base.End != -1 && alreadySendHistoryBlockHeight >= base.End {
+			if filterManagement.End != -1 && alreadySendHistoryBlockHeight >= filterManagement.End {
 				s.log.Infof("endBlockHeight reached[alreadySendHistoryBlockHeight:%d, "+
 					"endBlockHeight:%d], [txId:%s, sender:%s].",
 					alreadySendHistoryBlockHeight, endBlockHeight, txId, senderAddress)
@@ -325,7 +324,7 @@ func (s *ApiService) getTxSenderAddress(store protocol.BlockchainStore, tx *comm
 // sendHistoryBlock - send history block to subscriber
 func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer,
 	startBlockHeight, endBlockHeight int64, txId, senderAddress string,
-	subscribeFilter helper.Helper,
+	subscribeFilter subscribefilter.SubscribeFilter,
 	subscribeResult rpcRes.SubscribeResult) (int64, error) {
 
 	var (
@@ -357,7 +356,7 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer,
 			}
 
 			// 如果未查询到返回 (nil,nil,nil)
-			res, stat, err = subscribeResult.GetResultByHeight(uint64(i), subscribeFilter.FiltTxs)
+			res, stat, err = subscribeResult.GetResultByHeight(uint64(i), subscribeFilter.FilterTxs)
 			if err != nil {
 				return -1, s.errorResultByMessage(codes.Internal, "get result fail, error: %v", err)
 			}
@@ -378,7 +377,7 @@ func (s *ApiService) sendHistoryBlock(server apiPb.RpcNode_SubscribeServer,
 
 			s.log.Infof("send block info by history[height:%d], [txId:%s, sender:%s, subscriber:%v,data:%d]"+
 				"costs[getTokenCost:%d,db:%d,filter:%d,marshal:%d, sendCost:%d, total:%d].",
-				i, txId, senderAddress, string(subscribeFilter.GetBaseHelper().Tx.Sender.Signer.MemberInfo),
+				i, txId, senderAddress, string(subscribeFilter.GetSubscribeFilterManagement().Tx.Sender.Signer.MemberInfo),
 				len(res.Data), getTokenCost, stat.GetBlockElapsed,
 				stat.FilterElapsed, stat.MarshalElapsed, sendCost, totalCost)
 			i++

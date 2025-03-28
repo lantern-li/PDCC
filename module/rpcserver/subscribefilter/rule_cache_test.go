@@ -5,7 +5,7 @@ SPDX-License-Identifier: Apache-2.0
 */
 
 // Package helper rule cache test
-package helper
+package subscribefilter
 
 import (
 	"chainmaker.org/chainmaker/pb-go/v2/txassign"

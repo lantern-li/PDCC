@@ -8,7 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 package rpcserver
 
 import (
-	"chainmaker.org/chainmaker-go/module/rpcserver/helper"
+	"chainmaker.org/chainmaker-go/module/rpcserver/subscribefilter"
 	"context"
 	"errors"
 	"fmt"
@@ -148,7 +148,7 @@ func (s *ApiService) dealContractEventSubscription(tx *commonPb.Transaction,
 		return err
 	}
 
-	subscribeFilter, err := helper.InitSubscribeFilter(tx, db, reqSender, s.log, s.subscribeFilterPool)
+	subscribeFilter, err := subscribefilter.InitSubscribeFilter(tx, db, reqSender, s.log, s.subscribeFilterPool)
 	if err != nil {
 		return s.errorResultByError(codes.InvalidArgument, err)
 	}
@@ -169,7 +169,7 @@ func (s *ApiService) checkSubscribeContractEventPayload(startBlockHeight, endBlo
 
 func (s *ApiService) doSendContractEvent(tx *commonPb.Transaction, db protocol.BlockchainStore,
 	server apiPb.RpcNode_SubscribeServer, startBlock, endBlock int64,
-	contractName string, topic string, senderAddr string, subscribeFilter helper.Helper) error {
+	contractName string, topic string, senderAddr string, subscribeFilter subscribefilter.SubscribeFilter) error {
 
 	var (
 		alreadySendHistoryBlockHeight int64
@@ -213,7 +213,7 @@ func (s *ApiService) doSendContractEvent(tx *commonPb.Transaction, db protocol.B
 }
 
 func (s *ApiService) doSendHistoryContractEvent(db protocol.BlockchainStore, server apiPb.RpcNode_SubscribeServer,
-	startBlock, endBlock int64, contractName, topic, txId, senderAddr string, subscribeFilter helper.Helper) (int64, error) {
+	startBlock, endBlock int64, contractName, topic, txId, senderAddr string, subscribeFilter subscribefilter.SubscribeFilter) (int64, error) {
 
 	var (
 		err             error
@@ -271,7 +271,7 @@ func (s *ApiService) doSendHistoryContractEvent(db protocol.BlockchainStore, ser
 func (s *ApiService) sendHistoryContractEvent(store protocol.BlockchainStore,
 	server apiPb.RpcNode_SubscribeServer,
 	startBlockHeight, endBlockHeight int64,
-	contractName, topic, txId, senderAddr string, subscribeFilter helper.Helper) (int64, error) {
+	contractName, topic, txId, senderAddr string, subscribeFilter subscribefilter.SubscribeFilter) (int64, error) {
 
 	var (
 		err    error
@@ -349,14 +349,14 @@ For example:
   - If `contract_name` is empty, an error will be raised, as it is no longer supported.
 */
 func (s *ApiService) getSubscribeContractEvent(
-	block *commonPb.Block, contractName, topic string, subscribeFilter helper.Helper) []*commonPb.ContractEventInfo {
+	block *commonPb.Block, contractName, topic string, subscribeFilter subscribefilter.SubscribeFilter) []*commonPb.ContractEventInfo {
 
 	var (
 		contractEvents []*commonPb.ContractEventInfo
 	)
 
 	// 筛选符合条件的交易
-	filterTx, _ := subscribeFilter.FiltTxs(block, true)
+	filterTx, _ := subscribeFilter.FilterTxs(block, true)
 
 	for _, tx := range filterTx {
 		if tx.Result.ContractResult == nil {
@@ -427,7 +427,7 @@ func (s *ApiService) doSendSubscribeContractEvent(server apiPb.RpcNode_Subscribe
 func (s *ApiService) sendNewContractEvent(store protocol.BlockchainStore, tx *commonPb.Transaction,
 	server apiPb.RpcNode_SubscribeServer, startBlock, endBlock int64,
 	contractName string, topic string, alreadySendHistoryBlockHeight int64,
-	senderAddr string, subscribeFilter helper.Helper) error {
+	senderAddr string, subscribeFilter subscribefilter.SubscribeFilter) error {
 
 	var (
 		errCode         commonErr.ErrCode

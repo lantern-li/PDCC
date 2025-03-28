@@ -5,7 +5,7 @@ SPDX-License-Identifier: Apache-2.0
 */
 
 // Package helper alias test
-package helper
+package subscribefilter
 
 import (
 	"chainmaker.org/chainmaker/common/v2/bytehelper"

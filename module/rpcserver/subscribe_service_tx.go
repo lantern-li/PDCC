@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package rpcserver
 
 import (
-	"chainmaker.org/chainmaker-go/module/rpcserver/helper"
+	"chainmaker.org/chainmaker-go/module/rpcserver/subscribefilter"
 	"context"
 	"errors"
 	"fmt"
@@ -143,7 +143,7 @@ func (s *ApiService) dealTxSubscription(tx *commonPb.Transaction, server apiPb.R
 	}
 	reqSenderOrgId := tx.Sender.Signer.OrgId
 
-	subscribeFilter, err := helper.InitSubscribeFilter(tx, db, reqSender, s.log, s.subscribeFilterPool)
+	subscribeFilter, err := subscribefilter.InitSubscribeFilter(tx, db, reqSender, s.log, s.subscribeFilterPool)
 	if err != nil {
 		return s.errorResultByError(codes.InvalidArgument, err)
 	}
@@ -156,7 +156,7 @@ func (s *ApiService) dealTxSubscription(tx *commonPb.Transaction, server apiPb.R
 func (s *ApiService) doSendTx(tx *commonPb.Transaction, db protocol.BlockchainStore,
 	server apiPb.RpcNode_SubscribeServer, startBlock, endBlock int64, contractName string,
 	txIds []string, preAlias string, preTxId string, preOrgId string,
-	reqSender protocol.Role, reqSenderOrgId, senderAddr string, subscribeFilter helper.Helper) error {
+	reqSender protocol.Role, reqSenderOrgId, senderAddr string, subscribeFilter subscribefilter.SubscribeFilter) error {
 
 	var (
 		txIdsMap                      = make(map[string]struct{})
@@ -195,7 +195,7 @@ func (s *ApiService) doSendHistoryTx(db protocol.BlockchainStore, server apiPb.R
 	startBlock, endBlock int64, contractName string, txIds []string,
 	preAlias string, preTxId string, preOrgId string,
 	txIdsMap map[string]struct{}, reqSender protocol.Role, reqSenderOrgId, reqTxId, senderAddr string,
-	subscribeFilter helper.Helper) (int64, error) {
+	subscribeFilter subscribefilter.SubscribeFilter) (int64, error) {
 
 	var (
 		err             error
@@ -265,7 +265,7 @@ func (s *ApiService) sendNewTx(store protocol.BlockchainStore, tx *commonPb.Tran
 	server apiPb.RpcNode_SubscribeServer, startBlock, endBlock int64, contractName string,
 	txIds []string, preAlias string, preTxId string, preOrgId string,
 	txIdsMap map[string]struct{}, alreadySendHistoryBlockHeight int64,
-	reqSender protocol.Role, reqSenderOrgId, senderAddr string, subscribeFilter helper.Helper) error {
+	reqSender protocol.Role, reqSenderOrgId, senderAddr string, subscribeFilter subscribefilter.SubscribeFilter) error {
 
 	var (
 		errCode         commonErr.ErrCode
@@ -346,7 +346,7 @@ func (s *ApiService) sendHistoryTx(store protocol.BlockchainStore,
 	preAlias string, preTxId string, preOrgId string,
 	txIdsMap map[string]struct{},
 	reqSender protocol.Role, reqSenderOrgId, txId, senderAddr string,
-	subscribeFilter helper.Helper) (int64, error) {
+	subscribeFilter subscribefilter.SubscribeFilter) (int64, error) {
 
 	var (
 		err    error
@@ -402,7 +402,7 @@ func (s *ApiService) sendHistoryTx(store protocol.BlockchainStore,
 				i, txId, senderAddr, contractName)
 
 			// 根据注册的规则，筛选交易
-			filterTxs, _ := subscribeFilter.FiltTxs(block, true)
+			filterTxs, _ := subscribeFilter.FilterTxs(block, true)
 
 			if err := s.sendSubscribeTx(server, filterTxs, contractName, txIds,
 				preAlias, preTxId, preOrgId,

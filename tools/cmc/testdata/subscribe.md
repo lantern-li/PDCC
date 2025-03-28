@@ -18,7 +18,7 @@
 
 订阅区块：
 总局订阅：
-./cmc block-with-rule \
+./cmc sub block-with-rule \
 --sdk-conf-path=./testdata/sdk_config_admin.yml \
 --start=0 \
 --end=-1 \
@@ -29,7 +29,7 @@
 --method=Save
 
 省订阅：
-./cmc block-with-rule \
+./cmc sub block-with-rule \
 --sdk-conf-path=./testdata/sdk_config_144.yml \
 --start=0 \
 --end=-1 \
@@ -40,7 +40,7 @@
 --method=Save
 
 市订阅：
-./cmc block-with-rule \
+./cmc sub block-with-rule \
 --sdk-conf-path=./testdata/sdk_config_14433.yml \
 --start=0 \
 --end=-1 \
@@ -51,7 +51,7 @@
 --method=Save
 
 区订阅：
-./cmc block-with-rule \
+./cmc sub block-with-rule \
 --sdk-conf-path=./testdata/sdk_config_1443322.yml \
 --start=0 \
 --end=-1 \
@@ -62,7 +62,7 @@
 --method=Save
 
 自然人订阅：
-./cmc block-with-rule \
+./cmc sub block-with-rule \
 --sdk-conf-path=./testdata/sdk_config_412233200011260810.yml \
 --start=0 \
 --end=-1 \
@@ -300,4 +300,35 @@
 --method=save \
 --sdk-conf-path=./testdata/sdk_config_412233200011260810.yml \
 --params="{\"file_name\":\"412233200011260810x\",\"file_hash\":\"ab3456df5799b87c77e7f88\",\"time\":\"6543234\"}" \
+--sync-result=true
+
+
+////////////////////////////////////////////////////////////////////
+orgIdRule 清分测试
+
+设置orgIdRule enable 区块范围
+./cmc client contract user invoke \
+--contract-name=TX_ASSIGN \
+--method=RegisterRule \
+--sdk-conf-path=./testdata/sdk_config_admin.yml \
+--org-id=wx-org1.chainmaker.org \
+--params="{\"rule_type\":\"0\",\"rule\":\"{\\\"status\\\":0,\\\"start_height\\\":5,\\\"end_height\\\":10}\"}" \
+--sync-result=true
+
+设置orgIdRule disable 区块范围
+./cmc client contract user invoke \
+--contract-name=TX_ASSIGN \
+--method=RegisterRule \
+--sdk-conf-path=./testdata/sdk_config_admin.yml \
+--org-id=wx-org1.chainmaker.org \
+--params="{\"rule_type\":\"0\",\"rule\":\"{\\\"status\\\":1,\\\"start_height\\\":10,\\\"end_height\\\":15}\"}" \
+--sync-result=true
+
+更新orgIdRule
+./cmc client contract user invoke \
+--contract-name=TX_ASSIGN \
+--method=UpdateRuleByHeight \
+--sdk-conf-path=./testdata/sdk_config_admin.yml \
+--org-id=wx-org1.chainmaker.org \
+--params="{\"rule_type\":\"0\",\"rule\":\"{\\\"status\\\":0,\\\"start_height\\\":10,\\\"end_height\\\":15}\",\"height\":8}" \
 --sync-result=true
