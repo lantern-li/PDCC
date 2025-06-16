@@ -348,6 +348,9 @@ func (ts *TxScheduler) runContract(
 
 	default:
 		ts.log.Error("Invalid sz contract method: %s", tx.Payload.Method)
+		tx.Result = genDefaultFiledTxResult(tx)
+		txId := tx.Payload.TxId
+		txRWSetMap[txId] = genDefaultTxRWSet(txId)
 	}
 }
 
@@ -1972,6 +1975,23 @@ func genDefaultTxResult(tx *commonPb.Transaction) *commonPb.Result {
 			Code:    uint32(0),
 			Result:  nil,
 			Message: "OK",
+		},
+		RwSetHash: rwSetHash, // 避免从节点丢失原rwSetHash
+	}
+}
+
+func genDefaultFiledTxResult(tx *commonPb.Transaction) *commonPb.Result {
+	var rwSetHash []byte
+	if tx.Result != nil && len(tx.Result.RwSetHash) != 0 {
+		rwSetHash = tx.Result.RwSetHash
+	}
+
+	return &commonPb.Result{
+		Code: commonPb.TxStatusCode_CONTRACT_INVOKE_METHOD_FAILED,
+		ContractResult: &commonPb.ContractResult{
+			Code:    uint32(1),
+			Result:  nil,
+			Message: fmt.Sprintf("Invalid sz contract method: %s", tx.Payload.GetMethod()),
 		},
 		RwSetHash: rwSetHash, // 避免从节点丢失原rwSetHash
 	}
