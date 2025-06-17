@@ -31,7 +31,7 @@ type CommitBlock struct {
 	msgBus          msgbus.MessageBus
 }
 
-// CommitBlock the action that all consensus types do when a block is committed
+// CommitBlock the action that all consensus types do when a block is committed.
 func (cb *CommitBlock) CommitBlock(
 	block *commonpb.Block,
 	rwSetMap map[string]*commonpb.TxRWSet,
@@ -116,6 +116,11 @@ func (cb *CommitBlock) publishContractEvent(block *commonpb.Block, events []*com
 	)
 
 	if len(events) == 0 {
+		eventsInfos = append(eventsInfos, &commonpb.ContractEventInfo{
+			BlockHeight:    height,
+			ChainId:        chainId,
+			BlockTimestamp: block.Header.BlockTimestamp,
+		})
 		// 为避免由于没有event的情况下，导致contract event订阅落后很多区块，此处依然选择推送event事件给订阅模块
 		cb.msgBus.Publish(msgbus.ContractEventInfo, &commonpb.ContractEventMessageInfo{
 			BlockHeight:       height,
@@ -138,6 +143,7 @@ func (cb *CommitBlock) publishContractEvent(block *commonpb.Block, events []*com
 			ContractName:    t.ContractName,
 			ContractVersion: t.ContractVersion,
 			EventData:       t.EventData,
+			BlockTimestamp:  block.Header.BlockTimestamp,
 		}
 		eventsInfos = append(eventsInfos, eventInfo)
 	}

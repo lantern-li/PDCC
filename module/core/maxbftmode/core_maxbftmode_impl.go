@@ -169,7 +169,7 @@ func (c *CoreEngine) OnMessage(message *msgbus.Message) {
 		if proposal, ok := message.Payload.(*maxbft.BuildProposal); ok {
 			c.blockProposer.OnReceiveMaxBFTProposal(proposal)
 		}
-	case msgbus.RwSetVerifyFailTxs:
+	case msgbus.ConsensusFailTxs:
 		if signal, ok := message.Payload.(*consensuspb.RwSetVerifyFailTxs); ok {
 			c.log.DebugDynamic(func() string {
 				return fmt.Sprintf("received consensus rw set verify fail txs block height:%d", signal.BlockHeight)
@@ -187,7 +187,7 @@ func (c *CoreEngine) OnMessage(message *msgbus.Message) {
 // Start, initialize core engine
 func (c *CoreEngine) Start() {
 	c.msgBus.Register(msgbus.BuildProposal, c)
-	c.msgBus.Register(msgbus.RwSetVerifyFailTxs, c)
+	c.msgBus.Register(msgbus.ConsensusFailTxs, c)
 	c.msgBus.Register(msgbus.ProposeState, c)
 	c.msgBus.Register(msgbus.TxPoolSignal, c)
 	c.blockProposer.Start() //nolint: errcheck

@@ -187,7 +187,7 @@ func (c *CoreEngine) OnMessage(message *msgbus.Message) {
 		if signal, ok := message.Payload.(*txpoolpb.TxPoolSignal); ok {
 			c.blockProposer.OnReceiveTxPoolSignal(signal)
 		}
-	case msgbus.RwSetVerifyFailTxs:
+	case msgbus.ConsensusFailTxs:
 		if signal, ok := message.Payload.(*consensuspb.RwSetVerifyFailTxs); ok {
 			c.log.DebugDynamic(func() string {
 				return fmt.Sprintf("received consensus rw set verify fail txs block height:%d", signal.BlockHeight)
@@ -203,7 +203,7 @@ func (c *CoreEngine) Start() {
 	c.msgBus.Register(msgbus.VerifyBlock, c)
 	c.msgBus.Register(msgbus.CommitBlock, c)
 	c.msgBus.Register(msgbus.TxPoolSignal, c)
-	c.msgBus.Register(msgbus.RwSetVerifyFailTxs, c)
+	c.msgBus.Register(msgbus.ConsensusFailTxs, c)
 	//c.msgBus.Register(msgbus.BuildProposal, c)
 	c.blockProposer.Start() //nolint: errcheck
 }

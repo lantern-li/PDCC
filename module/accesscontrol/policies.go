@@ -32,7 +32,7 @@ func (acs *accessControlService) createDefaultResourcePolicyForCert(localOrgId s
 			syscontract.GasAccountFunction_SET_CONTRACT_METHOD_PAYER.String(), policyWrite)
 
 		// cert alias management
-		acs.senderPolicyMap.Store(syscontract.SystemContract_CERT_MANAGE.String()+"-"+
+		acs.resourceNamePolicyMap.Store(syscontract.SystemContract_CERT_MANAGE.String()+"-"+
 			syscontract.CertManageFunction_CERT_ALIAS_ADD.String(), policySpecialWrite)
 		acs.resourceNamePolicyMap.Store(syscontract.SystemContract_CERT_MANAGE.String()+"-"+
 			syscontract.CertManageFunction_CERT_ALIAS_UPDATE.String(), policyAdmin)
@@ -40,7 +40,7 @@ func (acs *accessControlService) createDefaultResourcePolicyForCert(localOrgId s
 			syscontract.CertManageFunction_CERTS_ALIAS_DELETE.String(), policyAdmin)
 
 		// cert management
-		acs.senderPolicyMap.Store(syscontract.SystemContract_CERT_MANAGE.String()+"-"+
+		acs.resourceNamePolicyMap.Store(syscontract.SystemContract_CERT_MANAGE.String()+"-"+
 			syscontract.CertManageFunction_CERT_ADD.String(), policySpecialWrite)
 		acs.resourceNamePolicyMap.Store(syscontract.SystemContract_CERT_MANAGE.String()+"-"+
 			syscontract.CertManageFunction_CERTS_FREEZE.String(), policyAdmin)
@@ -52,7 +52,7 @@ func (acs *accessControlService) createDefaultResourcePolicyForCert(localOrgId s
 			syscontract.CertManageFunction_CERTS_REVOKE.String(), policyAdmin)
 
 		// address type management
-		acs.resourceNamePolicyMap.Store(syscontract.SystemContract_CHAIN_CONFIG.String()+"-"+
+		acs.senderPolicyMap.Store(syscontract.SystemContract_CHAIN_CONFIG.String()+"-"+
 			syscontract.ChainConfigFunction_ALTER_ADDR_TYPE.String(), policyForbidden)
 
 		// block management
@@ -426,7 +426,7 @@ func (pk *pkACProvider) createDefaultResourcePolicyForPK() {
 			syscontract.CertManageFunction_CERTS_QUERY.String(), policyForbidden)
 
 		// address type management
-		pk.resourceNamePolicyMap.Store(syscontract.SystemContract_CHAIN_CONFIG.String()+"-"+
+		pk.senderPolicyMap.Store(syscontract.SystemContract_CHAIN_CONFIG.String()+"-"+
 			syscontract.ChainConfigFunction_ALTER_ADDR_TYPE.String(), policyForbidden)
 
 		// block management

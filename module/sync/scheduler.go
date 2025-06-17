@@ -232,8 +232,12 @@ func (sch *scheduler) addPendingBlocksAndUpdatePendingHeight(peerHeight uint64) 
 // handleDataDetection eliminate invalid data from the maintained data list
 func (sch *scheduler) handleDataDetection() {
 	blk := sch.ledger.GetLastCommittedBlock()
+	sch.clearLaggingRequest(blk.Header.BlockHeight)
+}
+
+func (sch *scheduler) clearLaggingRequest(curHeight uint64) {
 	for height := range sch.blockStates {
-		if height < blk.Header.BlockHeight {
+		if height < curHeight {
 			delete(sch.blockStates, height)
 			delete(sch.pendingBlocks, height)
 			delete(sch.receivedBlocks, height)
@@ -241,7 +245,7 @@ func (sch *scheduler) handleDataDetection() {
 		}
 	}
 
-	sch.pendingRecvHeight = blk.Header.BlockHeight + 1
+	sch.pendingRecvHeight = curHeight + 1
 	// `DataDetection` 中不对 `pendingRecvHeight` 高度的状态做状态重置，防止发起重复的数据请求，这部分逻辑由活性检查处理
 	// match pendingRecvHeight to (local commit block height + 1)
 	if _, exists := sch.blockStates[sch.pendingRecvHeight]; !exists {
@@ -375,6 +379,12 @@ func (sch *scheduler) isNeedSync() bool {
 	if err != nil {
 		panic(err)
 	}
+	// If the current height is greater or equal than the pendingRecvHeight,
+	// it means that these blocks have been processed by someone, clear the request records.
+	if currHeight >= sch.pendingRecvHeight {
+		sch.clearLaggingRequest(currHeight)
+	}
+
 	max := sch.maxHeight()
 	// The reason for the interval of 1 block is that the block to
 	// be synchronized is being processed by the consensus module.

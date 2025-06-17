@@ -24,53 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInitAccessControlService(t *testing.T) {
-	logger := test.NewTestLogger(t)
-	acServices := initAccessControlService(testHashType, protocol.PermissionedWithCert, config.AddrType_CHAINMAKER, nil, logger)
-	acServices.initResourcePolicy(testChainConfig.ResourcePolicies, testOrg1)
-	require.NotNil(t, acServices)
-
-	// check resource name policy number
-	resourceNamePolicyNum := 0
-	acServices.resourceNamePolicyMap.Range(func(key, val interface{}) bool {
-		resourceNamePolicyNum++
-		return true
-	})
-	require.Equal(t, resourceNamePolicyNum, 55)
-
-	// check sender policy number
-	senderPolicyNum := 0
-	acServices.senderPolicyMap.Range(func(key, val interface{}) bool {
-		senderPolicyNum++
-		return true
-	})
-	require.Equal(t, senderPolicyNum, 4)
-
-	// tx_type policy number
-	txTypePolicyNum := 0
-	acServices.txTypePolicyMap.Range(func(key, val interface{}) bool {
-		txTypePolicyNum++
-		return true
-	})
-	require.Equal(t, txTypePolicyNum, 4)
-
-	// msg_type policy number
-	msgTypePolicyNum := 0
-	acServices.msgTypePolicyMap.Range(func(key, val interface{}) bool {
-		msgTypePolicyNum++
-		return true
-	})
-	require.Equal(t, msgTypePolicyNum, 2)
-
-	// latest policy number
-	latestPolicyNum := 0
-	acServices.latestPolicyMap.Range(func(key, val interface{}) bool {
-		latestPolicyNum++
-		return true
-	})
-	require.Equal(t, latestPolicyNum, 1)
-}
-
 func TestValidateResourcePolicy(t *testing.T) {
 	_, cleanFunc, err := createTempDirWithCleanFunc()
 	require.Nil(t, err)

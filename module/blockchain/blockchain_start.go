@@ -105,6 +105,8 @@ func (bc *Blockchain) startNetService() error {
 		bc.log.Errorf("start net service failed, %s", err.Error())
 		return err
 	}
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	bc.startModules[moduleNameNetService] = struct{}{}
 	return nil
 }
@@ -118,6 +120,8 @@ func (bc *Blockchain) startConsensus() error {
 		bc.log.Errorf("start consensus failed, %s", err.Error())
 		return err
 	}
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	bc.startModules[moduleNameConsensus] = struct{}{}
 	return nil
 }
@@ -125,6 +129,8 @@ func (bc *Blockchain) startConsensus() error {
 func (bc *Blockchain) startCoreEngine() error {
 	// start core engine
 	bc.coreEngine.Start()
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	bc.startModules[moduleNameCore] = struct{}{}
 	return nil
 }
@@ -135,6 +141,8 @@ func (bc *Blockchain) startSyncService() error {
 		bc.log.Errorf("start sync server failed, %s", err.Error())
 		return err
 	}
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	bc.startModules[moduleNameSync] = struct{}{}
 	return nil
 }
@@ -146,6 +154,8 @@ func (bc *Blockchain) startTxPool() error {
 		bc.log.Errorf("start tx pool failed, %s", err)
 		return err
 	}
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	bc.startModules[moduleNameTxPool] = struct{}{}
 	return nil
 }
@@ -156,16 +166,22 @@ func (bc *Blockchain) startVM() error {
 		bc.log.Errorf("start vm failed, %s", err)
 		return err
 	}
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	bc.startModules[moduleNameVM] = struct{}{}
 	return nil
 }
 
 func (bc *Blockchain) startStore() error {
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	bc.startModules[moduleNameStore] = struct{}{}
 	return nil
 }
 
 func (bc *Blockchain) isModuleStartUp(moduleName string) bool {
+	bc.startModuleLock.RLock()
+	defer bc.startModuleLock.RUnlock()
 	_, res := bc.startModules[moduleName]
 	return res
 }

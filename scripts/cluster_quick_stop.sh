@@ -24,14 +24,21 @@ function cluster_stop() {
 }
 
 function stop_all() {
+    stop_count=0
     cd $RELEASE_PATH
     for file in `ls $RELEASE_PATH`
     do
         if [ -d $file ]; then
             echo "STOP ==> " $RELEASE_PATH/$file
             cd $file/bin && ./stop.sh full && cd - > /dev/null
+            stop_count=$((stop_count + 1))
         fi
     done
+    if [ $stop_count -eq 0 ]; then
+        echo "[WARN] No process is stopped. You need to check whether the chainmaker is running on the path."
+    else
+        echo " $stop_count chainmaker process is stopped."
+    fi
 }
 
 function clean() {

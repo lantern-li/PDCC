@@ -66,6 +66,8 @@ type BlockChainSyncServer struct {
 	nodeList *NodeList
 	//getStateFn used to get some running state
 	getStateFn getStateFn
+	// buffer broadcast to avoid network congestion that can cause important processes to get stuck.
+	broadcastCh chan uint64
 }
 
 // NewBlockChainSyncServer Create a new BlockChainSyncServer instance
@@ -93,6 +95,7 @@ func NewBlockChainSyncServer(
 		minLagReachC:    make(chan struct{}),
 		commitBlockC:    make(chan struct{}),
 		nodeList:        NewNodeList(),
+		broadcastCh:     make(chan uint64, 1024),
 	}
 	return syncServer
 }
@@ -143,7 +146,7 @@ func (sync *BlockChainSyncServer) Start() error {
 		return err
 	}
 
-	sync.closeWait.Add(2)
+	sync.closeWait.Add(3)
 	go func() {
 		defer sync.closeWait.Done()
 		sync.loop()
@@ -151,6 +154,10 @@ func (sync *BlockChainSyncServer) Start() error {
 	go func() {
 		defer sync.closeWait.Done()
 		sync.blockRequestEntrance()
+	}()
+	go func() {
+		defer sync.closeWait.Done()
+		sync.doBroadcastHeight()
 	}()
 	return nil
 }
@@ -358,6 +365,8 @@ func (sync *BlockChainSyncServer) sendInfos(req *syncPb.BlockSyncReq, from strin
 			sync.log.Errorf("fail to send message to [%s] error: %s", from, err.Error())
 			return err
 		}
+		sync.log.Infof("send block [height: %d, batch_size: %d] to node [%s] with rwset [%v]",
+			req.BlockHeight+i, req.BatchSize, from, req.WithRwset)
 	}
 	return nil
 }
@@ -653,16 +662,32 @@ func (sync *BlockChainSyncServer) OnMessage(message *msgbus.Message) {
 		if height%uint64(sync.conf.broadcastStatusPerBlocksCommitted) != 0 {
 			return
 		}
-		bz, err := proto.Marshal(&syncPb.BlockHeightBCM{BlockHeight: height})
-		if err != nil {
-			sync.log.Errorf("marshal BlockHeightBCM failed, reason: %s", err)
-			return
-		}
-		if err := sync.broadcastMsg(syncPb.SyncMsg_NODE_STATUS_RESP, bz); err != nil {
-			sync.log.Errorf("fail to broadcast the height as %d, and the error is %s", height, err)
+
+		select {
+		case sync.broadcastCh <- height:
+		default:
+			sync.log.Warnf("channel for broadcasting block height is full")
 		}
 	default:
 		sync.log.Errorf("not support the message type as %T", message.Payload)
+	}
+}
+
+func (sync *BlockChainSyncServer) doBroadcastHeight() {
+	for {
+		select {
+		case <-sync.close:
+			return
+		case height := <-sync.broadcastCh:
+			bz, err := proto.Marshal(&syncPb.BlockHeightBCM{BlockHeight: height})
+			if err != nil {
+				sync.log.Errorf("marshal BlockHeightBCM failed, reason: %s", err)
+				continue
+			}
+			if err := sync.broadcastMsg(syncPb.SyncMsg_NODE_STATUS_RESP, bz); err != nil {
+				sync.log.Errorf("fail to broadcast the height as %d, and the error is %s", height, err)
+			}
+		}
 	}
 }
 

@@ -359,6 +359,7 @@ func TestBlockChainSyncServer_OnMessage(t *testing.T) {
 			for i := 1; i <= tt.args.totalHeight; i++ {
 				sync.OnMessage(genBlockMessage(uint64(i)))
 			}
+			time.Sleep(3 * time.Second)
 			stop()
 			require.Equal(t, tt.want, broadcastCount)
 		})

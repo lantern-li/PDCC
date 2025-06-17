@@ -42,5 +42,6 @@ func (cf *coreEngineFactory) NewCoreEngine(consensusType string,
 	}
 	providerConf.StoreHelper = storeHelper
 
+	// new core engine
 	return p.NewCoreEngine(providerConf)
 }

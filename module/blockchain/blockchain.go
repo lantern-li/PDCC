@@ -9,6 +9,8 @@ SPDX-License-Identifier: Apache-2.0
 package blockchain
 
 import (
+	"sync"
+
 	"chainmaker.org/chainmaker-go/module/subscriber"
 	"chainmaker.org/chainmaker/common/v2/msgbus"
 	"chainmaker.org/chainmaker/logger/v2"
@@ -94,8 +96,13 @@ type Blockchain struct {
 
 	txFilter protocol.TxFilter
 
-	initModules  map[string]struct{}
-	startModules map[string]struct{}
+	// initModuleLock for initModules map
+	initModuleLock sync.RWMutex
+	initModules    map[string]struct{}
+
+	// startModuleLock for startModules map
+	startModuleLock sync.RWMutex
+	startModules    map[string]struct{}
 
 	// kms providers
 	kmsProviders map[string]protocol.KMSProvider

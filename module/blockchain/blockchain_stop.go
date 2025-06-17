@@ -86,8 +86,18 @@ func (bc *Blockchain) StopOnRequirements() {
 		moduleNameVM:         5,
 	}
 	closeFlagArray := [6]string{}
+	// 防止死锁，先获取所有start的模块列表
+	startModuleNames := make([]string, 0)
+	bc.startModuleLock.RLock()
 	for moduleName := range bc.startModules {
+		startModuleNames = append(startModuleNames, moduleName)
+	}
+	bc.startModuleLock.RUnlock()
+	// 遍历所有start的模块列表
+	for _, moduleName := range startModuleNames {
+		bc.initModuleLock.RLock()
 		_, ok := bc.initModules[moduleName]
+		bc.initModuleLock.RUnlock()
 		if ok {
 			continue
 		}
@@ -96,6 +106,19 @@ func (bc *Blockchain) StopOnRequirements() {
 			closeFlagArray[seq] = moduleName
 		}
 	}
+	//
+	//for moduleName := range bc.startModules {
+	//	bc.initModuleLock.RLock()
+	//	_, ok := bc.initModules[moduleName]
+	//	bc.initModuleLock.RUnlock()
+	//	if ok {
+	//		continue
+	//	}
+	//	seq, canStop := sequence[moduleName]
+	//	if canStop {
+	//		closeFlagArray[seq] = moduleName
+	//	}
+	//}
 	// stop modules
 	for i := range closeFlagArray {
 		moduleName := closeFlagArray[i]
@@ -118,6 +141,8 @@ func (bc *Blockchain) stopNetService() error {
 		bc.log.Errorf("stop net service failed, %s", err.Error())
 		return err
 	}
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	delete(bc.startModules, moduleNameNetService)
 	return nil
 }
@@ -128,6 +153,8 @@ func (bc *Blockchain) stopConsensus() error {
 		bc.log.Errorf("stop consensus failed, %s", err.Error())
 		return err
 	}
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	delete(bc.startModules, moduleNameConsensus)
 	return nil
 }
@@ -135,6 +162,8 @@ func (bc *Blockchain) stopConsensus() error {
 func (bc *Blockchain) stopCoreEngine() error {
 	// stop core engine
 	bc.coreEngine.Stop()
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	delete(bc.startModules, moduleNameCore)
 	return nil
 }
@@ -142,6 +171,8 @@ func (bc *Blockchain) stopCoreEngine() error {
 func (bc *Blockchain) stopSyncService() error {
 	// stop sync
 	bc.syncServer.Stop()
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	delete(bc.startModules, moduleNameSync)
 	return nil
 }
@@ -154,6 +185,8 @@ func (bc *Blockchain) stopTxPool() error {
 
 		return err
 	}
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	delete(bc.startModules, moduleNameTxPool)
 	return nil
 }
@@ -165,6 +198,8 @@ func (bc *Blockchain) stopVM() error {
 		bc.log.Errorf("stop vm failed, %s", err)
 		return err
 	}
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	delete(bc.startModules, moduleNameVM)
 	return nil
 }
@@ -177,6 +212,8 @@ func (bc *Blockchain) stopStore() error {
 
 		return err
 	}
+	bc.startModuleLock.Lock()
+	defer bc.startModuleLock.Unlock()
 	delete(bc.startModules, moduleNameStore)
 	return nil
 }

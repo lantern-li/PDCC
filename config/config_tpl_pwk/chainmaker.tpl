@@ -60,7 +60,7 @@ node:
 #  # Timeout for waiting for block request response, unit second.
 #  wait_time_requested: 30
 #  # The number of blocks requested at a time.
-#  batch_Size_from_one_node: 1
+#  batch_size_from_one_node: 1
 #  # The time interval for verifying cached block, unit millisecond.
 #  process_block_tick: 20
 #  # The time interval for broadcasting a request to obtain the status of other nodes, unit second.
@@ -76,7 +76,7 @@ node:
 #  # Requests within this time will be ignored. Unit second.
 #  block_request_time: 5
 #  # Synchronize blocks from the configured nodes.
-#  from_nodes: 
+#  from_nodes:
 #  #- {nodeId}
 #  #- {nodeId}
 #  # broadcast node status once when {broadcast_status_per_blocks_committed} blocks are committed.
@@ -224,8 +224,24 @@ rpc:
 
   # RPC TLS settings
   tls:
-    # TLS mode, can be disable, oneway, twoway.
+    # TLS mode, can be disable, twoway. Default is disable.
     mode: disable
+
+    # TLS private key file path.
+    # priv_key_file: ../config/{org_path}/keys/{rpc_cert_path}.key
+
+    # TLS Certificate file path.
+    # cert_file: ../config/{org_path}/keys/{rpc_cert_path}.crt
+
+    # TLS enc private key file path. (only for gmtls1.1)
+    # priv_enc_key_file: ../config/{org_path}/keys/{rpc_cert_path}.enc.key
+
+    # TLS enc Certificate file path.
+    # cert_enc_file: ../config/{org_path}/keys/{rpc_cert_path}.enc.crt
+
+    # TLS certificate file path (only for gmtls1.1)
+    # client_root_ca_paths:
+      # - ../config/{org_path}/keys/ca
 
   # RPC blacklisted ip addresses
   blacklist:
@@ -399,6 +415,9 @@ consensus:
 
     # Min time unit in rate election and heartbeat.
     ticker: 1
+  # tbft:
+    # the interval milliseconds of broadcasting status messages about tbft consensus, Default is 1000
+    # broadcaster_interval: 1000
 
 # Scheduler related settings
 scheduler:
@@ -598,6 +617,29 @@ storage:
 
 # Contract Virtual Machine(VM) configs
 vm:
+  # Common configs of docker vm
+  common:
+    contract_engine:
+    # cgroup is used to limit the resource usage of contract processes on the host machine
+      cgroup:
+        # disable the cgroup function means that there will be no restrictions
+        # on the resource usage of the contract process on the host machine
+        disable: true
+        # max memory size per sandbox(MiB), -1 means no limit
+        max_mem_size_per_process: -1
+        # max cpu percent per sandbox, -1 means no limit
+        max_cpu_percent_per_process: -1
+
+        # allow devices list
+        # detailed information can be found in the document:
+        #     https://access.redhat.com/documentation/zh-cn/red_hat_enterprise_linux/7/html/resource_management_guide/sec-devices//
+        devices_allow: ""
+
+        # deny devices list
+        # detailed information can be found in the document:
+        #     https://access.redhat.com/documentation/zh-cn/red_hat_enterprise_linux/7/html/resource_management_guide/sec-devices//
+        devices_deny: ""
+
   # Golang runtime in docker container
   go:
     # Enable docker go virtual machine, default: false

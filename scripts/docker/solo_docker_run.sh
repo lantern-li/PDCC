@@ -16,8 +16,8 @@ docker run   \
  -v ./tmp_solo/log:/chainmaker-go/log \
  --privileged=true  \
  --name csolo  \
- chainmakerofficial/chainmaker:v2.3.5 \
- bash -c "./chainmaker start -c ../config/wx-org1.chainmaker.org/chainmaker.yml > panic.log"
+ chainmakerofficial/chainmaker:v2.3.7 \
+ bash -c "./chainmaker start -c ../config/wx-org1.chainmaker.org/chainmaker.yml >> panic.log"
 
 
 echo

@@ -11,7 +11,7 @@ LOG_LEVEL=INFO
 EXPOSE_PORT=22351
 RUNTIME_PORT=32351
 CONTAINER_NAME=chainmaker-vm-go
-IMAGE_NAME="chainmakerofficial/chainmaker-vm-engine:v2.3.5_qc"
+IMAGE_NAME="chainmakerofficial/chainmaker-vm-engine:v2.3.6"
 
 
 read -r -p "input path to cache contract files(must be absolute path, default:'./docker-go'): " tmp

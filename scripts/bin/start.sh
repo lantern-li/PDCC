@@ -32,7 +32,7 @@ config_file="../config/{org_id}/chainmaker.yml"
 # config_file="../../config/wx-org1-solo/chainmaker.yml"
 eval $(parse_yaml "$config_file" "chainmaker_")
 
-VM_GO_IMAGE_NAME="chainmakerofficial/chainmaker-vm-engine:v2.3.5"
+VM_GO_IMAGE_NAME="chainmakerofficial/chainmaker-vm-engine:v2.3.6"
 DOCKER_VM_IMAGE_NAME="chainmakerofficial/chainmaker-vm-docker-go:v2.3.1"
 START_FULL_MODE=""
 
@@ -112,6 +112,11 @@ function start_vm_go() {
   slow_step_time=$chainmaker_vm_go_slow_step_time
   slow_tx_time=$chainmaker_vm_go_slow_tx_time
   process_timeout=$chainmaker_vm_go_process_timeout
+  cgroup_disable=$chainmaker_vm_common_contract_engine_cgroup_disable
+  max_mem_size_per_process=$chainmaker_vm_common_contract_engine_cgroup_max_mem_size_per_process
+  max_cpu_percent_per_process=$chainmaker_vm_common_contract_engine_cgroup_max_cpu_percent_per_process
+  devices_allow=$chainmaker_vm_common_contract_engine_cgroup_devices_allow
+  devices_deny=$chainmaker_vm_common_contract_engine_cgroup_devices_deny
 
   if [[ $dockervm_config_path != "" ]];then
     if [[ "${dockervm_config_path:0:1}" != "/" ]];then
@@ -140,6 +145,11 @@ function start_vm_go() {
     -e SLOW_STEP_TIME="$slow_step_time" \
     -e SLOW_TX_TIME="$slow_tx_time" \
     -e PROCESS_TIMEOUT="$process_timeout" \
+    -e CGROUP_DISABLE="$cgroup_disable" \
+    -e MAX_MEM_SIZE_PER_PROCESS="$max_mem_size_per_process" \
+    -e MAX_CPU_PERCENT_PER_PROCESS="$max_cpu_percent_per_process" \
+    -e DEVICES_ALLOW="$devices_allow" \
+    -e DEVICES_DENY="$devices_deny" \
     --name $container_name \
     --privileged $VM_GO_IMAGE_NAME \
     > /dev/null
@@ -165,6 +175,11 @@ function start_vm_go() {
       -e SLOW_STEP_TIME="$slow_step_time" \
       -e SLOW_TX_TIME="$slow_tx_time" \
       -e PROCESS_TIMEOUT="$process_timeout" \
+      -e CGROUP_DISABLE="$cgroup_disable" \
+      -e MAX_MEM_SIZE_PER_PROCESS="$max_mem_size_per_process" \
+      -e MAX_CPU_PERCENT_PER_PROCESS="$max_cpu_percent_per_process" \
+      -e DEVICES_ALLOW="$devices_allow" \
+      -e DEVICES_DENY="$devices_deny" \
       --name $container_name \
       --privileged $VM_GO_IMAGE_NAME \
        > /dev/null

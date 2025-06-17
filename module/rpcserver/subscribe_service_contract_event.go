@@ -374,6 +374,7 @@ func (s *ApiService) getSubscribeContractEvent(
 						ContractName:    event.ContractName,
 						ContractVersion: event.ContractVersion,
 						EventData:       event.EventData,
+						BlockTimestamp:  block.Header.BlockTimestamp,
 					}
 
 					if eventInfo.BlockHeight != 0 {
@@ -387,8 +388,9 @@ func (s *ApiService) getSubscribeContractEvent(
 	// If no matching events are found, send an empty contract event with block height and chain id.
 	if len(contractEvents) == 0 {
 		return []*commonPb.ContractEventInfo{{
-			BlockHeight: block.Header.BlockHeight,
-			ChainId:     block.Header.ChainId,
+			BlockHeight:    block.Header.BlockHeight,
+			ChainId:        block.Header.ChainId,
+			BlockTimestamp: block.Header.BlockTimestamp,
 		}}
 	}
 
