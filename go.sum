@@ -60,8 +60,8 @@ chainmaker.org/chainmaker/protocol/v2 v2.3.9-0.20250617083152-1a285b623baa h1:Mq
 chainmaker.org/chainmaker/protocol/v2 v2.3.9-0.20250617083152-1a285b623baa/go.mod h1:yYPcgDpcwrekAiRFHNbd7I2zEK5BnjB7S6PGAGydSSg=
 chainmaker.org/chainmaker/raftwal/v2 v2.1.0 h1:8TNEw1XtWBZkjqoNgcc9qoD/0xFkSb0SDXyzM2rQxjo=
 chainmaker.org/chainmaker/raftwal/v2 v2.1.0/go.mod h1:19ulESU/EH/OxbMpo1PJMsRoJDM91BPrvXCyQhkHWpk=
-chainmaker.org/chainmaker/sdk-go/v2 v2.3.8-0.20250618055613-87abb119acbd h1:DAoXnP0uSOC3fMDgWERWo1m98BkFgLQc0hQxIQ5tn0w=
-chainmaker.org/chainmaker/sdk-go/v2 v2.3.8-0.20250618055613-87abb119acbd/go.mod h1:OjZXeR30Tewtsmo4mNQ8odmsTWjrIpRgS76FsVoTqIY=
+chainmaker.org/chainmaker/sdk-go/v2 v2.3.8-0.20250618081754-a0a4e072a695 h1:yibFLQ8VR78wMOvPqJfXl2+08HPHlLGkQLKpRQkpqYk=
+chainmaker.org/chainmaker/sdk-go/v2 v2.3.8-0.20250618081754-a0a4e072a695/go.mod h1:OjZXeR30Tewtsmo4mNQ8odmsTWjrIpRgS76FsVoTqIY=
 chainmaker.org/chainmaker/store-badgerdb/v2 v2.3.4 h1:VeuDy106pT77WhT4O0IKnV4b3SHsiN+nwTgpChXtQVE=
 chainmaker.org/chainmaker/store-badgerdb/v2 v2.3.4/go.mod h1:t3yYq5vDbLtL2NhbhhsR3stmm6kzZljY+jfU9GNoP5Q=
 chainmaker.org/chainmaker/store-leveldb/v2 v2.3.4 h1:l5wa+eZ2ptepL8a4H/no5FC+AvtK4MW8A926qc4hqik=
@@ -106,7 +106,7 @@ chainmaker.org/chainmaker/vm/v2 v2.3.8-0.20250617093715-8df667bd5161 h1:MfqtXtf9
 chainmaker.org/chainmaker/vm/v2 v2.3.8-0.20250617093715-8df667bd5161/go.mod h1:YJbTmHEm9g2RUDd7DBK+a1BmOSjm3Ggh1Jt9U2rWvho=
 chainmaker.org/third_party/badger/v3 v3.0.0 h1:8fPIUB8dyCCPu2QbQbp6r4QcixYVK7KOdfSEUeMZPVc=
 chainmaker.org/third_party/badger/v3 v3.0.0/go.mod h1:RHo4/GmYcKKh5Lxu63wLEMHJ70Pac2JqZRYGhlyAo2M=
-chainmaker.org/third_party/btcd v1.0.0 h1:lAkOf3PC7YKQmgnJGVBAbPMfBaQI4Szsgk7DgopYl4A=
+chainmaker.org/third_party/btcd v1.0.0 h1:f91kXHbez+nzPcppW9U5Cb+sInQGHlx3O2KZ1E5hwsE=
 chainmaker.org/third_party/btcd v1.0.0/go.mod h1:wqgTSL29+50LRkmOVknEdmt8ZojIzhuWvgu/iptuN7Y=
 chainmaker.org/third_party/cuckoo-filter v1.0.0 h1:YLeHR9IxaIxZDoODQSRDe7glygrWYEGGMbiDDxoYufw=
 chainmaker.org/third_party/cuckoo-filter v1.0.0/go.mod h1:L3YZEEsEkbEEWCA2r4sVk1dkrqz+TZ+uxGihtb6BwwI=
