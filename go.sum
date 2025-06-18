@@ -106,7 +106,7 @@ chainmaker.org/chainmaker/vm/v2 v2.3.8-0.20250617093715-8df667bd5161 h1:MfqtXtf9
 chainmaker.org/chainmaker/vm/v2 v2.3.8-0.20250617093715-8df667bd5161/go.mod h1:YJbTmHEm9g2RUDd7DBK+a1BmOSjm3Ggh1Jt9U2rWvho=
 chainmaker.org/third_party/badger/v3 v3.0.0 h1:8fPIUB8dyCCPu2QbQbp6r4QcixYVK7KOdfSEUeMZPVc=
 chainmaker.org/third_party/badger/v3 v3.0.0/go.mod h1:RHo4/GmYcKKh5Lxu63wLEMHJ70Pac2JqZRYGhlyAo2M=
-chainmaker.org/third_party/btcd v1.0.0 h1:f91kXHbez+nzPcppW9U5Cb+sInQGHlx3O2KZ1E5hwsE=
+chainmaker.org/third_party/btcd v1.0.0 h1:lAkOf3PC7YKQmgnJGVBAbPMfBaQI4Szsgk7DgopYl4A=
 chainmaker.org/third_party/btcd v1.0.0/go.mod h1:wqgTSL29+50LRkmOVknEdmt8ZojIzhuWvgu/iptuN7Y=
 chainmaker.org/third_party/cuckoo-filter v1.0.0 h1:YLeHR9IxaIxZDoODQSRDe7glygrWYEGGMbiDDxoYufw=
 chainmaker.org/third_party/cuckoo-filter v1.0.0/go.mod h1:L3YZEEsEkbEEWCA2r4sVk1dkrqz+TZ+uxGihtb6BwwI=
