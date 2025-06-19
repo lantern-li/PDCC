@@ -1,6 +1,6 @@
 module chainmaker.org/chainmaker-go
 
-go 1.20
+go 1.18
 
 require (
 	chainmaker.org/chainmaker/chainconf/v2 v2.3.4
@@ -45,20 +45,20 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/mr-tron/base58 v1.2.0
 	github.com/panjf2000/ants/v2 v2.4.8
-	github.com/prometheus/client_golang v1.14.0
+	github.com/prometheus/client_golang v1.12.1
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.2
 	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
 	github.com/tidwall/pretty v1.2.0
 	github.com/tjfoc/gmsm v1.4.1
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802
-	go.uber.org/atomic v1.10.0
-	golang.org/x/net v0.33.0
-	golang.org/x/time v0.3.0
-	google.golang.org/grpc v1.58.3
+	go.uber.org/atomic v1.7.0
+	golang.org/x/net v0.25.0
+	golang.org/x/time v0.0.0-20210608053304-ed9ce3a009e4
+	google.golang.org/grpc v1.56.2
 )
 
 require (
@@ -306,5 +306,4 @@ replace (
 	github.com/marten-seemann/qtls-go1-19 => chainmaker.org/third_party/qtls-go1-19 v1.0.0
 	github.com/syndtr/goleveldb => chainmaker.org/third_party/goleveldb v1.1.0
 	github.com/tikv/client-go => chainmaker.org/third_party/tikv-client-go v1.0.0
-	golang.org/x/crypto => golang.org/x/crypto v0.31.0
 )
