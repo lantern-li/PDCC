@@ -12,7 +12,7 @@ log:
       core: {log_level}                  # 查看commit block落快信息关键字，需将core改为info级别及以下
       net: {log_level}
       vm: {log_level}                    # 合约中的日志，需将vm改为debug级别
-      storage: Debug               # sql模式查看sql语句，需将storage改为debug级别
+      storage: {log_level}               # sql模式查看sql语句，需将storage改为debug级别
     file_path: ../log/system.log
     max_age: 365                  # 日志最长保存时间，单位：天
     rotation_time: 1              # 日志滚动时间，单位：小时
