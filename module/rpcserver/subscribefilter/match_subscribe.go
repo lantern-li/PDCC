@@ -108,9 +108,9 @@ func (ic *IdentityCode) verify() bool {
 			ic.CityCode == RootCode &&
 			ic.DistrictCode == RootCode
 	}
-	if ic.ProvinceCode == RootCode {
-		return false
-	}
+	//if ic.ProvinceCode == RootCode {
+	//	return false
+	//}
 	return true
 }
 
