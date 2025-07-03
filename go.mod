@@ -16,7 +16,7 @@ require (
 	chainmaker.org/chainmaker/net-liquid v1.1.3
 	chainmaker.org/chainmaker/pb-go/v2 v2.3.7-0.20251014072803-a1df36e31026
 	chainmaker.org/chainmaker/protocol/v2 v2.3.10-0.20251014105707-ac82844b1248
-	chainmaker.org/chainmaker/sdk-go/v2 v2.3.8-0.20250618081754-a0a4e072a695
+	chainmaker.org/chainmaker/sdk-go/v2 v2.3.8-0.20251014114010-bd34c4366689
 	chainmaker.org/chainmaker/store/v2 v2.3.9-0.20251014111758-0e6d0a5314fa
 	chainmaker.org/chainmaker/utils/v2 v2.3.7-0.20250328034818-47f6fead061a
 	chainmaker.org/chainmaker/vm-docker-go/v2 v2.3.7-0.20251014101335-9f9cf26776fa
@@ -187,6 +187,7 @@ require (
 	github.com/marten-seemann/qtls-go1-17 v0.1.0 // indirect
 	github.com/marten-seemann/qtls-go1-18 v0.1.0 // indirect
 	github.com/marten-seemann/qtls-go1-19 v0.1.1 // indirect
+	github.com/marten-seemann/qtls-go1-20 v0.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mattn/go-sqlite3 v2.0.1+incompatible // indirect
@@ -302,11 +303,12 @@ replace (
 	github.com/libp2p/go-conn-security-multistream v0.2.0 => chainmaker.org/third_party/go-conn-security-multistream v1.0.5
 	github.com/libp2p/go-libp2p-core => chainmaker.org/chainmaker/libp2p-core v1.1.1
 	github.com/linvon/cuckoo-filter => chainmaker.org/third_party/cuckoo-filter v1.0.0
-	github.com/lucas-clemente/quic-go v0.26.0 => chainmaker.org/third_party/quic-go v1.2.2
+	github.com/lucas-clemente/quic-go v0.26.0 => chainmaker.org/third_party/quic-go v1.2.3-0.20250703073227-9e1279c1eb93
 	github.com/marten-seemann/qtls-go1-16 => chainmaker.org/third_party/qtls-go1-16 v1.1.0
 	github.com/marten-seemann/qtls-go1-17 => chainmaker.org/third_party/qtls-go1-17 v1.1.0
 	github.com/marten-seemann/qtls-go1-18 => chainmaker.org/third_party/qtls-go1-18 v1.1.0
 	github.com/marten-seemann/qtls-go1-19 => chainmaker.org/third_party/qtls-go1-19 v1.0.0
+	github.com/marten-seemann/qtls-go1-20 => chainmaker.org/third_party/qtls-go1-20 v0.0.0-20250701072625-cdc938ae5cd5
 	github.com/syndtr/goleveldb => chainmaker.org/third_party/goleveldb v1.1.0
 	github.com/tikv/client-go => chainmaker.org/third_party/tikv-client-go v1.0.0
 )
