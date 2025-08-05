@@ -337,7 +337,19 @@ func (server *ChainMakerServer) deleteBlockchainTaskListener() {
 		}
 		log.Infof("old block chain found(chain-id: %s), start to delete block chain.", deleteChainId)
 		oldBlockChainS, _ := oldBlockChain.(*Blockchain)
-		oldBlockChainS.Stop()
+		blockchainsCount := 0
+		server.blockchains.Range(func(key, value any) bool {
+			blockchainsCount++
+			return true
+		})
+		// there will be still some blockchains left after delete the current one,
+		// so we cannot stop vm module because that different blockchains share
+		// grpc connections for some vm runtime types, such as docker-go, docker-java
+		if blockchainsCount != 1 {
+			oldBlockChainS.StopWithoutVm()
+		} else {
+			oldBlockChainS.Stop()
+		}
 		server.blockchains.Delete(deleteChainId)
 	}
 }

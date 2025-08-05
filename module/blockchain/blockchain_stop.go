@@ -59,6 +59,54 @@ func (bc *Blockchain) Stop() {
 	}
 }
 
+// Stop all the modules.
+func (bc *Blockchain) StopWithoutVm() {
+	// stop all modules except vm
+
+	// stop sequence：
+	// 1、sync service
+	// 2、core engine
+	// 3、consensus module
+	// 4、net service
+	// 5、tx pool
+	// 6、store
+
+	var stopModules = make([]map[string]func() error, 0)
+
+	if bc.isModuleStartUp(moduleNameStore) {
+		stopModules = append(stopModules, map[string]func() error{moduleNameStore: bc.stopStore})
+	}
+	if bc.isModuleStartUp(moduleNameNetService) {
+		stopModules = append(stopModules, map[string]func() error{moduleNameNetService: bc.stopNetService})
+	}
+	if bc.isModuleStartUp(moduleNameConsensus) {
+		stopModules = append(stopModules, map[string]func() error{moduleNameConsensus: bc.stopConsensus})
+	}
+	if bc.isModuleStartUp(moduleNameCore) {
+		stopModules = append(stopModules, map[string]func() error{moduleNameCore: bc.stopCoreEngine})
+	}
+	if bc.isModuleStartUp(moduleNameSync) {
+		stopModules = append(stopModules, map[string]func() error{moduleNameSync: bc.stopSyncService})
+	}
+	if bc.isModuleStartUp(moduleNameTxPool) {
+		stopModules = append(stopModules, map[string]func() error{moduleNameTxPool: bc.stopTxPool})
+	}
+
+	total := len(stopModules)
+
+	// stop with total order
+	for idx := total - 1; idx >= 0; idx-- {
+		stopModule := stopModules[idx]
+		for name, stopFunc := range stopModule {
+			if err := stopFunc(); err != nil {
+				bc.log.Errorf("stop module[%s] failed, %s", name, err)
+				continue
+			}
+			bc.log.Infof("STOP STEP (%d/%d) => stop module[%s] success :)", total-idx, total, name)
+		}
+	}
+}
+
 // StopOnRequirements close the module instance which is required to shut down when chain configuration updating.
 func (bc *Blockchain) StopOnRequirements() {
 	stopMethodMap := map[string]func() error{
