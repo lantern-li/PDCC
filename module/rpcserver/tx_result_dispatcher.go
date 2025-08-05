@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"chainmaker.org/chainmaker-go/module/bridge"
+
 	"chainmaker.org/chainmaker-go/module/blockchain"
 	"chainmaker.org/chainmaker-go/module/subscriber"
 	"chainmaker.org/chainmaker-go/module/subscriber/model"
@@ -78,6 +80,7 @@ func NewRootDispatcher(chainMakerServer *blockchain.ChainMakerServer) (*RootDisp
 // Start all child dispatchers
 func (root *RootDispatcher) Start() {
 	go root.loggingStatistics()
+	go root.chainUpdateMonitor()
 
 	childs := root.loadChilds()
 	for i := range childs {
@@ -216,6 +219,26 @@ func (root *RootDispatcher) loggingStatistics() {
 			}
 			log.Infof("total [%d] txs are waiting for results, [%s]", totalCount,
 				strings.Join(childTxCounts, ","))
+		case <-root.stopC:
+			return
+		}
+	}
+}
+
+// chainUpdateMonitor monitor chan config update
+func (root *RootDispatcher) chainUpdateMonitor() {
+	for {
+		select {
+		case chainId, ok := <-bridge.RpcDispatcherChan:
+			if !ok {
+				return
+			}
+			log.Infof("chain update monitor chain [%s]", chainId)
+			if err := root.CheckAndUpdate(); err != nil {
+				log.Errorf("chain update monitor chain [%s] failed, %s", chainId, err.Error())
+				break
+			}
+			log.Infof("chain update monitor chain [%s] success", chainId)
 		case <-root.stopC:
 			return
 		}
