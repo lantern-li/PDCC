@@ -864,6 +864,13 @@ func (ts *TxScheduler) processSenderCollectionIn234(tx *commonPb.Transaction,
 		if col.accountStatus != commonPb.TxStatusCode_SUCCESS {
 			accountStatus = col.accountStatus
 			accountAbnormal = true
+			// We should have returned "accountStatus, true" here, but due to an oversight, we did not.
+			// After subsequent checks in the guardForExecuteTx2300() method, we can still obtain the
+			// execution result we should have gotten. While this places the check for whether the
+			// gas-limit is set before the account status check, it is harmless. However, if we were
+			// to correct the original error now, it would reverse the order, placing the account status
+			// check before the gas-limit check. This reversal could potentially introduce compatibility
+			// issues. Therefore, we will not fix this anomaly.
 		}
 	}
 	// checking for balance is not enough

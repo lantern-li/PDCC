@@ -73,8 +73,10 @@ func (ts *TxScheduler) guardForExecuteTx2300(tx *commonPb.Transaction, txSimCont
 				RwSetHash: nil,
 			}
 
-			txResultCode := tx.Result.Code
-			if blockVersion >= blockVersion2340 {
+			var txResultCode commonPb.TxStatusCode
+			if tx.Result != nil {
+				txResultCode = tx.Result.Code
+			} else if blockVersion >= blockVersion2340 {
 				txResultCode = accountStatus
 			}
 
