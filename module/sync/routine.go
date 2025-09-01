@@ -83,10 +83,16 @@ func (r *Routine) loop() {
 		}
 		select {
 		case <-r.stop:
+			close(r.out)
 			return
 		default:
 			if ret != nil {
-				r.out <- ret
+				select {
+				case <-r.stop:
+					close(r.out)
+					return
+				case r.out <- ret:
+				}
 			}
 		}
 	}
@@ -113,5 +119,4 @@ func (r *Routine) end() {
 	}
 	r.queue.Dispose()
 	close(r.stop)
-	close(r.out)
 }
