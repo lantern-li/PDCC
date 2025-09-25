@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync/atomic"
 
 	"chainmaker.org/chainmaker/utils/v2"
@@ -66,6 +67,22 @@ func (s *ApiService) checkDealContractEventSubscriptionParams(tx *commonPb.Trans
 			err = status.Error(codes.InvalidArgument, errMsg)
 			return
 		}
+	}
+
+	/**
+	change from v2.3.6
+	Previously, an empty contract name was supported, which would return all events related to all contracts.
+	However, due to the potential for a large amount of data being returned, this approach is no longer supported.
+	Now, a contract name must be specified.
+	Since 238, it is not allowed for both the contract name and topic to be empty at the same time.
+	*/
+	// Ensure at least one of contractName or topic is provided.
+	if strings.TrimSpace(contractName) == "" && strings.TrimSpace(topic) == "" {
+		errCode := commonErr.ERR_CODE_SYSTEM_CONTRACT_UNSUPPORT_CONTRACT_NAME
+		// Return a clearer error message: require at least one of contractName or topic.
+		errMsg := s.getErrMsg(errCode, fmt.Errorf("either contractName or topic must be provided"))
+		err = status.Error(codes.InvalidArgument, errMsg)
+		return
 	}
 
 	return
