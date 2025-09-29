@@ -897,7 +897,7 @@ func TestSimulateWithDag(t *testing.T) {
 				if txId == txId0 {
 					return contractResult, protocol.ExecOrderTxTypeNormal, commonPb.TxStatusCode_SUCCESS
 				}
-				return contractResult, protocol.ExecOrderTxTypeIterator, commonPb.TxStatusCode_SUCCESS
+				return contractResult, protocol.ExecOrderTxTypeSpecial, commonPb.TxStatusCode_SUCCESS
 			},
 			sealTimes: 1,
 			wantErr:   false,
@@ -913,7 +913,7 @@ func TestSimulateWithDag(t *testing.T) {
 		//		if txId != txId0 {
 		//			return contractResult, protocol.ExecOrderTxTypeNormal, commonPb.TxStatusCode_SUCCESS
 		//		}
-		//		return contractResult, protocol.ExecOrderTxTypeIterator, commonPb.TxStatusCode_SUCCESS
+		//		return contractResult, protocol.ExecOrderTxTypeSpecial, commonPb.TxStatusCode_SUCCESS
 		//	},
 		//	sealTimes: 1,
 		//	wantErr:   true,
@@ -967,137 +967,137 @@ func TestSimulateWithDag(t *testing.T) {
 	}
 }
 
-//	dagNormal := &commonPb.DAG{
-//		Vertexes: []*commonPb.DAG_Neighbor{
+//		dagNormal := &commonPb.DAG{
+//			Vertexes: []*commonPb.DAG_Neighbor{
+//				{
+//					Neighbors: nil,
+//				},
+//				{
+//					Neighbors: []uint32{0},
+//				},
+//				{
+//					Neighbors: []uint32{0, 1},
+//				},
+//			},
+//		}
+//		applyTxSimContextNormal := func(txSimContext protocol.TxSimContext, specialTxType protocol.ExecOrderTxType,
+//			runVmSuccess bool, applySpecialTx bool) (bool, int) {
+//			switch txSimContext.GetTx().Payload.TxId {
+//			case txId0:
+//				return true, 1
+//			case txId1:
+//				return true, 2
+//			case txId2:
+//				return true, 3
+//			default:
+//				panic("Test shouldn't reach here")
+//			}
+//		}
+//		contractResult := &commonPb.ContractResult{
+//			Code:    0,
+//			Result:  nil,
+//			Message: "",
+//		}
+//		runContractNormal := func(*commonPb.Contract, string, []byte, map[string][]byte, protocol.TxSimContext,
+//			uint64, commonPb.TxType) (*commonPb.ContractResult, protocol.ExecOrderTxType, commonPb.TxStatusCode) {
+//			return contractResult, protocol.ExecOrderTxTypeNormal, commonPb.TxStatusCode_SUCCESS
+//		}
+//		tests := []struct {
+//			name              string
+//			dag               *commonPb.DAG
+//			applyTxSimContext func(protocol.TxSimContext, protocol.ExecOrderTxType, bool, bool) (bool, int)
+//			runContract       func(*commonPb.Contract, string, []byte, map[string][]byte, protocol.TxSimContext,
+//				uint64, commonPb.TxType) (*commonPb.ContractResult, protocol.ExecOrderTxType, commonPb.TxStatusCode)
+//			sealTimes int
+//			wantErr   bool
+//		}{
 //			{
-//				Neighbors: nil,
+//				name:              "test0",
+//				dag:               dagNormal,
+//				applyTxSimContext: applyTxSimContextNormal,
+//				runContract:       runContractNormal,
+//				sealTimes:         1,
+//				wantErr:           true, // last tx should be gas type
 //			},
 //			{
-//				Neighbors: []uint32{0},
+//				name:              "test1",
+//				dag:               dagNormal,
+//				applyTxSimContext: applyTxSimContextNormal,
+//				runContract: func(contract *commonPb.Contract, method string, byteCode []byte, parameters map[string][]byte,
+//					txContext protocol.TxSimContext, gasUsed uint64, refTxType commonPb.TxType) (
+//					*commonPb.ContractResult, protocol.ExecOrderTxType, commonPb.TxStatusCode) {
+//					txId := txContext.GetTx().GetPayload().GetTxId()
+//					if txId == txId0 {
+//						return contractResult, protocol.ExecOrderTxTypeNormal, commonPb.TxStatusCode_SUCCESS
+//					} else if txId == txId1 {
+//						return contractResult, protocol.ExecOrderTxTypeSpecial, commonPb.TxStatusCode_SUCCESS
+//					} else {
+//						return contractResult, protocol.ExecOrderTxTypeChargeGas, commonPb.TxStatusCode_SUCCESS
+//					}
+//				},
+//				sealTimes: 1,
+//				wantErr:   false,
 //			},
 //			{
-//				Neighbors: []uint32{0, 1},
+//				name:              "test2",
+//				dag:               dagNormal,
+//				applyTxSimContext: applyTxSimContextNormal,
+//				runContract: func(contract *commonPb.Contract, method string, byteCode []byte, parameters map[string][]byte,
+//					txContext protocol.TxSimContext, gasUsed uint64, refTxType commonPb.TxType) (
+//					*commonPb.ContractResult, protocol.ExecOrderTxType, commonPb.TxStatusCode) {
+//					txId := txContext.GetTx().GetPayload().GetTxId()
+//					if txId == txId0 {
+//						return contractResult, protocol.ExecOrderTxTypeNormal, commonPb.TxStatusCode_SUCCESS
+//					}
+//					return contractResult, protocol.ExecOrderTxTypeSpecial, commonPb.TxStatusCode_SUCCESS
+//				},
+//				sealTimes: 1,
+//				wantErr:   true, // last tx should be gas type
 //			},
-//		},
-//	}
-//	applyTxSimContextNormal := func(txSimContext protocol.TxSimContext, specialTxType protocol.ExecOrderTxType,
-//		runVmSuccess bool, applySpecialTx bool) (bool, int) {
-//		switch txSimContext.GetTx().Payload.TxId {
-//		case txId0:
-//			return true, 1
-//		case txId1:
-//			return true, 2
-//		case txId2:
-//			return true, 3
-//		default:
-//			panic("Test shouldn't reach here")
+//		}
+//		for _, tt := range tests {
+//			t.Run(tt.name, func(t *testing.T) {
+//				vmMgr, _, _, snapshot, scheduler, contractId, block := prepare4(t, true, false, false, 3, false)
+//
+//				parameters := make(map[string]string, 8)
+//				tx0 := newTx(txId0, contractId, parameters)
+//				tx1 := newTx(txId1, contractId, parameters)
+//				tx2 := newTx(txId2, contractId, parameters)
+//				tx2.Payload.ContractName = syscontract.SystemContract_ACCOUNT_MANAGER.String()
+//
+//				block.Txs = []*commonPb.Transaction{tx0, tx1, tx2}
+//				block.Dag = tt.dag
+//
+//				snapshot.EXPECT().IsSealed().AnyTimes().Return(false)
+//				snapshot.EXPECT().Seal().Return().Times(tt.sealTimes)
+//				snapshot.EXPECT().ApplyTxSimContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(tt.applyTxSimContext)
+//				txResults := make(map[string]*commonPb.Result, len(block.Txs))
+//				snapshot.EXPECT().GetTxResultMap().AnyTimes().Return(txResults)
+//				dagCopy := &commonPb.DAG{
+//					Vertexes: []*commonPb.DAG_Neighbor{
+//						{
+//							Neighbors: []uint32{},
+//						},
+//					},
+//				}
+//				snapshot.EXPECT().BuildDAG(gomock.Any(), gomock.Any()).AnyTimes().Return(dagCopy)
+//
+//				vmMgr.EXPECT().RunContract(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(tt.runContract)
+//
+//				txRwSet, result, err := scheduler.SimulateWithDag(block, snapshot)
+//				if tt.wantErr {
+//					require.NotNil(t, err)
+//					fmt.Println("err: ", err)
+//				} else {
+//					require.Nil(t, err)
+//					require.NotNil(t, txRwSet)
+//					require.NotNil(t, result)
+//					fmt.Println("txRWSet: ", txRwSet)
+//					fmt.Println("result: ", result)
+//				}
+//			})
 //		}
 //	}
-//	contractResult := &commonPb.ContractResult{
-//		Code:    0,
-//		Result:  nil,
-//		Message: "",
-//	}
-//	runContractNormal := func(*commonPb.Contract, string, []byte, map[string][]byte, protocol.TxSimContext,
-//		uint64, commonPb.TxType) (*commonPb.ContractResult, protocol.ExecOrderTxType, commonPb.TxStatusCode) {
-//		return contractResult, protocol.ExecOrderTxTypeNormal, commonPb.TxStatusCode_SUCCESS
-//	}
-//	tests := []struct {
-//		name              string
-//		dag               *commonPb.DAG
-//		applyTxSimContext func(protocol.TxSimContext, protocol.ExecOrderTxType, bool, bool) (bool, int)
-//		runContract       func(*commonPb.Contract, string, []byte, map[string][]byte, protocol.TxSimContext,
-//			uint64, commonPb.TxType) (*commonPb.ContractResult, protocol.ExecOrderTxType, commonPb.TxStatusCode)
-//		sealTimes int
-//		wantErr   bool
-//	}{
-//		{
-//			name:              "test0",
-//			dag:               dagNormal,
-//			applyTxSimContext: applyTxSimContextNormal,
-//			runContract:       runContractNormal,
-//			sealTimes:         1,
-//			wantErr:           true, // last tx should be gas type
-//		},
-//		{
-//			name:              "test1",
-//			dag:               dagNormal,
-//			applyTxSimContext: applyTxSimContextNormal,
-//			runContract: func(contract *commonPb.Contract, method string, byteCode []byte, parameters map[string][]byte,
-//				txContext protocol.TxSimContext, gasUsed uint64, refTxType commonPb.TxType) (
-//				*commonPb.ContractResult, protocol.ExecOrderTxType, commonPb.TxStatusCode) {
-//				txId := txContext.GetTx().GetPayload().GetTxId()
-//				if txId == txId0 {
-//					return contractResult, protocol.ExecOrderTxTypeNormal, commonPb.TxStatusCode_SUCCESS
-//				} else if txId == txId1 {
-//					return contractResult, protocol.ExecOrderTxTypeIterator, commonPb.TxStatusCode_SUCCESS
-//				} else {
-//					return contractResult, protocol.ExecOrderTxTypeChargeGas, commonPb.TxStatusCode_SUCCESS
-//				}
-//			},
-//			sealTimes: 1,
-//			wantErr:   false,
-//		},
-//		{
-//			name:              "test2",
-//			dag:               dagNormal,
-//			applyTxSimContext: applyTxSimContextNormal,
-//			runContract: func(contract *commonPb.Contract, method string, byteCode []byte, parameters map[string][]byte,
-//				txContext protocol.TxSimContext, gasUsed uint64, refTxType commonPb.TxType) (
-//				*commonPb.ContractResult, protocol.ExecOrderTxType, commonPb.TxStatusCode) {
-//				txId := txContext.GetTx().GetPayload().GetTxId()
-//				if txId == txId0 {
-//					return contractResult, protocol.ExecOrderTxTypeNormal, commonPb.TxStatusCode_SUCCESS
-//				}
-//				return contractResult, protocol.ExecOrderTxTypeIterator, commonPb.TxStatusCode_SUCCESS
-//			},
-//			sealTimes: 1,
-//			wantErr:   true, // last tx should be gas type
-//		},
-//	}
-//	for _, tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
-//			vmMgr, _, _, snapshot, scheduler, contractId, block := prepare4(t, true, false, false, 3, false)
-//
-//			parameters := make(map[string]string, 8)
-//			tx0 := newTx(txId0, contractId, parameters)
-//			tx1 := newTx(txId1, contractId, parameters)
-//			tx2 := newTx(txId2, contractId, parameters)
-//			tx2.Payload.ContractName = syscontract.SystemContract_ACCOUNT_MANAGER.String()
-//
-//			block.Txs = []*commonPb.Transaction{tx0, tx1, tx2}
-//			block.Dag = tt.dag
-//
-//			snapshot.EXPECT().IsSealed().AnyTimes().Return(false)
-//			snapshot.EXPECT().Seal().Return().Times(tt.sealTimes)
-//			snapshot.EXPECT().ApplyTxSimContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(tt.applyTxSimContext)
-//			txResults := make(map[string]*commonPb.Result, len(block.Txs))
-//			snapshot.EXPECT().GetTxResultMap().AnyTimes().Return(txResults)
-//			dagCopy := &commonPb.DAG{
-//				Vertexes: []*commonPb.DAG_Neighbor{
-//					{
-//						Neighbors: []uint32{},
-//					},
-//				},
-//			}
-//			snapshot.EXPECT().BuildDAG(gomock.Any(), gomock.Any()).AnyTimes().Return(dagCopy)
-//
-//			vmMgr.EXPECT().RunContract(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(tt.runContract)
-//
-//			txRwSet, result, err := scheduler.SimulateWithDag(block, snapshot)
-//			if tt.wantErr {
-//				require.NotNil(t, err)
-//				fmt.Println("err: ", err)
-//			} else {
-//				require.Nil(t, err)
-//				require.NotNil(t, txRwSet)
-//				require.NotNil(t, result)
-//				fmt.Println("txRWSet: ", txRwSet)
-//				fmt.Println("result: ", result)
-//			}
-//		})
-//	}
-//}
 func TestMarshalDag(t *testing.T) {
 	dag := &commonPb.DAG{
 		Vertexes: []*commonPb.DAG_Neighbor{
@@ -2791,8 +2791,8 @@ func TestTxScheduler_verifyExecOrderTxType(t *testing.T) {
 			args: args{
 				txExecOrderTypeMap: map[string]protocol.ExecOrderTxType{
 					txId0: protocol.ExecOrderTxTypeNormal,
-					txId1: protocol.ExecOrderTxTypeIterator,
-					txId2: protocol.ExecOrderTxTypeIterator,
+					txId1: protocol.ExecOrderTxTypeSpecial,
+					txId2: protocol.ExecOrderTxTypeSpecial,
 				},
 			},
 			want:    1,
@@ -2809,7 +2809,7 @@ func TestTxScheduler_verifyExecOrderTxType(t *testing.T) {
 			args: args{
 				txExecOrderTypeMap: map[string]protocol.ExecOrderTxType{
 					txId0: protocol.ExecOrderTxTypeNormal,
-					txId1: protocol.ExecOrderTxTypeIterator,
+					txId1: protocol.ExecOrderTxTypeSpecial,
 					txId2: protocol.ExecOrderTxTypeChargeGas,
 				},
 			},
@@ -2827,7 +2827,7 @@ func TestTxScheduler_verifyExecOrderTxType(t *testing.T) {
 			args: args{
 				txExecOrderTypeMap: map[string]protocol.ExecOrderTxType{
 					txId0: protocol.ExecOrderTxTypeNormal,
-					txId1: protocol.ExecOrderTxTypeIterator,
+					txId1: protocol.ExecOrderTxTypeSpecial,
 					txId2: protocol.ExecOrderTxTypeChargeGas,
 				},
 			},
@@ -2846,7 +2846,7 @@ func TestTxScheduler_verifyExecOrderTxType(t *testing.T) {
 				txExecOrderTypeMap: map[string]protocol.ExecOrderTxType{
 					txId0: protocol.ExecOrderTxTypeNormal,
 					txId1: protocol.ExecOrderTxTypeChargeGas,
-					txId2: protocol.ExecOrderTxTypeIterator,
+					txId2: protocol.ExecOrderTxTypeSpecial,
 				},
 			},
 			want:    1,
@@ -2862,7 +2862,7 @@ func TestTxScheduler_verifyExecOrderTxType(t *testing.T) {
 			},
 			args: args{
 				txExecOrderTypeMap: map[string]protocol.ExecOrderTxType{
-					txId0: protocol.ExecOrderTxTypeIterator,
+					txId0: protocol.ExecOrderTxTypeSpecial,
 					txId1: protocol.ExecOrderTxTypeNormal,
 					txId2: protocol.ExecOrderTxTypeChargeGas,
 				},
@@ -2948,9 +2948,9 @@ func TestTxScheduler_compareDag(t *testing.T) {
 				txExecOrderTypeMap: map[string]protocol.ExecOrderTxType{
 					txId0: protocol.ExecOrderTxTypeNormal,
 					txId1: protocol.ExecOrderTxTypeNormal,
-					txId2: protocol.ExecOrderTxTypeIterator,
-					txId3: protocol.ExecOrderTxTypeIterator,
-					txId4: protocol.ExecOrderTxTypeIterator,
+					txId2: protocol.ExecOrderTxTypeSpecial,
+					txId3: protocol.ExecOrderTxTypeSpecial,
+					txId4: protocol.ExecOrderTxTypeSpecial,
 				},
 				dag: &commonPb.DAG{
 					Vertexes: []*commonPb.DAG_Neighbor{
@@ -2984,9 +2984,9 @@ func TestTxScheduler_compareDag(t *testing.T) {
 				txExecOrderTypeMap: map[string]protocol.ExecOrderTxType{
 					txId0: protocol.ExecOrderTxTypeNormal,
 					txId1: protocol.ExecOrderTxTypeNormal,
-					txId2: protocol.ExecOrderTxTypeIterator,
-					txId3: protocol.ExecOrderTxTypeIterator,
-					txId4: protocol.ExecOrderTxTypeIterator,
+					txId2: protocol.ExecOrderTxTypeSpecial,
+					txId3: protocol.ExecOrderTxTypeSpecial,
+					txId4: protocol.ExecOrderTxTypeSpecial,
 				},
 				dag: &commonPb.DAG{
 					Vertexes: []*commonPb.DAG_Neighbor{
@@ -3020,8 +3020,8 @@ func TestTxScheduler_compareDag(t *testing.T) {
 				txExecOrderTypeMap: map[string]protocol.ExecOrderTxType{
 					txId0: protocol.ExecOrderTxTypeNormal,
 					txId1: protocol.ExecOrderTxTypeNormal,
-					txId2: protocol.ExecOrderTxTypeIterator,
-					txId3: protocol.ExecOrderTxTypeIterator,
+					txId2: protocol.ExecOrderTxTypeSpecial,
+					txId3: protocol.ExecOrderTxTypeSpecial,
 					txId4: protocol.ExecOrderTxTypeChargeGas,
 				},
 				dag: &commonPb.DAG{
@@ -3056,7 +3056,7 @@ func TestTxScheduler_compareDag(t *testing.T) {
 				txExecOrderTypeMap: map[string]protocol.ExecOrderTxType{
 					txId0: protocol.ExecOrderTxTypeNormal,
 					txId1: protocol.ExecOrderTxTypeNormal,
-					txId2: protocol.ExecOrderTxTypeIterator,
+					txId2: protocol.ExecOrderTxTypeSpecial,
 					txId3: protocol.ExecOrderTxTypeNormal,
 					txId4: protocol.ExecOrderTxTypeChargeGas,
 				},

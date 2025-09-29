@@ -495,10 +495,10 @@ func (s *SnapshotImpl) ApplyTxSimContext(txSimContext protocol.TxSimContext, spe
 
 	switch {
 	// 第一次调度执行时，迭代器交易处理逻辑，仅将该笔交易缓存到specialTxTable中
-	case !applySpecialTx && specialTxType == protocol.ExecOrderTxTypeIterator:
+	case !applySpecialTx && specialTxType == protocol.ExecOrderTxTypeSpecial:
 		return s.applyIteratorFirstRun(tx)
 	// 第二次调度执行时，迭代器交易处理逻辑，正式apply到snapshot
-	case applySpecialTx && specialTxType == protocol.ExecOrderTxTypeIterator:
+	case applySpecialTx && specialTxType == protocol.ExecOrderTxTypeSpecial:
 		return s.applyIteratorSecondRun(tx, txSimContext, runVmSuccess)
 	// gas交易处理逻辑，apply gas 交易到snapshot（有gas交易，该逻辑最后执行，否则不执行）
 	case specialTxType == protocol.ExecOrderTxTypeChargeGas:

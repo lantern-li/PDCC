@@ -914,10 +914,11 @@ func (ts *TxScheduler) simulateSpecialTxs(specialTxs []*commonPb.Transaction, da
 			select {
 			case tx := <-runningTxC:
 				// simulate tx
-				txSimContext, specialTxType, runVmSuccess := ts.executeTx(tx, snapshot, block, collection)
+				txSimContext, _, runVmSuccess := ts.executeTx(tx, snapshot, block, collection)
 				tx.Result = txSimContext.GetTxResult()
 				// apply tx
-				applyResult, applySize := snapshot.ApplyTxSimContext(txSimContext, specialTxType, runVmSuccess, true)
+				applyResult, applySize := snapshot.ApplyTxSimContext(txSimContext,
+					protocol.ExecOrderTxTypeSpecial, runVmSuccess, true)
 				if !applyResult {
 					ts.log.Debugf("failed to apply according to dag with tx %s ", tx.Payload.TxId)
 					runningTxC <- tx
@@ -1875,7 +1876,7 @@ func (ts *TxScheduler) verifyExecOrderTxType(block *commonPb.Block,
 			} else {
 				txExecOrderIteratorCount++
 			}
-		} else if t == protocol.ExecOrderTxTypeIterator {
+		} else if t == protocol.ExecOrderTxTypeSpecial {
 			txExecOrderIteratorCount++
 		} else if t == protocol.ExecOrderTxTypeChargeGas {
 			txExecOrderChargeGasCount++
