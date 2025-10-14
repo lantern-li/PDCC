@@ -17,14 +17,14 @@ require (
 	chainmaker.org/chainmaker/pb-go/v2 v2.3.7-0.20251014072803-a1df36e31026
 	chainmaker.org/chainmaker/protocol/v2 v2.3.10-0.20251014105707-ac82844b1248
 	chainmaker.org/chainmaker/sdk-go/v2 v2.3.8-0.20250618081754-a0a4e072a695
-	chainmaker.org/chainmaker/store/v2 v2.3.9-0.20251013094618-be311f27ea67
+	chainmaker.org/chainmaker/store/v2 v2.3.9-0.20251014111758-0e6d0a5314fa
 	chainmaker.org/chainmaker/utils/v2 v2.3.7-0.20250328034818-47f6fead061a
 	chainmaker.org/chainmaker/vm-docker-go/v2 v2.3.7-0.20251014101335-9f9cf26776fa
 	chainmaker.org/chainmaker/vm-engine/v2 v2.3.9-0.20251014101717-69b88ad43d10
 	chainmaker.org/chainmaker/vm-evm/v2 v2.3.8-0.20251014101459-542dce77696b
 	chainmaker.org/chainmaker/vm-gasm/v2 v2.3.7-0.20251014083702-b3099fe75f73
 	chainmaker.org/chainmaker/vm-native/v2 v2.3.7-0.20251014073415-27d8726533c5
-	chainmaker.org/chainmaker/vm-wasmer/v2 v2.3.7-0.20250120062002-5bfc32757cce
+	chainmaker.org/chainmaker/vm-wasmer/v2 v2.3.7-0.20251014074053-aa9593cfa17d
 	chainmaker.org/chainmaker/vm-wxvm/v2 v2.3.6
 	chainmaker.org/chainmaker/vm/v2 v2.3.9-0.20251014073908-42b4daeec1a0
 	code.cloudfoundry.org/bytefmt v0.0.0-20211005130812-5bb3c17173e5
@@ -294,6 +294,9 @@ require (
 
 replace (
 	github.com/RedisBloom/redisbloom-go => chainmaker.org/third_party/redisbloom-go v1.0.0
+	github.com/bits-and-blooms/bitset => chainmaker.org/third_party/bitset v0.0.0-20250827033140-c958f2649ebe
+	github.com/bits-and-blooms/bloom/v3 => chainmaker.org/third_party/bloom/v3 v3.0.0-20250827033434-e72bb2fe7ae6
+	github.com/btcsuite/btcd => chainmaker.org/third_party/btcd v1.0.0
 	github.com/dgraph-io/badger/v3 => chainmaker.org/third_party/badger/v3 v3.0.0
 	github.com/golang/glog => github.com/golang/glog v1.0.0
 	github.com/libp2p/go-conn-security-multistream v0.2.0 => chainmaker.org/third_party/go-conn-security-multistream v1.0.5

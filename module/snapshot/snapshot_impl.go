@@ -845,7 +845,7 @@ func (s *SnapshotImpl) dealNormalTx(txSimContext protocol.TxSimContext, specialT
 	var txRWSet *commonPb.TxRWSet
 	var txResult *commonPb.Result
 
-	if !applySpecialTx && specialTxType == protocol.ExecOrderTxTypeIterator {
+	if !applySpecialTx && specialTxType == protocol.ExecOrderTxTypeSpecial {
 		s.specialTxTable = append(s.specialTxTable, tx)
 		return true, len(s.txTable) + len(s.specialTxTable)
 	}
@@ -854,7 +854,7 @@ func (s *SnapshotImpl) dealNormalTx(txSimContext protocol.TxSimContext, specialT
 	txRWSet = txSimContext.GetTxRWSet(runVmSuccess)
 	txResult = txSimContext.GetTxResult()
 
-	if specialTxType == protocol.ExecOrderTxTypeIterator || txExecSeq >= len(s.txTable) {
+	if specialTxType == protocol.ExecOrderTxTypeSpecial || txExecSeq >= len(s.txTable) {
 		s.apply(tx, txRWSet, txResult, runVmSuccess)
 		return true, len(s.txTable)
 	}
@@ -892,7 +892,7 @@ func (s *SnapshotImpl) dealSZTx(txSimContext protocol.TxSimContext, specialTxTyp
 	//	TxReads:  []*commonPb.TxRead{},
 	//	TxWrites: []*commonPb.TxWrite{},
 	//}
-	if !applySpecialTx && specialTxType == protocol.ExecOrderTxTypeIterator {
+	if !applySpecialTx && specialTxType == protocol.ExecOrderTxTypeSpecial {
 		s.specialTxTable = append(s.specialTxTable, tx)
 		return true, len(s.txTable) + len(s.specialTxTable)
 	}
@@ -902,7 +902,7 @@ func (s *SnapshotImpl) dealSZTx(txSimContext protocol.TxSimContext, specialTxTyp
 	txRWSet = txSimContext.GetTxRWSet(runVmSuccess)
 	txResult = txSimContext.GetTxResult()
 
-	if specialTxType == protocol.ExecOrderTxTypeIterator || txExecSeq >= len(s.txTable) {
+	if specialTxType == protocol.ExecOrderTxTypeSpecial || txExecSeq >= len(s.txTable) {
 		s.apply(tx, txRWSet, txResult, runVmSuccess)
 		return true, len(s.txTable)
 	}
