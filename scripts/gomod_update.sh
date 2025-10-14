@@ -35,7 +35,7 @@ go get chainmaker.org/chainmaker/chainconf/v2@${PRE_BRANCH}
 go get chainmaker.org/chainmaker/common/v2@v2.3.8_sz
 go get chainmaker.org/chainmaker/localconf/v2@v2.3.7_sz
 go get chainmaker.org/chainmaker/logger/v2@${LOGGER_BRANCH}
-go get chainmaker.org/chainmaker/pb-go/v2@v2.3.7_sz
+go get chainmaker.org/chainmaker/pb-go/v2@v2.3.8_sz
 go get chainmaker.org/chainmaker/protocol/v2@v2.3.10_sz
 go get chainmaker.org/chainmaker/utils/v2@v2.3.6_qc_sz
 go get chainmaker.org/chainmaker/net-common@${NET_COMMON_BRANCH}
@@ -59,7 +59,7 @@ go get chainmaker.org/chainmaker/vm/v2@v2.3.8_sz
 go get chainmaker.org/chainmaker/txpool-batch/v2@${PRE_BRANCH}
 go get chainmaker.org/chainmaker/txpool-normal/v2@${PRE_BRANCH}
 go get chainmaker.org/chainmaker/txpool-single/v2@${PRE_BRANCH}
-go get chainmaker.org/chainmaker/sdk-go/v2@v2.3.7_sz
+go get chainmaker.org/chainmaker/sdk-go/v2@v2.3.8_sz
 
 go mod tidy
 
