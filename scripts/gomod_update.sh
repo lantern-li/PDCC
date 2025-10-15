@@ -20,7 +20,7 @@ PROTOCOL_BRANCH='v2.3.9_qc'
 PB_BRANCH='v2.3.6_qc'
 UTILS_BRANCH='v2.3.5_qc'
 LOGGER_BRANCH='v2.3.4_qc'
-TBFT_BRANCH='v2.3.6_sz'
+TBFT_BRANCH='v2.3.7_sz'
 STORE_BRANCH='v2.3.6_qc'
 VM_ENGINE_BRANCH='v2.3.6_qc'
 EVM_BRANCH='v2.3.6_qc'
@@ -44,7 +44,7 @@ go get chainmaker.org/chainmaker/net-liquid@${NET_LIQUID_BRANCH}
 go get chainmaker.org/chainmaker/consensus-dpos/v2@${PRE_BRANCH}
 go get chainmaker.org/chainmaker/consensus-raft/v2@${PRE_BRANCH}
 go get chainmaker.org/chainmaker/consensus-solo/v2@${PRE_BRANCH}
-go get chainmaker.org/chainmaker/consensus-utils/v2@${PRE_BRANCH}
+go get chainmaker.org/chainmaker/consensus-utils/v2@v2.3.5_sz
 go get chainmaker.org/chainmaker/consensus-maxbft/v2@${PRE_BRANCH}
 go get chainmaker.org/chainmaker/consensus-tbft/v2@${TBFT_BRANCH}
 go get chainmaker.org/chainmaker/store/v2@v2.3.8_sz
