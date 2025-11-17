@@ -10,6 +10,7 @@ import (
 	"chainmaker.org/chainmaker/pb-go/v2/accesscontrol"
 	"chainmaker.org/chainmaker/pb-go/v2/config"
 	consensusPb "chainmaker.org/chainmaker/pb-go/v2/consensus"
+	"chainmaker.org/chainmaker/protocol/v2"
 	"chainmaker.org/chainmaker/protocol/v2/mock"
 	"chainmaker.org/chainmaker/utils/v2"
 	"github.com/golang/mock/gomock"
@@ -81,7 +82,11 @@ func TestCommitBlock_CommitBlock(t *testing.T) {
 	}
 
 	conEventMap := make(map[string][]*commonpb.ContractEvent)
-	proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(block, txRWSetMap, conEventMap)
+	proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(&protocol.ProposalData{
+		Block:            block,
+		TxRwSetMap:       txRWSetMap,
+		ContractEventMap: conEventMap,
+	})
 
 	config := &config.ChainConfig{
 		ChainId: "chain1",

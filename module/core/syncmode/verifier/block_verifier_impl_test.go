@@ -10,9 +10,14 @@ import (
 	"fmt"
 	"testing"
 
+	"chainmaker.org/chainmaker-go/module/core/provider/conf"
+
+	"github.com/golang/mock/gomock"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
+
 	"chainmaker.org/chainmaker-go/module/core/cache"
 	"chainmaker.org/chainmaker-go/module/core/common"
-	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 	"chainmaker.org/chainmaker/common/v2/crypto/hash"
 	"chainmaker.org/chainmaker/common/v2/msgbus"
 	mock2 "chainmaker.org/chainmaker/common/v2/msgbus/mock"
@@ -25,9 +30,6 @@ import (
 	"chainmaker.org/chainmaker/protocol/v2"
 	"chainmaker.org/chainmaker/protocol/v2/mock"
 	"chainmaker.org/chainmaker/utils/v2"
-	"github.com/golang/mock/gomock"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -37,7 +39,7 @@ var (
 
 func TestBlockVerifierImpl_VerifyBlock(t *testing.T) {
 	ctl := gomock.NewController(t)
-	var chainId = "Chain1"
+	chainId := "Chain1"
 
 	msgBus := msgbus.NewMessageBus()
 	txScheduler := mock.NewMockTxScheduler(ctl)
@@ -91,9 +93,9 @@ func TestBlockVerifierImpl_VerifyBlock(t *testing.T) {
 
 	fillHashesOfBlock(t, b1, txHashs)
 
-	//member := mock.NewMockMember(ctl)
-	//member.EXPECT().GetMemberId().Return("123").AnyTimes()
-	//ac.EXPECT().NewMember(b1.Header.Proposer).Return(member, nil)
+	// member := mock.NewMockMember(ctl)
+	// member.EXPECT().GetMemberId().Return("123").AnyTimes()
+	// ac.EXPECT().NewMember(b1.Header.Proposer).Return(member, nil)
 
 	txpool.EXPECT().GetTxsByTxIds(gomock.Any()).Return(txList, nil).AnyTimes()
 	txpool.EXPECT().GetAllTxsByTxIds(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -110,7 +112,7 @@ func TestBlockVerifierImpl_VerifyBlock(t *testing.T) {
 	snapshot.EXPECT().GetTxResultMap().AnyTimes().Return(txResultMap)
 	snapshot.EXPECT().BuildDAG(gomock.Any(), gomock.Any()).AnyTimes().Return(b1.Dag)
 
-	//netService.EXPECT().GetNodeUidByCertId(gomock.Any()).Return("123", nil)
+	// netService.EXPECT().GetNodeUidByCertId(gomock.Any()).Return("123", nil)
 	snapshotMgr.EXPECT().NewSnapshot(gomock.Any(), gomock.Any()).AnyTimes().Return(snapshot)
 	snapshotMgr.EXPECT().GetSnapshot(gomock.Any(), gomock.Any()).AnyTimes().Return(snapshot)
 	snapshotMgr.EXPECT().ClearSnapshot(gomock.Any()).AnyTimes().Return(nil)
@@ -201,7 +203,7 @@ func TestBlockVerifierImpl_VerifyBlock(t *testing.T) {
 
 func TestBlockVerifierImpl_VerifyBlockWithRwSets(t *testing.T) {
 	ctl := gomock.NewController(t)
-	var chainId = "Chain1"
+	chainId := "Chain1"
 
 	msgBus := msgbus.NewMessageBus()
 	txScheduler := mock.NewMockTxScheduler(ctl)
@@ -275,9 +277,9 @@ func TestBlockVerifierImpl_VerifyBlockWithRwSets(t *testing.T) {
 		TxWrites: nil,
 	})
 
-	//member := mock.NewMockMember(ctl)
-	//member.EXPECT().GetMemberId().Return("123").AnyTimes()
-	//ac.EXPECT().NewMember(b1.Header.Proposer).Return(member, nil)
+	// member := mock.NewMockMember(ctl)
+	// member.EXPECT().GetMemberId().Return("123").AnyTimes()
+	// ac.EXPECT().NewMember(b1.Header.Proposer).Return(member, nil)
 
 	txpool.EXPECT().GetTxsByTxIds(gomock.Any()).Return(txList, nil).AnyTimes()
 	txpool.EXPECT().GetAllTxsByTxIds(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -293,7 +295,7 @@ func TestBlockVerifierImpl_VerifyBlockWithRwSets(t *testing.T) {
 	snapshot.EXPECT().GetTxResultMap().AnyTimes().Return(txResultMap)
 	snapshot.EXPECT().BuildDAG(gomock.Any(), gomock.Any()).AnyTimes().Return(b1.Dag)
 	snapshot.EXPECT().ApplyBlock(gomock.Any(), gomock.Any()).AnyTimes()
-	//netService.EXPECT().GetNodeUidByCertId(gomock.Any()).Return("123", nil)
+	// netService.EXPECT().GetNodeUidByCertId(gomock.Any()).Return("123", nil)
 
 	snapshotMgr.EXPECT().NewSnapshot(gomock.Any(), gomock.Any()).AnyTimes().Return(snapshot)
 
@@ -328,7 +330,8 @@ func TestBlockVerifierImpl_VerifyBlockWithRwSets(t *testing.T) {
 				RetryTime:             0,
 				RetryInterval:         0,
 			},
-		}}
+		},
+	}
 	chainConf.EXPECT().ChainConfig().Return(&chainConfig).AnyTimes()
 
 	verifier := &BlockVerifierImpl{
@@ -407,7 +410,7 @@ func Test_DispatchTask(t *testing.T) {
 }
 
 func createNewTestBlock(height uint64, proposer *accesscontrol.Member, txs []*commonpb.Transaction) *commonpb.Block {
-	var hash = []byte("0123456789")
+	hash := []byte("0123456789")
 
 	dag := &commonpb.DAG{Vertexes: []*commonpb.DAG_Neighbor{}}
 	neighbor := make([]*commonpb.DAG_Neighbor, 0)
@@ -466,12 +469,11 @@ func createNewTestTx() *commonpb.Transaction {
 			RwSetHash: nil,
 		},
 	}
-
 }
 
 func createNewTestBlockWithoutProposer(height uint64) *commonpb.Block {
-	var hash = []byte("0123456789")
-	var block = &commonpb.Block{
+	hash := []byte("0123456789")
+	block := &commonpb.Block{
 		Header: &commonpb.BlockHeader{
 			ChainId:        "Chain1",
 			BlockHeight:    height,
@@ -562,7 +564,7 @@ func TestBlockVerifierImpl_verifyRepeat(t *testing.T) {
 			fields: fields{
 				proposalCache: func() protocol.ProposalCache {
 					proposalCache := mock.NewMockProposalCache(c)
-					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(nil, nil, nil)
+					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(nil)
 					return proposalCache
 				}(),
 				log: func() protocol.Logger {
@@ -584,7 +586,11 @@ func TestBlockVerifierImpl_verifyRepeat(t *testing.T) {
 			fields: fields{
 				proposalCache: func() protocol.ProposalCache {
 					proposalCache := mock.NewMockProposalCache(c)
-					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(getBlock(), nil, nil)
+					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(&protocol.ProposalData{
+						Block:            getBlock(),
+						TxRwSetMap:       nil,
+						ContractEventMap: nil,
+					})
 					proposalCache.EXPECT().GetProposedBlockByHashAndHeight(gomock.Any(), gomock.Any()).
 						Return(nil, nil)
 					return proposalCache
@@ -610,7 +616,11 @@ func TestBlockVerifierImpl_verifyRepeat(t *testing.T) {
 			fields: fields{
 				proposalCache: func() protocol.ProposalCache {
 					proposalCache := mock.NewMockProposalCache(c)
-					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(getBlock(), nil, nil)
+					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(&protocol.ProposalData{
+						Block:            getBlock(),
+						TxRwSetMap:       nil,
+						ContractEventMap: nil,
+					})
 					proposalCache.EXPECT().GetProposedBlockByHashAndHeight(gomock.Any(), gomock.Any()).
 						Return(getBlock(), nil)
 					proposalCache.EXPECT().KeepProposedBlock(gomock.Any(), gomock.Any()).
@@ -638,7 +648,11 @@ func TestBlockVerifierImpl_verifyRepeat(t *testing.T) {
 			fields: fields{
 				proposalCache: func() protocol.ProposalCache {
 					proposalCache := mock.NewMockProposalCache(c)
-					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(getBlock(), nil, nil)
+					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(&protocol.ProposalData{
+						Block:            getBlock(),
+						TxRwSetMap:       nil,
+						ContractEventMap: nil,
+					})
 					proposalCache.EXPECT().GetProposedBlockByHashAndHeight(gomock.Any(), gomock.Any()).
 						Return(nil, nil)
 					return proposalCache
@@ -664,7 +678,11 @@ func TestBlockVerifierImpl_verifyRepeat(t *testing.T) {
 			fields: fields{
 				proposalCache: func() protocol.ProposalCache {
 					proposalCache := mock.NewMockProposalCache(c)
-					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(getBlock(), nil, nil)
+					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(&protocol.ProposalData{
+						Block:            getBlock(),
+						TxRwSetMap:       nil,
+						ContractEventMap: nil,
+					})
 					proposalCache.EXPECT().GetProposedBlockByHashAndHeight(gomock.Any(), gomock.Any()).
 						Return(getBlock(), nil)
 					proposalCache.EXPECT().KeepProposedBlock(gomock.Any(), gomock.Any()).
@@ -692,7 +710,11 @@ func TestBlockVerifierImpl_verifyRepeat(t *testing.T) {
 			fields: fields{
 				proposalCache: func() protocol.ProposalCache {
 					proposalCache := mock.NewMockProposalCache(c)
-					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(getBlock(), nil, nil)
+					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(&protocol.ProposalData{
+						Block:            getBlock(),
+						TxRwSetMap:       nil,
+						ContractEventMap: nil,
+					})
 					return proposalCache
 				}(),
 				chainConf: getCc(consensus.ConsensusType_SOLO, false, c),
@@ -716,7 +738,11 @@ func TestBlockVerifierImpl_verifyRepeat(t *testing.T) {
 			fields: fields{
 				proposalCache: func() protocol.ProposalCache {
 					proposalCache := mock.NewMockProposalCache(c)
-					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(getBlock(), nil, nil)
+					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(&protocol.ProposalData{
+						Block:            getBlock(),
+						TxRwSetMap:       nil,
+						ContractEventMap: nil,
+					})
 					return proposalCache
 				}(),
 				chainConf: getCc(consensus.ConsensusType_SOLO, false, c),
@@ -740,7 +766,11 @@ func TestBlockVerifierImpl_verifyRepeat(t *testing.T) {
 			fields: fields{
 				proposalCache: func() protocol.ProposalCache {
 					proposalCache := mock.NewMockProposalCache(c)
-					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(getBlock(), nil, nil)
+					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(&protocol.ProposalData{
+						Block:            getBlock(),
+						TxRwSetMap:       nil,
+						ContractEventMap: nil,
+					})
 					proposalCache.EXPECT().GetProposedBlockByHashAndHeight(gomock.Any(), gomock.Any()).
 						Return(nil, nil)
 					return proposalCache
@@ -766,7 +796,11 @@ func TestBlockVerifierImpl_verifyRepeat(t *testing.T) {
 			fields: fields{
 				proposalCache: func() protocol.ProposalCache {
 					proposalCache := mock.NewMockProposalCache(c)
-					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(getBlock(), nil, nil)
+					proposalCache.EXPECT().GetProposedBlock(gomock.Any()).Return(&protocol.ProposalData{
+						Block:            getBlock(),
+						TxRwSetMap:       nil,
+						ContractEventMap: nil,
+					})
 					proposalCache.EXPECT().GetProposedBlockByHashAndHeight(gomock.Any(), gomock.Any()).
 						Return(getBlock(), nil)
 					proposalCache.EXPECT().KeepProposedBlock(gomock.Any(), gomock.Any()).

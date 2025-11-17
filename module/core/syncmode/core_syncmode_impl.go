@@ -8,8 +8,20 @@ SPDX-License-Identifier: Apache-2.0
 package syncmode
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
+
+	"github.com/gogo/protobuf/proto"
+
+	"chainmaker.org/chainmaker/common/v2/msgbus"
+	"chainmaker.org/chainmaker/localconf/v2"
+	commonpb "chainmaker.org/chainmaker/pb-go/v2/common"
+	chainConfConfig "chainmaker.org/chainmaker/pb-go/v2/config"
+	consensuspb "chainmaker.org/chainmaker/pb-go/v2/consensus"
+	tbftpb "chainmaker.org/chainmaker/pb-go/v2/consensus/tbft"
+	txpoolpb "chainmaker.org/chainmaker/pb-go/v2/txpool"
+	"chainmaker.org/chainmaker/protocol/v2"
 
 	"chainmaker.org/chainmaker-go/module/core/common"
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler"
@@ -17,12 +29,6 @@ import (
 	"chainmaker.org/chainmaker-go/module/core/syncmode/proposer"
 	"chainmaker.org/chainmaker-go/module/core/syncmode/verifier"
 	"chainmaker.org/chainmaker-go/module/subscriber"
-	"chainmaker.org/chainmaker/common/v2/msgbus"
-	"chainmaker.org/chainmaker/localconf/v2"
-	commonpb "chainmaker.org/chainmaker/pb-go/v2/common"
-	consensuspb "chainmaker.org/chainmaker/pb-go/v2/consensus"
-	txpoolpb "chainmaker.org/chainmaker/pb-go/v2/txpool"
-	"chainmaker.org/chainmaker/protocol/v2"
 )
 
 // CoreEngine is a block handle engine.
@@ -32,11 +38,11 @@ type CoreEngine struct {
 	chainId   string             // chainId, identity of a chain
 	chainConf protocol.ChainConf // chain config
 
-	msgBus         msgbus.MessageBus       // message bus, transfer messages with other modules
-	blockProposer  protocol.BlockProposer  // block proposer, to generate new block when node is proposer
-	BlockVerifier  protocol.BlockVerifier  // block verifier, to verify block that proposer generated
-	BlockCommitter protocol.BlockCommitter // block committer, to commit block to store after consensus
-	txScheduler    protocol.TxScheduler    // transaction scheduler, schedule transactions run in vm
+	msgBus         msgbus.MessageBus              // message bus, transfer messages with other modules
+	blockProposer  protocol.BlockProposer         // block proposer, to generate new block when node is proposer
+	BlockVerifier  *verifier.BlockVerifierFactory // block verifier, to verify block that proposer generated
+	BlockCommitter protocol.BlockCommitter        // block committer, to commit block to store after consensus
+	txScheduler    protocol.TxScheduler           // transaction scheduler, schedule transactions run in vm
 	MaxbftHelper   protocol.MaxbftHelper
 
 	txPool          protocol.TxPool          // transaction pool, cache transactions to be pack in block
@@ -49,92 +55,60 @@ type CoreEngine struct {
 	log           protocol.Logger             // logger
 	subscriber    *subscriber.EventSubscriber // block subsriber
 
-	netService protocol.NetService
+	netService       protocol.NetService
+	ledgerCache      protocol.LedgerCache // for update scheduler、proposer、verifier、committer
+	identity         protocol.SigningMember
+	ac               protocol.AccessControlProvider
+	txFilter         protocol.TxFilter
+	storeHelper      conf.StoreHelper
+	currentScheduler *chainConfConfig.SchedulerConfig
 }
 
 // NewCoreEngine new a core engine.
 func NewCoreEngine(cf *conf.CoreEngineConfig) (*CoreEngine, error) {
 	core := &CoreEngine{
-		msgBus:          cf.MsgBus,
-		txPool:          cf.TxPool,
-		vmMgr:           cf.VmMgr,
-		blockchainStore: cf.BlockchainStore,
-		snapshotManager: cf.SnapshotManager,
-		proposedCache:   cf.ProposalCache,
-		chainConf:       cf.ChainConf,
-		log:             cf.Log,
-		netService:      cf.NetService,
+		chainId:          cf.ChainId,
+		msgBus:           cf.MsgBus,
+		txPool:           cf.TxPool,
+		vmMgr:            cf.VmMgr,
+		blockchainStore:  cf.BlockchainStore,
+		snapshotManager:  cf.SnapshotManager,
+		proposedCache:    cf.ProposalCache,
+		chainConf:        cf.ChainConf,
+		log:              cf.Log,
+		netService:       cf.NetService,
+		ledgerCache:      cf.LedgerCache,
+		identity:         cf.Identity,
+		ac:               cf.AC,
+		txFilter:         cf.TxFilter,
+		storeHelper:      cf.StoreHelper,
+		quitC:            make(<-chan interface{}),
+		currentScheduler: &chainConfConfig.SchedulerConfig{},
 	}
 
-	var schedulerFactory scheduler.TxSchedulerFactory
-	core.txScheduler = schedulerFactory.NewTxScheduler(
-		cf.VmMgr,
-		cf.ChainConf,
-		cf.StoreHelper,
-		cf.LedgerCache,
-		cf.AC)
-	core.quitC = make(<-chan interface{})
+	// "cf.ChainConf.ChainConfig().Scheduler == nil" means use non deterministic scheduler(SchedulerType = 0).
+	if cf.ChainConf.ChainConfig().Scheduler != nil {
+		core.currentScheduler = cf.ChainConf.ChainConfig().Scheduler
+	}
 
+	// new a tx scheduler
+	core.txScheduler = createTxScheduler(core)
 	var err error
-	// new a bock proposer
-	proposerConfig := proposer.BlockProposerConfig{
-		ChainId:         cf.ChainId,
-		TxPool:          cf.TxPool,
-		SnapshotManager: cf.SnapshotManager,
-		MsgBus:          cf.MsgBus,
-		Identity:        cf.Identity,
-		LedgerCache:     cf.LedgerCache,
-		TxScheduler:     core.txScheduler,
-		ProposalCache:   cf.ProposalCache,
-		ChainConf:       cf.ChainConf,
-		AC:              cf.AC,
-		BlockchainStore: cf.BlockchainStore,
-		StoreHelper:     cf.StoreHelper,
-		TxFilter:        cf.TxFilter,
-	}
-	core.blockProposer, err = proposer.NewBlockProposer(proposerConfig, cf.Log)
+
+	// Initialize the block proposer
+	core.blockProposer, err = core.createBlockProposer()
 	if err != nil {
 		return nil, err
 	}
 
-	// new a block verifier
-	verifierConfig := verifier.BlockVerifierConfig{
-		ChainId:         cf.ChainId,
-		MsgBus:          cf.MsgBus,
-		SnapshotManager: cf.SnapshotManager,
-		BlockchainStore: cf.BlockchainStore,
-		LedgerCache:     cf.LedgerCache,
-		TxScheduler:     core.txScheduler,
-		ProposedCache:   cf.ProposalCache,
-		ChainConf:       cf.ChainConf,
-		AC:              cf.AC,
-		TxPool:          cf.TxPool,
-		VmMgr:           cf.VmMgr,
-		StoreHelper:     cf.StoreHelper,
-		NetService:      cf.NetService,
-		TxFilter:        cf.TxFilter,
-	}
-	core.BlockVerifier, err = verifier.NewBlockVerifier(verifierConfig, cf.Log)
+	// Initialize the block verifier
+	core.BlockVerifier, err = core.createBlockVerifier()
 	if err != nil {
 		return nil, err
 	}
 
-	// new a block committer
-	committerConfig := common.BlockCommitterConfig{
-		ChainId:         cf.ChainId,
-		BlockchainStore: cf.BlockchainStore,
-		SnapshotManager: cf.SnapshotManager,
-		TxPool:          cf.TxPool,
-		LedgerCache:     cf.LedgerCache,
-		ProposedCache:   cf.ProposalCache,
-		ChainConf:       cf.ChainConf,
-		MsgBus:          cf.MsgBus,
-		Subscriber:      cf.Subscriber,
-		Verifier:        core.BlockVerifier,
-		StoreHelper:     cf.StoreHelper,
-		TxFilter:        cf.TxFilter,
-	}
-	core.BlockCommitter, err = common.NewBlockCommitter(committerConfig, cf.Log)
+	// Initialize the block committer
+	core.BlockCommitter, err = core.createBlockCommitter()
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +120,97 @@ func NewCoreEngine(cf *conf.CoreEngineConfig) (*CoreEngine, error) {
 	}
 
 	return core, nil
+}
+
+// createTxScheduler creates a transaction scheduler.
+func createTxScheduler(c *CoreEngine) protocol.TxScheduler {
+	var schedulerFactory scheduler.TxSchedulerFactory
+	return schedulerFactory.NewTxScheduler(
+		c.vmMgr, c.chainConf, c.storeHelper, c.ledgerCache, c.ac)
+}
+
+// createBlockProposer initializes a block proposer.
+func (c *CoreEngine) createBlockProposer() (protocol.BlockProposer, error) {
+	// new a bock proposer
+	proposerConfig := proposer.BlockProposerConfig{
+		ChainId:         c.chainId,
+		TxPool:          c.txPool,
+		SnapshotManager: c.snapshotManager,
+		MsgBus:          c.msgBus,
+		Identity:        c.identity,
+		LedgerCache:     c.ledgerCache,
+		TxScheduler:     c.txScheduler,
+		ProposalCache:   c.proposedCache,
+		ChainConf:       c.chainConf,
+		AC:              c.ac,
+		BlockchainStore: c.blockchainStore,
+		StoreHelper:     c.storeHelper,
+		TxFilter:        c.txFilter,
+	}
+
+	pf := new(proposer.BlockProposerFactory)
+	return pf.NewBlockProposer(proposerConfig, c.log)
+}
+
+// createBlockVerifier initializes a block verifier.
+func (c *CoreEngine) createBlockVerifier() (*verifier.BlockVerifierFactory, error) {
+	verifierConfig := verifier.BlockVerifierConfig{
+		ChainId:         c.chainId,
+		TxPool:          c.txPool,
+		SnapshotManager: c.snapshotManager,
+		MsgBus:          c.msgBus,
+		LedgerCache:     c.ledgerCache,
+		TxScheduler:     c.txScheduler,
+		ProposedCache:   c.proposedCache,
+		ChainConf:       c.chainConf,
+		AC:              c.ac,
+		BlockchainStore: c.blockchainStore,
+		StoreHelper:     c.storeHelper,
+		TxFilter:        c.txFilter,
+		VmMgr:           c.vmMgr,
+		NetService:      c.netService,
+	}
+	return verifier.NewBlockVerifierFactory(verifierConfig, c.log)
+}
+
+// createBlockVerifier update a block verifier.
+func (c *CoreEngine) updateBlockVerifier() error {
+	verifierConfig := verifier.BlockVerifierConfig{
+		ChainId:         c.chainId,
+		TxPool:          c.txPool,
+		SnapshotManager: c.snapshotManager,
+		MsgBus:          c.msgBus,
+		LedgerCache:     c.ledgerCache,
+		TxScheduler:     c.txScheduler,
+		ProposedCache:   c.proposedCache,
+		ChainConf:       c.chainConf,
+		AC:              c.ac,
+		BlockchainStore: c.blockchainStore,
+		StoreHelper:     c.storeHelper,
+		TxFilter:        c.txFilter,
+		VmMgr:           c.vmMgr,
+		NetService:      c.netService,
+	}
+	return c.BlockVerifier.UpdateBlockVerifier(verifierConfig)
+}
+
+// createBlockCommitter initializes a block committer.
+func (c *CoreEngine) createBlockCommitter() (protocol.BlockCommitter, error) {
+	committerConfig := common.BlockCommitterConfig{
+		ChainId:         c.chainId,
+		BlockchainStore: c.blockchainStore,
+		SnapshotManager: c.snapshotManager,
+		TxPool:          c.txPool,
+		LedgerCache:     c.ledgerCache,
+		ProposedCache:   c.proposedCache,
+		ChainConf:       c.chainConf,
+		MsgBus:          c.msgBus,
+		Subscriber:      c.subscriber,
+		Verifier:        c.BlockVerifier,
+		StoreHelper:     c.storeHelper,
+		TxFilter:        c.txFilter,
+	}
+	return common.NewBlockCommitter(committerConfig, c.log)
 }
 
 // OnQuit called when quit subsribe message from message bus
@@ -172,6 +237,24 @@ func (c *CoreEngine) OnMessage(message *msgbus.Message) {
 				c.BlockVerifier.VerifyBlock(block, protocol.CONSENSUS_VERIFY) //nolint: errcheck
 			}
 		}()
+	case msgbus.VerifyBlockWithRWSet:
+		go func() {
+			if proposal, ok := message.Payload.(*tbftpb.Proposal); ok {
+				block := proposal.Block
+				rwSetMap := proposal.TxsRwSet
+				rwSets := make([]*commonpb.TxRWSet, len(rwSetMap))
+
+				if rwSetMap == nil {
+					c.BlockVerifier.VerifyBlock(block, protocol.CONSENSUS_VERIFY) //nolint: errcheck
+
+				} else {
+					for index, tx := range block.Txs {
+						rwSets[index] = rwSetMap[tx.Payload.TxId]
+					}
+					c.BlockVerifier.VerifyBlockWithRwSets(block, rwSets, protocol.CONSENSUS_VERIFY) //nolint: errcheck
+				}
+			}
+		}()
 	case msgbus.CommitBlock:
 		go func() {
 			if block, ok := message.Payload.(*commonpb.Block); ok {
@@ -194,6 +277,29 @@ func (c *CoreEngine) OnMessage(message *msgbus.Message) {
 			})
 			c.blockProposer.OnReceiveRwSetVerifyFailTxs(signal)
 		}
+
+	case msgbus.ChainConfig:
+		dataStr, ok := message.Payload.([]string)
+		if !ok {
+			return
+		}
+		dataBytes, err := hex.DecodeString(dataStr[0])
+		if err != nil {
+			c.log.Warn(err)
+			return
+		}
+		chainConfig := &chainConfConfig.ChainConfig{}
+		err = proto.Unmarshal(dataBytes, chainConfig)
+		if err != nil {
+			c.log.Warn(err)
+			return
+		}
+
+		// update chain config
+		c.updateChinConfig(chainConfig)
+
+		c.log.Infof("[BlockVerifierImpl] receive msg, topic: %s, blockConfUpdate[%v], ScheduleConfUpdate[%v]",
+			message.Topic.String(), c.chainConf.ChainConfig().Block, c.chainConf.ChainConfig().Scheduler)
 	}
 }
 
@@ -201,9 +307,11 @@ func (c *CoreEngine) OnMessage(message *msgbus.Message) {
 func (c *CoreEngine) Start() {
 	c.msgBus.Register(msgbus.ProposeState, c)
 	c.msgBus.Register(msgbus.VerifyBlock, c)
+	c.msgBus.Register(msgbus.VerifyBlockWithRWSet, c)
 	c.msgBus.Register(msgbus.CommitBlock, c)
 	c.msgBus.Register(msgbus.TxPoolSignal, c)
 	c.msgBus.Register(msgbus.ConsensusFailTxs, c)
+	c.msgBus.Register(msgbus.ChainConfig, c)
 	//c.msgBus.Register(msgbus.BuildProposal, c)
 	c.blockProposer.Start() //nolint: errcheck
 }
@@ -228,4 +336,69 @@ func (c *CoreEngine) GetBlockVerifier() protocol.BlockVerifier {
 
 func (c *CoreEngine) GetMaxbftHelper() protocol.MaxbftHelper {
 	return c.MaxbftHelper
+}
+
+func (c *CoreEngine) updateChinConfig(chainConfig *chainConfConfig.ChainConfig) {
+	c.chainConf.ChainConfig().Block = chainConfig.Block
+	c.chainConf.ChainConfig().Scheduler = chainConfig.Scheduler
+	c.chainConf.ChainConfig().AuthType = strings.ToLower(chainConfig.AuthType) // avoid not change to lower when need to new singer
+
+	// update tx parameters ' max length
+	protocol.ParametersValueMaxLength = chainConfig.Block.TxParameterSize * 1024 * 1024
+	if chainConfig.Block.TxParameterSize <= 0 {
+		protocol.ParametersValueMaxLength = protocol.DefaultParametersValueMaxSize * 1024 * 1024
+	}
+
+	//todo: 直接用值判断。
+	if chainConfig.Scheduler != nil && (*c.currentScheduler).SchedulerType != (*chainConfig.Scheduler).SchedulerType &&
+		(*c.currentScheduler).AlgorithmType != (*chainConfig.Scheduler).AlgorithmType {
+		c.log.Infof("scheduler type update, new:%+v", *chainConfig.Scheduler)
+		var storeHelper conf.StoreHelper
+		if c.chainConf.ChainConfig().Contract.EnableSqlSupport {
+			storeHelper = common.NewSQLStoreHelper(c.chainConf.ChainConfig().ChainId)
+		} else {
+			storeHelper = common.NewKVStoreHelper(c.chainConf.ChainConfig().ChainId)
+		}
+
+		// update scheduler
+		var schedulerFactory scheduler.TxSchedulerFactory
+		c.txScheduler = schedulerFactory.NewTxScheduler(c.vmMgr, c.chainConf, storeHelper, c.ledgerCache, c.ac)
+
+		// stop old proposer
+
+		err := c.blockProposer.Stop()
+		if err != nil {
+			//todo: add c.log.Panicf,带上error
+			c.log.Errorf("proposer stop  failed: %v", err)
+			c.log.Panicf("proposer stop  failed: %v", err)
+			return
+		}
+		//NOTE: 讨论启停逻辑
+		c.blockProposer, err = c.createBlockProposer()
+		if err != nil {
+			//todo: add c.log.Panicf,带上error
+			c.log.Errorf("update block proposer failed: %v", err)
+			c.log.Panicf("update block proposer failed: %v", err)
+			return
+		}
+
+		err = c.updateBlockVerifier()
+		if err != nil {
+			//todo: add c.log.Panicf,带上error
+			c.log.Errorf("update block verifier failed: %v", err)
+			c.log.Panicf("update block verifier failed: %v", err)
+			return
+		}
+
+		c.currentScheduler = chainConfig.Scheduler
+
+		// start new proposer
+		err = c.blockProposer.Start()
+		if err != nil {
+			//todo: add c.log.Panicf,带上error
+			c.log.Errorf("proposer start  failed: %v", err)
+			c.log.Panicf("proposer start  failed: %v", err)
+			return
+		}
+	}
 }

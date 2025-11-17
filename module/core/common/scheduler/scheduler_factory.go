@@ -7,18 +7,20 @@ SPDX-License-Identifier: Apache-2.0
 package scheduler
 
 import (
-	"chainmaker.org/chainmaker/common/v2/monitor"
 	"fmt"
 	"regexp"
 	"sync"
 
-	"chainmaker.org/chainmaker-go/module/accesscontrol"
-	"chainmaker.org/chainmaker/pb-go/v2/config"
-
-	"chainmaker.org/chainmaker-go/module/core/provider/conf"
+	"chainmaker.org/chainmaker/common/v2/monitor"
 	"chainmaker.org/chainmaker/localconf/v2"
 	"chainmaker.org/chainmaker/logger/v2"
+	"chainmaker.org/chainmaker/pb-go/v2/config"
 	"chainmaker.org/chainmaker/protocol/v2"
+
+	"chainmaker.org/chainmaker-go/module/accesscontrol"
+	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/reorder"
+	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/serial"
+	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 )
 
 type TxSchedulerFactory struct {
@@ -28,10 +30,29 @@ type TxSchedulerFactory struct {
 func (sf TxSchedulerFactory) NewTxScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
 	storeHelper conf.StoreHelper, ledgerCache protocol.LedgerCache,
 	ac protocol.AccessControlProvider) protocol.TxScheduler {
+
+	scheduler := chainConf.ChainConfig().Scheduler
+	if scheduler == nil {
+		return newTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac)
+	}
+
 	if chainConf.ChainConfig().Scheduler != nil && chainConf.ChainConfig().Scheduler.EnableEvidence {
 		return newTxSchedulerEvidence(vmMgr, chainConf, storeHelper, ledgerCache)
 	}
-	return newTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac)
+
+	switch scheduler.SchedulerType {
+	case config.SchedulerType_DAG:
+		if scheduler.AlgorithmType == config.AlgorithmType_RANDOM {
+			return newTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac)
+		}
+	case config.SchedulerType_DETERMINISTIC:
+		if scheduler.AlgorithmType == config.AlgorithmType_SERIAL {
+			return serial.NewSerialScheduler(vmMgr, chainConf, ac)
+		} else if scheduler.AlgorithmType == config.AlgorithmType_REORDER {
+			return reorder.NewReorderTxScheduler(vmMgr, chainConf, storeHelper, ac)
+		}
+	}
+	panic(fmt.Sprintf("invaild scheduler config  %+v", scheduler))
 }
 
 // newTxScheduler building a regular transaction scheduler

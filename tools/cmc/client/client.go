@@ -105,6 +105,9 @@ var (
 
 	multiSignEnableManualRun bool
 
+	schedulerType uint32
+	algorithmType uint32
+
 	txRequest string
 )
 
@@ -183,8 +186,10 @@ const (
 	flagRespResultToString               = "result-to-string"
 	flagMultiSignEnableManualRun         = "multi-sign-enable-manual-run"
 
+	flagScheduleType  = "scheduler-type"
+	flagAlgorithmType = "algorithm-type"
 	// test
-	flagTxRequest						 = "tx-request"
+	flagTxRequest = "tx-request"
 )
 
 // ClientCMD new client series command
@@ -274,6 +279,8 @@ func init() {
 		"block timestamp verify, use former value if flag not set")
 	flags.Uint32Var(&blockTimeout, flagBlockTimeout, 30,
 		"block timestamp timeout, use former value if flag not set")
+	flags.Uint32Var(&schedulerType, flagScheduleType, 0, "scheduler type")
+	flags.Uint32Var(&algorithmType, flagAlgorithmType, 0, "algorithm type")
 	flags.StringVar(&nodeOrgId, flagNodeOrgId, "", "specify node org id")
 	flags.StringVar(&nodeIdOld, flagNodeIdOld, "", "specify old node id")
 	flags.StringVar(&nodeId, flagNodeId, "", "specify node id(which will be added or update to")

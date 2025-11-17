@@ -29,8 +29,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var ModuleNameCore = "Core"
-
 // BlockVerifierImpl implements BlockVerifier interface.
 // Verify block and transactions.
 // nolint: structcheck,unused
@@ -55,23 +53,6 @@ type BlockVerifierImpl struct {
 
 	metricBlockVerifyTime *prometheus.HistogramVec // metrics monitor
 	netService            protocol.NetService
-}
-
-type BlockVerifierConfig struct {
-	ChainId         string
-	MsgBus          msgbus.MessageBus
-	SnapshotManager protocol.SnapshotManager
-	BlockchainStore protocol.BlockchainStore
-	LedgerCache     protocol.LedgerCache
-	TxScheduler     protocol.TxScheduler
-	ProposedCache   protocol.ProposalCache
-	ChainConf       protocol.ChainConf
-	AC              protocol.AccessControlProvider
-	TxPool          protocol.TxPool
-	VmMgr           protocol.VmManager
-	StoreHelper     conf.StoreHelper
-	NetService      protocol.NetService
-	TxFilter        protocol.TxFilter
 }
 
 func NewBlockVerifier(config BlockVerifierConfig, log protocol.Logger) (protocol.BlockVerifier, error) {
@@ -125,8 +106,9 @@ func NewBlockVerifier(config BlockVerifierConfig, log protocol.Logger) (protocol
 // VerifyBlockSync only maxbft use this method
 func (v *BlockVerifierImpl) VerifyBlockSync(block *commonpb.Block,
 	mode protocol.VerifyMode) (*consensuspb.VerifyResult, error) {
-	//TODO implement me
-	panic("only maxbft use this method")
+
+	// 目前tbft只有确定性调度才会调这里，直接返回nil即可
+	return nil, nil
 }
 
 // VerifyBlock to check if block is valid
@@ -222,7 +204,10 @@ func (v *BlockVerifierImpl) VerifyBlock(block *commonpb.Block, mode protocol.Ver
 	// verify success, cache block and read write set
 	// solo need this，too！！！
 	v.log.Debugf("set proposed block(%d,%x)", newBlock.Header.BlockHeight, newBlock.Header.BlockHash)
-	if err = v.proposalCache.SetProposedBlock(newBlock, txRWSetMap, contractEventMap, false); err != nil {
+	if err = v.proposalCache.SetProposedBlock(&protocol.ProposalData{
+		Block: newBlock, TxRwSetMap: txRWSetMap, ContractEventMap: contractEventMap},
+		false); err != nil {
+
 		return err
 	}
 
@@ -323,7 +308,9 @@ func (v *BlockVerifierImpl) VerifyBlockWithRwSets(block *commonpb.Block,
 	// verify success, cache block and read write set
 	// solo need this，too！！！
 	v.log.Debugf("set proposed block(%d,%x)", newBlock.Header.BlockHeight, newBlock.Header.BlockHash)
-	if err = v.proposalCache.SetProposedBlock(newBlock, txRWSetMap, contractEventMap, false); err != nil {
+	if err = v.proposalCache.SetProposedBlock(&protocol.ProposalData{
+		Block: newBlock, TxRwSetMap: txRWSetMap, ContractEventMap: contractEventMap},
+		false); err != nil {
 		return err
 	}
 
@@ -445,28 +432,6 @@ func (v *BlockVerifierImpl) verifyVoteSig(block *commonpb.Block) error {
 	return consensus.VerifyBlockSignatures(v.chainConf, v.ac, v.blockchainStore, block, v.ledgerCache)
 }
 
-func parseVerifyResult(block *commonpb.Block, isValid bool,
-	txsRwSet map[string]*commonpb.TxRWSet, rwSetVerifyFailTxs *common.RwSetVerifyFailTx) *consensuspb.VerifyResult {
-	verifyResult := &consensuspb.VerifyResult{
-		VerifiedBlock: block,
-		TxsRwSet:      txsRwSet,
-	}
-	if isValid {
-		verifyResult.Code = consensuspb.VerifyResult_SUCCESS
-		verifyResult.Msg = "OK"
-	} else {
-		verifyResult.Msg = "FAIL"
-		verifyResult.Code = consensuspb.VerifyResult_FAIL
-		if rwSetVerifyFailTxs != nil {
-			verifyResult.RwSetVerifyFailTxs = &consensuspb.RwSetVerifyFailTxs{
-				TxIds:       rwSetVerifyFailTxs.TxIds,
-				BlockHeight: rwSetVerifyFailTxs.BlockHeight,
-			}
-		}
-	}
-	return verifyResult
-}
-
 func (v *BlockVerifierImpl) cutBlocks(blocksToCut []*commonpb.Block, blockToKeep *commonpb.Block) {
 	if common.TxPoolType == batch.TxPoolType {
 		err := v.cutBlocksForBatchPool(blocksToCut, blockToKeep)
@@ -539,9 +504,9 @@ func (v *BlockVerifierImpl) cutBlocksForBatchPool(blocksToCut []*commonpb.Block,
 // verifyRepeat to check if the block has verified before
 func (v *BlockVerifierImpl) verifyRepeat(block *commonpb.Block, startTick int64,
 	mode protocol.VerifyMode) (isRepeat bool) {
-	b, txRwSet, _ := v.proposalCache.GetProposedBlock(block)
+	proposedData := v.proposalCache.GetProposedBlock(block)
 	// Return not repeat if SQL is not enabled or if it is not solo
-	if b == nil {
+	if proposedData == nil {
 		return false
 	}
 	isSqlDb := v.chainConf.ChainConfig().Contract.EnableSqlSupport
@@ -551,7 +516,7 @@ func (v *BlockVerifierImpl) verifyRepeat(block *commonpb.Block, startTick int64,
 		v.log.Infof("verify success repeat [%d](%x), total: %d", block.Header.BlockHeight, block.Header.BlockHash, elapsed)
 		if protocol.CONSENSUS_VERIFY == mode {
 			// consensus mode, publish verify result to message bus
-			v.msgBus.Publish(msgbus.VerifyResult, parseVerifyResult(block, true, txRwSet, nil))
+			v.msgBus.Publish(msgbus.VerifyResult, parseVerifyResult(block, true, proposedData.TxRwSetMap, nil))
 		}
 		lastBlock, _ := v.proposalCache.GetProposedBlockByHashAndHeight(
 			block.Header.PreBlockHash, block.Header.BlockHeight-1)

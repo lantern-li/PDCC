@@ -157,22 +157,32 @@ func TestShouldPropose(t *testing.T) {
 	ledgerCache.SetLastCommittedBlock(b0)
 
 	b := createNewTestBlock(1)
-	proposedCache.SetProposedBlock(b, nil, nil, false)
+	proposedCache.SetProposedBlock(&protocol.ProposalData{
+		Block:            b,
+		TxRwSetMap:       nil,
+		ContractEventMap: nil,
+	}, false)
 	require.Nil(t, proposedCache.GetSelfProposedBlockAt(1))
-	b1, _, _ := proposedCache.GetProposedBlock(b)
-	require.NotNil(t, b1)
+	proposalData1 := proposedCache.GetProposedBlock(b)
+	require.NotNil(t, proposalData1)
+	require.NotNil(t, proposalData1.Block)
 
 	b2 := createNewTestBlock(1)
 	b2.Header.BlockHash = nil
-	proposedCache.SetProposedBlock(b2, nil, nil, true)
+	proposedCache.SetProposedBlock(&protocol.ProposalData{
+		Block:            b2,
+		TxRwSetMap:       nil,
+		ContractEventMap: nil,
+	}, true)
 
 	require.NotNil(t, proposedCache.GetSelfProposedBlockAt(1))
 	ledgerCache.SetLastCommittedBlock(b2)
 
-	b3, _, _ := proposedCache.GetProposedBlock(b2)
-	require.NotNil(t, b3)
+	proposalData3 := proposedCache.GetProposedBlock(b2)
+	require.NotNil(t, proposalData3)
+	require.NotNil(t, proposalData3.Block)
 
-	proposedCache.SetProposedAt(b3.Header.BlockHeight)
+	proposedCache.SetProposedAt(proposalData3.Block.Header.BlockHeight)
 }
 
 /*
@@ -213,19 +223,29 @@ func TestShouldProposeByMaxBFT(t *testing.T) {
 	require.False(t, blockProposer.shouldProposeByMaxBFT(b0.Header.BlockHeight, b0.Header.PreBlockHash))
 
 	b := createNewTestBlock(1)
-	proposedCache.SetProposedBlock(b, nil, nil, false)
+	proposedCache.SetProposedBlock(&protocol.ProposalData{
+		Block:            b,
+		TxRwSetMap:       nil,
+		ContractEventMap: nil,
+	}, false)
 	require.Nil(t, proposedCache.GetSelfProposedBlockAt(1))
-	b1, _, _ := proposedCache.GetProposedBlock(b)
-	require.NotNil(t, b1)
+	proposalData1 := proposedCache.GetProposedBlock(b)
+	require.NotNil(t, proposalData1)
+	require.NotNil(t, proposalData1.Block)
 
 	b2 := createNewTestBlock(1)
 	b2.Header.BlockHash = nil
-	proposedCache.SetProposedBlock(b2, nil, nil, true)
+	proposedCache.SetProposedBlock(&protocol.ProposalData{
+		Block:            b2,
+		TxRwSetMap:       nil,
+		ContractEventMap: nil,
+	}, true)
 	require.NotNil(t, proposedCache.GetSelfProposedBlockAt(1))
 	require.True(t, blockProposer.shouldProposeByMaxBFT(b2.Header.BlockHeight, b0.Header.BlockHash))
 
-	b3, _, _ := proposedCache.GetProposedBlock(b2)
-	require.NotNil(t, b3)
+	proposalData3 := proposedCache.GetProposedBlock(b2)
+	require.NotNil(t, proposalData3)
+	require.NotNil(t, proposalData3.Block)
 
 }
 

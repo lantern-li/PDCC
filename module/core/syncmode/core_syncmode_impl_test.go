@@ -148,7 +148,7 @@ func TestNewCoreEngine(t *testing.T) {
 					VmMgr:           cf.VmMgr,
 					StoreHelper:     cf.StoreHelper,
 				}
-				core.BlockVerifier, err = verifier.NewBlockVerifier(verifierConfig, cf.Log)
+				core.BlockVerifier, err = verifier.NewBlockVerifierFactory(verifierConfig, cf.Log)
 				if err != nil {
 					t.Error(err)
 					return nil
@@ -425,7 +425,7 @@ func TestCoreEngine_GetBlockCommitter(t *testing.T) {
 
 func TestCoreEngine_GetBlockVerifier(t *testing.T) {
 	type fields struct {
-		BlockVerifier protocol.BlockVerifier
+		BlockVerifier *verifier.BlockVerifierFactory
 	}
 	tests := []struct {
 		name   string

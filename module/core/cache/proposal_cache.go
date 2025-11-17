@@ -67,10 +67,9 @@ func (pc *ProposalCache) ClearProposedBlockAt(height uint64) {
 }
 
 // GetProposedBlock get proposed block with specific block hash in current consensus height.
-func (pc *ProposalCache) GetProposedBlock(b *commonpb.Block) (
-	*commonpb.Block, map[string]*commonpb.TxRWSet, map[string][]*commonpb.ContractEvent) {
+func (pc *ProposalCache) GetProposedBlock(b *commonpb.Block) *protocol.ProposalData {
 	if b == nil || b.Header == nil {
-		return nil, nil, nil
+		return nil
 	}
 	height := b.Header.BlockHeight
 	fingerPrint := utils.CalcBlockFingerPrint(b)
@@ -79,9 +78,13 @@ func (pc *ProposalCache) GetProposedBlock(b *commonpb.Block) (
 	defer pc.rwMu.RUnlock()
 
 	if proposedBlock, ok := pc.lastProposedBlock[height][string(fingerPrint)]; ok {
-		return proposedBlock.block, proposedBlock.rwSetMap, proposedBlock.contractEventInfoMap
+		return &protocol.ProposalData{
+			Block:            proposedBlock.block,
+			TxRwSetMap:       proposedBlock.rwSetMap,
+			ContractEventMap: proposedBlock.contractEventInfoMap,
+		}
 	}
-	return nil, nil, nil
+	return nil
 }
 
 // GetProposedBlocksAt get all proposed blocks at a specific height.
@@ -120,12 +123,17 @@ func (pc *ProposalCache) GetProposedBlockByHashAndHeight(hash []byte, height uin
 }
 
 // SetProposedBlock set porposed block in current consensus height, after it's generated or verified.
-func (pc *ProposalCache) SetProposedBlock(b *commonpb.Block, rwSetMap map[string]*commonpb.TxRWSet,
-	contractEventMap map[string][]*commonpb.ContractEvent, selfPropose bool) error {
-	if b == nil || b.Header == nil {
+func (pc *ProposalCache) SetProposedBlock(proposalData *protocol.ProposalData, selfPropose bool) error {
+	if proposalData == nil || proposalData.Block == nil {
 		return nil
 	}
-	height := b.Header.BlockHeight
+
+	block := proposalData.Block
+	if block.Header == nil {
+		return nil
+	}
+
+	height := block.Header.BlockHeight
 	currentHeight, err := pc.ledgerCache.CurrentHeight()
 	if err != nil {
 		return err
@@ -134,11 +142,11 @@ func (pc *ProposalCache) SetProposedBlock(b *commonpb.Block, rwSetMap map[string
 		// this height has committed, ignore this block
 		return fmt.Errorf("block with invalid height, currentHeight: %d, blockHeight: %d", currentHeight, height)
 	}
-	fingerPrint := utils.CalcBlockFingerPrint(b)
+	fingerPrint := utils.CalcBlockFingerPrint(block)
 	bs := &blockProposal{
-		block:                b,
-		rwSetMap:             rwSetMap,
-		contractEventInfoMap: contractEventMap,
+		block:                block,
+		rwSetMap:             proposalData.TxRwSetMap,
+		contractEventInfoMap: proposalData.ContractEventMap,
 		isSelfProposed:       selfPropose,
 		hasProposedThisRound: true,
 	}
@@ -152,7 +160,7 @@ func (pc *ProposalCache) SetProposedBlock(b *commonpb.Block, rwSetMap map[string
 	pc.logger.DebugDynamic(func() string {
 		return fmt.Sprintf(
 			"set proposed block, height: %d, fingerPrint:%s, hash: %x",
-			b.Header.BlockHeight, string(fingerPrint), b.Header.BlockHash)
+			block.Header.BlockHeight, string(fingerPrint), block.Header.BlockHash)
 	})
 
 	return nil

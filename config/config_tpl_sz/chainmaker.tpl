@@ -173,6 +173,8 @@ txpool:
   # Interval of creating a transaction batch, for normal and batch tx_pool, in millisecond(ms).
   batch_create_timeout: 1000
 
+  enable_tx_turbo: true
+
  # RPC service setting
 rpc:
   # RPC type, can only be grpc now
@@ -243,6 +245,7 @@ rpc:
   # RPC server max send/receive message size in MB
   max_send_msg_size: 100
   max_recv_msg_size: 100
+  enable_tx_turbo: true
 
 tx_filter:
   # default(store) 0; bird's nest 1; map 2; 3 sharding bird's nest

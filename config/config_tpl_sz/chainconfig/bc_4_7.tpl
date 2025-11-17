@@ -113,7 +113,8 @@ account_config:
 # scheduler:
   # Enable the evidence scheduler or not.
   # enable_evidence: false
-
+  # scheduler_type: deterministic
+  # algorithm_type: reorder
 # Consensus settings
 consensus:
   # Consensus type

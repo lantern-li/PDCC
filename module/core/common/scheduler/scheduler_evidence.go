@@ -27,6 +27,12 @@ func (ts *TxSchedulerEvidence) SimulateWithDag(block *commonPb.Block,
 	return ts.delegate.SimulateWithDag(block, snapshot)
 }
 
+// SimulateWithDagAndRWSet based on the dag in the block, perform scheduling and execution transactions
+func (ts *TxSchedulerEvidence) SimulateWithDagAndRWSet(block *commonPb.Block, rwSet []*commonPb.TxRWSet, snapshot protocol.Snapshot) (
+	map[string]*commonPb.TxRWSet, map[string]*commonPb.Result, error) {
+	return ts.delegate.SimulateWithDag(block, snapshot)
+}
+
 func (ts *TxSchedulerEvidence) Halt() {
 	ts.delegate.Halt()
 }

@@ -137,7 +137,15 @@ account_config:
 # scheduler:
   # Enable the evidence scheduler or not.
   # enable_evidence: false
-
+  # Scheduler type:(default=0):
+  # 0: DAG - Proposer schedules transactions and generates DAG using random scheduling algorithm; consensus nodes execute transactions according to DAG order (DAG-based Order-Execute)
+  # 1: Deterministic - All consensus nodes schedule and execute transactions in parallel using deterministic scheduling algorithm (Deterministic Order-Execute)
+  # type: 0
+  # Scheduling algorithm (when type=0，RANDOM ;type=1, SERIAL or REORDER，default=0):
+  # 0: RANDOM - Optimistic parallel execution using random-generated DAG (non-deterministic, highest performance)
+  # 1: SERIAL - Sequential execution in deterministic order (fully deterministic, lower performance)
+  # 2: REORDER - DAG-based deterministic reordering for parallel execution (deterministic with better performance)
+  # algorithm: 0
 # Consensus settings
 consensus:
   # Consensus type

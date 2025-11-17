@@ -599,6 +599,120 @@ func (vt *VerifierTx) verifyTxWithRWSet(txs []*commonpb.Transaction,
 	return txHashes, nil
 }
 
+// verifierTxsWithoutResult verify transactions in block without result
+// include if transaction is double spent, transaction signature
+func (vt *VerifierTx) verifierTxsWithoutResult(block *commonpb.Block, mode protocol.VerifyMode, verifyMode uint8) (
+	[][]byte, []*commonpb.Transaction, *RwSetVerifyFailTx, error) {
+
+	verifyBatch := utils.DispatchTxVerifyTask(block.Txs)
+	resultTasks := make(map[int]VerifyBlockBatch)
+	stats := make(map[int]*VerifyStat)
+	var resultMu sync.Mutex
+	var wg sync.WaitGroup
+	waitCount := len(verifyBatch)
+	wg.Add(waitCount)
+	txIds := utils.GetTxIds(block.Txs)
+
+	poolStart := utils.CurrentTimeMillisSeconds()
+	txsRet := make(map[string]*commonpb.Transaction)
+	if !IfOpenConsensusMessageTurbo(vt.chainConf) {
+		if TxPoolType != batch.TxPoolType {
+			txsRet, _ = vt.txPool.GetTxsByTxIds(txIds)
+		}
+	}
+	poolLasts := utils.CurrentTimeMillisSeconds() - poolStart
+
+	startTicker := utils.CurrentTimeMillisSeconds()
+	for i := 0; i < waitCount; i++ {
+		index := i
+		go func() {
+			defer wg.Done()
+			txs := verifyBatch[index]
+			stat := &VerifyStat{
+				TotalCount: len(txs),
+			}
+			txHashes1, newAddTxs, err := vt.verifyTxWithoutResult(txs, txsRet, stat, block, mode, verifyMode)
+			if err != nil {
+				vt.log.Errorf("verify tx failed, block height:%d, err:%v", block.Header.BlockHeight, err)
+				return
+			}
+			resultMu.Lock()
+			defer resultMu.Unlock()
+			resultTasks[index] = VerifyBlockBatch{
+				txs:       txs,
+				txHash:    txHashes1,
+				newAddTxs: newAddTxs,
+			}
+			stats[index] = stat
+		}()
+	}
+	wg.Wait()
+	concurrentLasts := utils.CurrentTimeMillisSeconds() - startTicker
+
+	resultStart := utils.CurrentTimeMillisSeconds()
+	txHashes, txNewAdd, err := TxVerifyResultsMerge(resultTasks, verifyBatch)
+	if err != nil {
+		return txHashes, txNewAdd, nil, err
+	}
+	resultLasts := utils.CurrentTimeMillisSeconds() - resultStart
+
+	for i, stat := range stats {
+		if stat != nil {
+			vt.log.Debugf(
+				"verify stat (index:%d,sigcount:%d/%d,db:%d,sig:%d,other:%d,total:%d) "+
+					"txfilter (fp:%d,exists:%d,fpdb:%d)",
+				i, stat.SigLasts, stat.TotalCount, stat.DBLasts, stat.SigLasts, stat.OthersLasts, concurrentLasts,
+				stat.FpCount, stat.FilterCosts, stat.DbCosts,
+			)
+		}
+	}
+
+	total, sig, db, other, fp, filterCosts, dbCosts, totalFilterCosts, totalDbCosts := calStatsAvg(stats)
+
+	vt.log.Infof("verify txs,height: [%d] (count:%v,pool:%d,txVerify:%d,results:%d) "+
+		"avg(sigcount:%d/%d,db:%d,sig:%d,other:%d) "+
+		"filter total(fp:%d,exists:%d,fpdb:%d) filter avg(fp:%d,exists:%d,fpdb:%d)",
+		block.Header.BlockHeight, block.Header.TxCount, poolLasts, concurrentLasts, resultLasts,
+		sig, total, db, sig, other,
+		fp, totalFilterCosts, totalDbCosts,
+		fp, filterCosts, dbCosts,
+	)
+	return txHashes, txNewAdd, nil, nil
+}
+
+func (vt *VerifierTx) verifyTxWithoutResult(txs []*commonpb.Transaction, txsRet map[string]*commonpb.Transaction,
+	stat *VerifyStat, block *commonpb.Block, mode protocol.VerifyMode, verifyMode uint8) (
+	[][]byte, []*commonpb.Transaction, error) {
+	txHashes := make([][]byte, 0)
+	newAddTxs := make([]*commonpb.Transaction, 0) // tx that verified and not in txpool, need to be added to txpool
+
+	for _, tx := range txs {
+		// tx must in txpool when open consensus message turbo
+		if !IfOpenConsensusMessageTurbo(vt.chainConf) {
+			if err := ValidateTx(txsRet, tx, stat, newAddTxs, block,
+				vt.chainConf.ChainConfig().Consensus.Type,
+				vt.txFilter, vt.chainConf.ChainConfig().ChainId, vt.ac,
+				vt.proposalCache, mode, verifyMode, vt.block.Header.BlockVersion); err != nil {
+				return nil, nil, err
+			}
+		}
+
+		startOthersTicker := utils.CurrentTimeMillisSeconds()
+
+		hash, err := utils.CalcTxHashWithVersion(
+			vt.chainConf.ChainConfig().Crypto.Hash, tx, int(block.Header.BlockVersion))
+		if err != nil {
+			vt.log.Warnf("calc txhash error (tx:%s), %s", tx.Payload.TxId, err)
+			return nil, nil, err
+		}
+		txHashes = append(txHashes, hash)
+
+		stat.OthersLasts += utils.CurrentTimeMillisSeconds() - startOthersTicker
+	}
+
+	return txHashes, newAddTxs, nil
+}
+
 // ValidateTxRules validate Transactions and return remain Transactions and Transactions that
 // need to be removed
 func ValidateTxRules(filter protocol.TxFilter, txs []*commonpb.Transaction) (

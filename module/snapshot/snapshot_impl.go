@@ -67,6 +67,14 @@ type SnapshotImpl struct {
 	txRoot    []byte
 	dagHash   []byte
 	rwSetHash []byte
+
+	txLock    sync.Mutex // 交易读写kv锁
+	txLockLog sync.Map   // txId => 交易读写锁（ps: 与txLockMap中的锁是同一把锁)
+}
+
+type txLocker struct {
+	sync.Mutex
+	lockerName string
 }
 
 // NewQuerySnapshot create a snapshot for query tx
@@ -192,6 +200,85 @@ func (s *SnapshotImpl) GetTxRWSetTable() []*commonPb.TxRWSet {
 	return s.txRWSetTable
 }
 
+// Lock lock snapshot with locker name
+func (s *SnapshotImpl) Lock(lockerName, txId string) error {
+	/**
+	1. 根据lockerName检查锁是否存在
+	2. 根据txId判断是否正在锁中
+	3. 对于locker进行加锁
+	4. GetKey()
+	*/
+
+	// 获取合约关键字锁（如果不存在，则构造）
+	//txLockMapLockStartStick := utils.CurrentTimeMillisSeconds()
+	//s.txLockMapLock.RLock()
+	//locker, ok := s.txLockMap[lockerName]
+	//s.txLockMapLock.RUnlock()
+	//txLockMapLockCost := utils.CurrentTimeMillisSeconds() - txLockMapLockStartStick
+
+	//newTxLockMapStartTick := utils.CurrentTimeMillisSeconds()
+	//if !ok {
+	//	s.txLockMapLock.Lock()
+	//	locker, ok = s.txLockMap[lockerName] // Double-Checked Locking
+	//	if !ok {
+	//		locker = &txLocker{
+	//			lockerName: lockerName,
+	//		}
+	//		s.txLockMap[lockerName] = locker
+	//	}
+	//	s.txLockMapLock.Unlock()
+	//}
+	//newTxLockMapCost := utils.CurrentTimeMillisSeconds() - newTxLockMapStartTick
+
+	// 检查当前交易是否正在使用锁,如果未使用，则合约关键字锁进行加锁操作，然后记录txid
+	_, ok := s.txLockLog.LoadOrStore(txId, struct{}{}) // 这么设计是由于目前只允许一个交易一个locker
+	//getLockStartTick := utils.CurrentTimeMillisSeconds()
+	if !ok {
+		s.txLock.Lock() // ps: 这笔交易在apply时才进行解锁操作。
+	}
+	//getLockCost := utils.CurrentTimeMillisSeconds() - getLockStartTick
+
+	//s.log.DebugDynamic(func() string {
+	//	return fmt.Sprintf("snapshot lock success[txId:%s, txLockMapLockCost:%v, newTxLockMapCost:%v, getLockCost:%v]",
+	//		txId, txLockMapLockCost, newTxLockMapCost, getLockCost)
+	//})
+
+	return nil
+}
+
+// GetKeyWithLock from snapshot with lock
+func (s *SnapshotImpl) GetKeyWithLock(txExecSeq int, contractName, lockerName, txId string, key []byte) ([]byte, error) {
+	s.log.DebugDynamic(func() string {
+		return fmt.Sprintf("GetKeyWithLock contractName:%s, lockerName:%s, txId:%s, height:%d",
+			contractName, lockerName, txId, s.blockHeight)
+	})
+
+	//getLockStartTick := utils.CurrentTimeMillisSeconds()
+	err := s.Lock(lockerName, txId)
+	if err != nil {
+		s.log.Warnf("snapshot GetKeyWithLock fail[contract:%s, txid:%s, lock:%s]",
+			contractName, txId, lockerName)
+		return nil, err
+	}
+	//getLockCost := utils.CurrentTimeMillisSeconds() - getLockStartTick
+
+	//getKeyStartTick := utils.CurrentTimeMillisSeconds()
+	v, err := s.GetKey(txExecSeq, contractName, key)
+	if err != nil {
+		s.log.Warnf("snapshot GetKeyWithLock fail[contract:%s, txid:%s, lock:%s]",
+			contractName, txId, lockerName)
+		return nil, err
+	}
+	//getKeyCost := utils.CurrentTimeMillisSeconds() - getKeyStartTick
+	//
+	s.log.DebugDynamic(func() string {
+		return fmt.Sprintf("GetKeyWithLock success[contractName:%s, lockerName:%s, txId:%s, height:%d]",
+			contractName, lockerName, txId, s.blockHeight)
+	})
+
+	return v, nil
+}
+
 // GetKey from snapshot
 func (s *SnapshotImpl) GetKey(txExecSeq int, contractName string, key []byte) ([]byte, error) {
 	// get key before txExecSeq
@@ -262,6 +349,35 @@ func (s *SnapshotImpl) GetKeys(txExecSeq int, keys []*vmPb.BatchKey) ([]*vmPb.Ba
 		return nil, err
 	}
 	return append(objects, append(value, append(readSetValues, writeSetValues...)...)...), nil
+}
+
+// GetKeysWithLock from snapshot
+func (s *SnapshotImpl) GetKeysWithLock(txExecSeq int, keys []*vmPb.BatchKey, lockerName, txId string) ([]*vmPb.BatchKey, error) {
+	s.log.DebugDynamic(func() string {
+		return fmt.Sprintf("GetKeysWithLock lockerName:%s, txId:%s, height:%d", lockerName, txId, s.blockHeight)
+	})
+	getLockStartTick := time.Now().UnixMicro()
+	err := s.Lock(lockerName, txId)
+	if err != nil {
+		s.log.Warnf("snapshot GetKeyWithLock fail[txid:%s, lock:%s]",
+			txId, lockerName)
+		return nil, err
+	}
+	getLockCost := time.Now().UnixMicro() - getLockStartTick
+	//
+
+	getKeysStartTick := time.Now().UnixMicro()
+	batchKeys, err := s.GetKeys(txExecSeq, keys)
+	getKeysCost := time.Now().UnixMicro() - getKeysStartTick
+
+	timeLog := fmt.Sprintf("GetKeysWithLock success[lockerName:%s, txId:%s, height:%d, lockCost:%d us, getKeysCost:%d us, currentTime:%d]",
+		lockerName, txId, s.blockHeight, getLockCost, getKeysCost, time.Now().UnixMicro())
+
+	s.log.DebugDynamic(func() string {
+		return timeLog
+	})
+
+	return batchKeys, err
 }
 
 // getObjects returns objects on given keys

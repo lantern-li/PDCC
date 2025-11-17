@@ -185,24 +185,34 @@ func TestShouldPropose(t *testing.T) {
 	require.True(t, blockProposer.shouldProposeByBFT(b0.Header.BlockHeight+1))
 
 	b := createNewTestBlock(1)
-	proposedCache.SetProposedBlock(b, nil, nil, false)
+	proposedCache.SetProposedBlock(&protocol.ProposalData{
+		Block:            b,
+		TxRwSetMap:       nil,
+		ContractEventMap: nil,
+	}, false)
 	require.Nil(t, proposedCache.GetSelfProposedBlockAt(1))
-	b1, _, _ := proposedCache.GetProposedBlock(b)
-	require.NotNil(t, b1)
+	proposalData1 := proposedCache.GetProposedBlock(b)
+	require.NotNil(t, proposalData1)
+	require.NotNil(t, proposalData1.Block)
 
 	b2 := createNewTestBlock(1)
 	b2.Header.BlockHash = nil
-	proposedCache.SetProposedBlock(b2, nil, nil, true)
+	proposedCache.SetProposedBlock(&protocol.ProposalData{
+		Block:            b2,
+		TxRwSetMap:       nil,
+		ContractEventMap: nil,
+	}, true)
 	require.False(t, blockProposer.shouldProposeByBFT(b2.Header.BlockHeight+1))
 	require.NotNil(t, proposedCache.GetSelfProposedBlockAt(1))
 	ledgerCache.SetLastCommittedBlock(b2)
 	require.True(t, blockProposer.shouldProposeByBFT(b2.Header.BlockHeight+1))
 
-	b3, _, _ := proposedCache.GetProposedBlock(b2)
-	require.NotNil(t, b3)
+	proposalData3 := proposedCache.GetProposedBlock(b2)
+	require.NotNil(t, proposalData3)
+	require.NotNil(t, proposalData3.Block)
 
-	proposedCache.SetProposedAt(b3.Header.BlockHeight)
-	require.False(t, blockProposer.shouldProposeByBFT(b3.Header.BlockHeight))
+	proposedCache.SetProposedAt(proposalData3.Block.Header.BlockHeight)
+	require.False(t, blockProposer.shouldProposeByBFT(proposalData3.Block.Header.BlockHeight))
 }
 
 func TestYieldGoRountine(t *testing.T) {
@@ -1157,7 +1167,11 @@ func TestProposeBlock(t *testing.T) {
 	b2 := createNewTestBlock(3)
 	proposedCache.EXPECT().GetSelfProposedBlockAt(b2.Header.BlockHeight).Return(b2).AnyTimes()
 	proposedCache.EXPECT().SetProposedAt(gomock.Any()).AnyTimes()
-	proposedCache.EXPECT().GetProposedBlock(b2).AnyTimes()
+	proposedCache.EXPECT().GetProposedBlock(b2).Return(&protocol.ProposalData{
+		Block:            b2,
+		TxRwSetMap:       nil,
+		ContractEventMap: nil,
+	}).AnyTimes()
 
 	c1 := &configpb.ChainConfig{
 		Block: &configpb.BlockConfig{

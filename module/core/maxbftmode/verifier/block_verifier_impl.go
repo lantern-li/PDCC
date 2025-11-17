@@ -262,7 +262,11 @@ func (v *BlockVerifierImpl) verifyBlock(block *commonpb.Block, mode protocol.Ver
 	// verify success, cache block and read write set
 	// solo need this，too！！！
 	v.log.Debugf("set proposed block(%d,%x)", newBlock.Header.BlockHeight, newBlock.Header.BlockHash)
-	if err = v.proposalCache.SetProposedBlock(newBlock, txRWSetMap, contractEventMap, false); err != nil {
+	if err = v.proposalCache.SetProposedBlock(&protocol.ProposalData{
+		Block:            newBlock,
+		TxRwSetMap:       txRWSetMap,
+		ContractEventMap: contractEventMap,
+	}, false); err != nil {
 		return nil, err
 	}
 
@@ -364,7 +368,11 @@ func (v *BlockVerifierImpl) VerifyBlockWithRwSets(block *commonpb.Block,
 	// verify success, cache block and read write set
 	// solo need this，too！！！
 	v.log.Debugf("set proposed block(%d,%x)", newBlock.Header.BlockHeight, newBlock.Header.BlockHash)
-	if err = v.proposalCache.SetProposedBlock(newBlock, txRWSetMap, contractEventMap, false); err != nil {
+	if err = v.proposalCache.SetProposedBlock(&protocol.ProposalData{
+		Block:            newBlock,
+		TxRwSetMap:       txRWSetMap,
+		ContractEventMap: contractEventMap,
+	}, false); err != nil {
 		return err
 	}
 	currSnapshot := v.snapshotManager.NewSnapshot(lastBlock, block)
@@ -605,27 +613,31 @@ func (v *BlockVerifierImpl) cutBlocksForBatchPool(blocksToCut []*commonpb.Block,
 // verifyRepeat to check if the block has verified before
 func (v *BlockVerifierImpl) verifyRepeat(block *commonpb.Block, startTick int64,
 	mode protocol.VerifyMode) (result *consensuspb.VerifyResult, isRepeat bool) {
-	b, txRwSet, _ := v.proposalCache.GetProposedBlock(block)
-	if b == nil {
+	proposalData := v.proposalCache.GetProposedBlock(block)
+	if proposalData == nil {
 		return nil, false
 	}
+
+	proposedBlock := proposalData.Block
+	txRwSet := proposalData.TxRwSetMap
 	if consensuspb.ConsensusType_SOLO != v.chainConf.ChainConfig().Consensus.Type ||
 		v.chainConf.ChainConfig().Contract.EnableSqlSupport {
 		elapsed := utils.CurrentTimeMillisSeconds() - startTick
 		// the block has verified before
-		v.log.Infof("verify success repeat [%d](%x), total: %d", b.Header.BlockHeight, b.Header.BlockHash, elapsed)
+		v.log.Infof("verify success repeat [%d](%x), total: %d",
+			proposedBlock.Header.BlockHeight, proposedBlock.Header.BlockHash, elapsed)
 		if protocol.CONSENSUS_VERIFY == mode {
 			// consensus mode, publish verify result to message bus
-			result = parseVerifyResult(b, true, txRwSet, nil)
+			result = parseVerifyResult(proposedBlock, true, txRwSet, nil)
 			v.msgBus.Publish(msgbus.VerifyResult, result)
 		}
 		lastBlock, _ := v.proposalCache.GetProposedBlockByHashAndHeight(
-			b.Header.PreBlockHash, b.Header.BlockHeight-1)
+			proposedBlock.Header.PreBlockHash, proposedBlock.Header.BlockHeight-1)
 		if lastBlock == nil {
 			v.log.Debugf(
 				"no pre-block be found, preHeight:%d, preBlockHash:%x",
-				b.Header.BlockHeight-1,
-				b.Header.PreBlockHash,
+				proposedBlock.Header.BlockHeight-1,
+				proposedBlock.Header.PreBlockHash,
 			)
 			return result, true
 		}

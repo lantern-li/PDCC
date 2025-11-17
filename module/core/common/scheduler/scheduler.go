@@ -11,14 +11,16 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"regexp"
 	"strconv"
 	"sync"
 	"time"
 
-	"chainmaker.org/chainmaker-go/module/core/common/coinbasemgr"
-	"chainmaker.org/chainmaker-go/module/core/provider/conf"
+	"github.com/gogo/protobuf/proto"
+	"github.com/hokaccha/go-prettyjson"
+	"github.com/panjf2000/ants/v2"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"chainmaker.org/chainmaker/common/v2/crypto"
 	"chainmaker.org/chainmaker/localconf/v2"
 	"chainmaker.org/chainmaker/pb-go/v2/accesscontrol"
@@ -26,13 +28,12 @@ import (
 	"chainmaker.org/chainmaker/pb-go/v2/consensus"
 	"chainmaker.org/chainmaker/pb-go/v2/syscontract"
 	"chainmaker.org/chainmaker/protocol/v2"
-	"chainmaker.org/chainmaker/utils/v2"
+	cutils "chainmaker.org/chainmaker/utils/v2"
 	"chainmaker.org/chainmaker/vm-native/v2/accountmgr"
 	"chainmaker.org/chainmaker/vm/v2"
 
-	"github.com/gogo/protobuf/proto"
-	"github.com/hokaccha/go-prettyjson"
-	"github.com/panjf2000/ants/v2"
+	"chainmaker.org/chainmaker-go/module/core/common/coinbasemgr"
+	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 )
 
 const (
@@ -44,6 +45,8 @@ const (
 	blockVersion2320       = uint32(2030200)
 	blockVersion2330       = uint32(2030300)
 	blockVersion2340       = uint32(2030400)
+
+	SpecialTxIndexAdditionalDataKey = "SpecialTxIndexAdditionalDataKey"
 )
 
 const (
@@ -84,6 +87,18 @@ type applyResult struct {
 	txIndex        int
 	isApplySuccess bool
 	applySize      int
+}
+
+type executeResult struct {
+	txId          string
+	runVmSuccess  bool
+	specialTxType protocol.ExecOrderTxType
+	txSimContext  protocol.TxSimContext
+}
+
+type runTxTask struct {
+	txIndex      int
+	txSimContext protocol.TxSimContext
 }
 
 // todo 确认一下
@@ -179,7 +194,7 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 		ts.log.Debugf("end prepare `SenderGroup` ")
 	}
 
-	blockFingerPrint := string(utils.CalcBlockFingerPrintWithoutTx(block))
+	blockFingerPrint := string(cutils.CalcBlockFingerPrintWithoutTx(block))
 	ts.VmManager.BeforeSchedule(blockFingerPrint, block.Header.BlockHeight)
 	defer ts.VmManager.AfterSchedule(blockFingerPrint, block.Header.BlockHeight)
 
@@ -611,7 +626,7 @@ func (ts *TxScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.
 			block.Header.BlockHeight, len(txIndexBatch), txBatchSize)
 	})
 
-	blockFingerPrint := string(utils.CalcBlockFingerPrintWithoutTx(block))
+	blockFingerPrint := string(cutils.CalcBlockFingerPrintWithoutTx(block))
 	ts.VmManager.BeforeSchedule(blockFingerPrint, block.Header.BlockHeight)
 	defer ts.VmManager.AfterSchedule(blockFingerPrint, block.Header.BlockHeight)
 
@@ -1160,7 +1175,7 @@ func (ts *TxScheduler) checkNativeFilter(blockVersion uint32, contractName, meth
 	ts.log.Debugf("checkNativeFilter => contractName = %s, method = %s", contractName, method)
 
 	// 用户合约，扣费
-	if !utils.IsNativeContract(contractName) {
+	if !cutils.IsNativeContract(contractName) {
 		return true
 	}
 
@@ -1322,13 +1337,13 @@ func getPayerFromContract(tx *commonPb.Transaction, snapshot protocol.Snapshot,
 	var err error
 
 	// 先从缓存查
-	_, pkBytes, _ = utils.GetContractMethodPayerPKFromAC(ac, contractName, method)
+	_, pkBytes, _ = cutils.GetContractMethodPayerPKFromAC(ac, contractName, method)
 	if pkBytes != nil {
 		return pkBytes, nil
 	}
 
 	// 缓存查不到从snapshot查
-	key, value, err := utils.GetContractMethodPayerPK(snapshot, contractName, method)
+	key, value, err := cutils.GetContractMethodPayerPK(snapshot, contractName, method)
 	if err != nil {
 		return nil, fmt.Errorf("get contract method payer failed, error: %v", err)
 	}
@@ -1635,7 +1650,7 @@ func (ts *TxScheduler) createChargeGasTx(
 	payload := &commonPb.Payload{
 		ChainId:        ts.chainConf.ChainConfig().ChainId,
 		TxType:         commonPb.TxType_INVOKE_CONTRACT,
-		TxId:           utils.GetRandTxId(),
+		TxId:           cutils.GetRandTxId(),
 		Timestamp:      time.Now().Unix(),
 		ExpirationTime: time.Now().Add(time.Second * 1).Unix(),
 		ContractName:   syscontract.SystemContract_ACCOUNT_MANAGER.String(),
@@ -1757,7 +1772,7 @@ func errResult(result *commonPb.Result, err error) (*commonPb.Result, protocol.E
 
 // parseUserAddress
 func publicKeyFromCert(member []byte) ([]byte, error) {
-	certificate, err := utils.ParseCert(member)
+	certificate, err := cutils.ParseCert(member)
 	if err != nil {
 		return nil, err
 	}
@@ -1910,7 +1925,7 @@ func (ts *TxScheduler) compareDag(block *commonPb.Block, snapshot protocol.Snaps
 		return err
 	}
 	// rebuild and verify dag
-	txRWSetTable := utils.RearrangeRWSet(block, txRWSetMap)
+	txRWSetTable := cutils.RearrangeRWSet(block, txRWSetMap)
 	if uint32(len(txRWSetTable)) != txExecOrderNormalCount+txExecOrderIteratorCount+txExecOrderChargeGasCount {
 		return fmt.Errorf("txRWSetTable:%d != txExecOrderTypeCount:%d+%d+%d", len(txRWSetTable),
 			txExecOrderNormalCount, txExecOrderIteratorCount, txExecOrderChargeGasCount)
@@ -1927,7 +1942,7 @@ func (ts *TxScheduler) compareDag(block *commonPb.Block, snapshot protocol.Snaps
 	//if coinbasemgr.IsOptimizeChargeGasEnabled(ts.chainConf) && snapshot.GetSnapshotSize() > 0 {
 	//	ts.appendChargeGasTxToDAG(dag, snapshot)
 	//}
-	equal, err := utils.IsDagEqual(block.Dag, dag)
+	equal, err := cutils.IsDagEqual(block.Dag, dag)
 	if err != nil {
 		return err
 	}
@@ -2140,4 +2155,227 @@ func getUpdateParam(tx *commonPb.Transaction, paramMap map[string][]byte) (strin
 	}
 
 	return string(paramMap["bizId"]), string(paramMap["businessType"]), string(paramMap["nonce"])
+}
+
+// SimulateWithDagAndRWSet based on the dag in the block, perform scheduling and execution transactions
+func (ts *TxScheduler) SimulateWithDagAndRWSet(block *commonPb.Block,
+	rwSetTable []*commonPb.TxRWSet, snapshot protocol.Snapshot) (
+	map[string]*commonPb.TxRWSet, map[string]*commonPb.Result, error) {
+	ts.lock.Lock()
+	defer ts.lock.Unlock()
+
+	defer ts.releaseContractCache()
+
+	var (
+		startTime  = time.Now()
+		txRWSetMap = make(map[string]*commonPb.TxRWSet, len(block.Txs))
+	)
+	if block.Header.BlockVersion >= blockVersion2300 && len(block.Txs) != len(block.Dag.Vertexes) {
+		ts.log.Warnf("found dag size mismatch txs length in "+
+			"block[%x] dag:%d, txs:%d", block.Header.BlockHash, len(block.Dag.Vertexes), len(block.Txs))
+		return nil, nil, fmt.Errorf("found dag size mismatch txs length in "+
+			"block[%x] dag:%d, txs:%d", block.Header.BlockHash, len(block.Dag.Vertexes), len(block.Txs))
+	}
+	if len(block.Txs) == 0 {
+		ts.log.Infof("no txs in block[%x] when simulate", block.Header.BlockHash)
+		return txRWSetMap, snapshot.GetTxResultMap(), nil
+	}
+	ts.log.Infof("simulate with dag start, size %d", len(block.Txs))
+	txMapping := make(map[int]*commonPb.Transaction, len(block.Txs))
+	for index, tx := range block.Txs {
+		txMapping[index] = tx
+	}
+
+	// 根据主节点提供的rwsets列表，转化成rwSet的map集合
+	rwSet := make(map[string]*commonPb.TxRWSet)
+	for _, txRWSet := range rwSetTable {
+		if txRWSet != nil {
+			rwSet[txRWSet.TxId] = txRWSet
+		}
+	}
+
+	// Construct the adjacency list of dag, which describes the subsequent adjacency transactions of all transactions
+	dag := block.Dag
+	var senderCollection *SenderCollection
+	//txAddressCache := make(map[string]string, snapshot.GetSnapshotSize())
+	enableOptimizeChargeGas := coinbasemgr.IsOptimizeChargeGasEnabled(ts.chainConf)
+
+	blockVersion := block.Header.BlockVersion
+	if enableOptimizeChargeGas {
+		ts.log.Debugf("before prepare `SenderCollection` ")
+		senderCollection = ts.NewSenderCollection(block.Txs, snapshot, ts.ac, blockVersion, ts.log)
+		// reset totalGasUsed for recalculating txs in block
+		senderCollection.resetTotalGasUsed()
+		ts.log.Debugf("end prepare `SenderCollection` ")
+	}
+
+	txBatchSize := len(dag.Vertexes)
+	runningTxC := make(chan *runTxTask, txBatchSize)
+	doneTxC := make(chan *executeResult, txBatchSize)
+	txExecuteResultMap := make(map[string]*executeResult) // txid => executeResult
+
+	timeoutC := time.After(ScheduleWithDagTimeout * time.Second)
+	finishC := make(chan bool, 1)
+
+	var goRoutinePool *ants.Pool
+	var err error
+	if goRoutinePool, err = ants.NewPool(len(block.Txs), ants.WithPreAlloc(true)); err != nil {
+		return nil, nil, err
+	}
+	defer goRoutinePool.Release()
+
+	ts.log.DebugDynamic(func() string {
+		return fmt.Sprintf("block [%d] simulate with dag first batch size:%d, total batch size:%d",
+			block.Header.BlockHeight, len(block.Txs), txBatchSize)
+	})
+
+	blockFingerPrint := string(cutils.CalcBlockFingerPrintWithoutTx(block))
+	ts.VmManager.BeforeSchedule(blockFingerPrint, block.Header.BlockHeight)
+	defer ts.VmManager.AfterSchedule(blockFingerPrint, block.Header.BlockHeight)
+
+	// 提前将相关依赖数据注入到每笔交易的simcontext中
+	startNewSimContextTick := cutils.CurrentTimeMillisSeconds()
+	txSimContextList := make([]protocol.TxSimContext, len(block.Txs))
+	for i, tx := range block.Txs {
+		txSimContext := vm.NewTxSimContextForFollower(ts.VmManager, snapshot,
+			tx, block.Header.BlockVersion, ts.log)
+		txSimContextList[i] = txSimContext
+	}
+	newSimContextCost := cutils.CurrentTimeMillisSeconds() - startNewSimContextTick
+
+	filSimContextStartTick := cutils.CurrentTimeMillisSeconds()
+
+	specialTxIndex := 0
+	specialTxIndexByte, hasSpecialTx := block.AdditionalData.ExtraData[SpecialTxIndexAdditionalDataKey]
+	if hasSpecialTx {
+		specialTxIndex, err = strconv.Atoi(string(specialTxIndexByte))
+		if err != nil {
+			// 此处一般不会有err，如果真有err，SimulateWithDagAndRWSet无法处理specialTx的并行执行，退化为SimulateWithDag
+			ts.log.Warnf("SimulateWithDagAndRWSet get special tx index fail[%v], use SimulateWithDag", err)
+			return ts.SimulateWithDag(block, snapshot)
+		}
+
+		ts.log.Infof("SimulateWithDagAndRWSet has special tx, index:%d", specialTxIndex)
+	}
+
+	//1. 初始化allReachMap
+	//2. 遍历DAG（从小到大）
+	//1. make bitmap
+	//2. bitmap set 自己
+	//3. 倒序遍历 neighbors
+	//1. bitmap has neighbor （判断有没有set过）
+	//1. if == 1 , continue
+	//2. else  取出neighbor 的bitmap or 运算 后， appendWSet 、 appendRelyCache（neighbor append 给自己） 由于此时大的数据在数组前，因此txSimcontext查询relyCache要改为顺序查。
+	//4. 将bitmap 填入allReachMap
+
+	// 遍历DAG（从小到大）
+	for index, vertexes := range dag.Vertexes {
+
+		// 根据下标，获取到当前交易的simContext
+		txSimContextForIndex := txSimContextList[index]
+
+		// 如果大于等于迭代器交易启始下标，则意味着这笔交易为迭代器交易或gas交易。【当前版本暂不考虑gas问题，但是理论上应该gas交易也没问题】
+		if hasSpecialTx && index >= specialTxIndex {
+			txSimContextForIndex.PutRelyTxRWSetTable(rwSetTable[:index])
+		}
+
+		// 倒序遍历 neighbors
+		for i := len(vertexes.Neighbors) - 1; i >= 0; i-- {
+			// 取出第i位的交易下标（高位到低位）
+			neighbor := vertexes.Neighbors[i]
+
+			txId := block.Txs[neighbor].Payload.TxId
+			// ps：relyCache中的顺序为：高位relyCache在前，低位在后；追加relyCache时，需要先添加writeSet，再追加relyCache
+			// 从rwSetMap中将neighbor对应的tx的write set写入txSimContextForIndex
+			txSimContextForIndex.AppendWriteSetIntoRelyCache(rwSet[txId].TxWrites)
+			// todo 这个是为了打日志，后续可删除
+			//LogRelyCacheSize(txSimContextForIndex.GetRelyCache(), ts.log, index, int(neighbor), txId)
+		}
+	}
+	filSimContextCost := cutils.CurrentTimeMillisSeconds() - filSimContextStartTick
+
+	go func() {
+		for txIndex := range block.Txs {
+			runningTxC <- &runTxTask{
+				txIndex:      txIndex,
+				txSimContext: txSimContextList[txIndex],
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case txTask := <-runningTxC:
+				tx := txMapping[txTask.txIndex]
+				ts.log.DebugDynamic(func() string {
+					return fmt.Sprintf("simulate with dag, prepare to submit running task for tx id:%s",
+						tx.Payload.GetTxId())
+				})
+				err = goRoutinePool.Submit(func() {
+					handleTxInSimulateWithDagAndRWSet(block, snapshot, ts, tx, txTask.txIndex, doneTxC,
+						txBatchSize, senderCollection, txTask.txSimContext)
+				})
+
+			case txExecuteResult := <-doneTxC:
+				txExecuteResultMap[txExecuteResult.txId] = txExecuteResult
+				if len(txExecuteResultMap) >= txBatchSize {
+					ts.log.DebugDynamic(func() string {
+						return fmt.Sprintf("finished 1 batch, apply size:%d, tx batch size:%d",
+							len(txExecuteResultMap), txBatchSize)
+					})
+					finishC <- true
+				}
+			case <-finishC:
+				ts.log.DebugDynamic(func() string {
+					return fmt.Sprintf("block [%d] simulate with dag finish", block.Header.BlockHeight)
+				})
+				ts.scheduleFinishC <- true
+				return
+			case <-timeoutC:
+				ts.log.Errorf("block [%d] simulate with dag timeout", block.Header.BlockHeight)
+				ts.scheduleFinishC <- true
+				return
+			}
+		}
+	}()
+
+	<-ts.scheduleFinishC
+
+	applyStartTick := cutils.CurrentTimeMillisSeconds()
+	// 将交易按照顺序串行apply
+	// build rwSetMap && resultMap
+	txResultMap := make(map[string]*commonPb.Result)
+	for txId, currentExecuteResult := range txExecuteResultMap {
+		currentTxSimContext := currentExecuteResult.txSimContext
+		txRwSet := currentTxSimContext.GetTxRWSet(currentExecuteResult.runVmSuccess)
+		if txRwSet != nil {
+			txRWSetMap[txId] = txRwSet
+		}
+		txResultMap[txId] = currentTxSimContext.GetTxResult()
+	}
+	applyCost := cutils.CurrentTimeMillisSeconds() - applyStartTick
+
+	snapshot.Seal()
+	timeUsed := time.Since(startTime)
+	ts.log.Infof("simulate with dag finished, block %d, size %d, time used(newSimContextCost:%v, "+
+		"filSimContextCost:%v, applyCost:%v,total:%v), tps %v",
+		block.Header.BlockHeight, len(block.Txs), newSimContextCost, filSimContextCost, applyCost,
+		timeUsed, float64(len(block.Txs))/(float64(timeUsed)/1e9))
+
+	writeRWSetLog(txRWSetMap, block.Dag, ts.log)
+	return txRWSetMap, txResultMap, nil
+}
+
+func handleTxInSimulateWithDagAndRWSet(
+	block *commonPb.Block, snapshot protocol.Snapshot,
+	ts *TxScheduler, tx *commonPb.Transaction, txIndex int,
+	doneTxC chan *executeResult, txBatchSize int,
+	collection *SenderCollection, txSimContext protocol.TxSimContext) {
+
+	_, specialTxType, runVmSuccess := ts.executeTx(tx, snapshot, block, collection)
+
+	// if apply failed means this tx's read set conflict with other txs' write set
+	doneTxC <- &executeResult{tx.Payload.TxId, runVmSuccess,
+		specialTxType, txSimContext}
 }

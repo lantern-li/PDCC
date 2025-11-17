@@ -35,7 +35,25 @@ func (s *SnapshotEvidence) SetBlockFingerprint(fp utils.BlockFingerPrint) {
 }
 
 // GetKeys returns keys
+func (s *SnapshotEvidence) GetKeyWithLock(txExecSeq int, contractName, lockerName, txId string, key []byte) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+// GetKeys returns keys
 func (s *SnapshotEvidence) GetKeys(txExecSeq int, keys []*vmPb.BatchKey) ([]*vmPb.BatchKey, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+// GetKeysWithLock returns keys
+func (s *SnapshotEvidence) GetKeysWithLock(txExecSeq int, keys []*vmPb.BatchKey, lockerName, txId string) ([]*vmPb.BatchKey, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+// Lock lock snapshot with locker name
+func (s *SnapshotEvidence) Lock(lockerName, txId string) error {
 	//TODO implement me
 	panic("implement me")
 }

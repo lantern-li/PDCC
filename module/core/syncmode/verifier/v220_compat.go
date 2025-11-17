@@ -24,3 +24,15 @@ func (v *BlockVerifierImpl) Watch(chainConfig *chainConfConfig.ChainConfig) erro
 	v.log.Infof("update chainconf,blockverify[%v]", v.chainConf.ChainConfig().Block)
 	return nil
 }
+
+var _ protocol.Watcher = (*DeterministicBlockVerifierImpl)(nil)
+
+func (v *DeterministicBlockVerifierImpl) Module() string {
+	return ModuleNameCore
+}
+
+func (v *DeterministicBlockVerifierImpl) Watch(chainConfig *chainConfConfig.ChainConfig) error {
+	v.chainConf.ChainConfig().Block = chainConfig.Block
+	v.log.Infof("update chainconf,blockverify[%v]", v.chainConf.ChainConfig().Block)
+	return nil
+}

@@ -8,6 +8,7 @@ package proposer
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -355,16 +356,16 @@ func (bp *BlockProposerImpl) proposing(height uint64, preHash []byte) (*consensu
 
 		return nil, err
 	}
-	_, txsRwSet, _ := bp.proposalCache.GetProposedBlock(block)
 
-	cutBlock := new(commonpb.Block)
-	if common.IfOpenConsensusMessageTurbo(bp.chainConf) ||
-		common.TxPoolType == batch.TxPoolType && len(block.Txs) != 0 {
-		cutBlock = common.GetTurboBlock(block, cutBlock, bp.chainConf, bp.log)
-	} else {
-		cutBlock = block
+	proposalData := bp.proposalCache.GetProposedBlock(block)
+	if proposalData == nil {
+		err = errors.New("proposalData is nil")
+		bp.log.Errorf("propose block failed, %s", err.Error())
+		return nil, err
 	}
 
+	txsRwSet := proposalData.TxRwSetMap
+	cutBlock := bp.getCutBlock(block)
 	bp.msgBus.Publish(msgbus.ProposedBlock,
 		&consensuspb.ProposalBlock{Block: block, TxsRwSet: txsRwSet, CutBlock: cutBlock})
 
@@ -378,6 +379,17 @@ func (bp *BlockProposerImpl) proposing(height uint64, preHash []byte) (*consensu
 		bp.metricBlockPackageTime.WithLabelValues(bp.chainId).Observe(float64(elapsed) / 1000)
 	}
 	return &consensuspb.ProposalBlock{Block: block, TxsRwSet: txsRwSet, CutBlock: cutBlock}, nil
+}
+
+func (bp *BlockProposerImpl) getCutBlock(block *commonpb.Block) *commonpb.Block {
+	cutBlock := new(commonpb.Block)
+	if common.IfOpenConsensusMessageTurbo(bp.chainConf) ||
+		common.TxPoolType == batch.TxPoolType && len(block.Txs) != 0 {
+		cutBlock = common.GetTurboBlock(block, cutBlock, bp.chainConf, bp.log)
+	} else {
+		cutBlock = block
+	}
+	return cutBlock
 }
 
 // OnReceiveTxPoolSignal receive txpool signal and deliver to chan txpool signal

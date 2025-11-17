@@ -20,7 +20,7 @@ PROTOCOL_BRANCH='v2.3.9_qc'
 PB_BRANCH='v2.3.6_qc'
 UTILS_BRANCH='v2.3.5_qc'
 LOGGER_BRANCH='v2.3.4_qc'
-TBFT_BRANCH='v2.3.7_sz'
+TBFT_BRANCH='v2.3.7_sz_determint'
 STORE_BRANCH='v2.3.6_qc'
 VM_ENGINE_BRANCH='v2.3.6_qc'
 EVM_BRANCH='v2.3.6_qc'
@@ -31,12 +31,12 @@ fi
 cd ..
 
 go get chainmaker.org/chainmaker/lws@${LWS_BRANCH}
-go get chainmaker.org/chainmaker/chainconf/v2@${PRE_BRANCH}
+go get chainmaker.org/chainmaker/chainconf/v2@v2.3.4_sz_determint
 go get chainmaker.org/chainmaker/common/v2@v2.3.8_sz
 go get chainmaker.org/chainmaker/localconf/v2@v2.3.7_sz
 go get chainmaker.org/chainmaker/logger/v2@${LOGGER_BRANCH}
-go get chainmaker.org/chainmaker/pb-go/v2@v2.3.8_sz
-go get chainmaker.org/chainmaker/protocol/v2@v2.3.10_sz
+go get chainmaker.org/chainmaker/pb-go/v2@v2.3.7_sz_determint
+go get chainmaker.org/chainmaker/protocol/v2@v2.3.10_sz_determint
 go get chainmaker.org/chainmaker/utils/v2@v2.3.6_qc_sz
 go get chainmaker.org/chainmaker/net-common@${NET_COMMON_BRANCH}
 go get chainmaker.org/chainmaker/net-libp2p@${NET_LIBP2P_BRANCH}
@@ -52,14 +52,14 @@ go get chainmaker.org/chainmaker/vm-docker-go/v2@v2.3.6_sz
 go get chainmaker.org/chainmaker/vm-engine/v2@v2.3.8_sz
 go get chainmaker.org/chainmaker/vm-evm/v2@v2.3.7_sz
 go get chainmaker.org/chainmaker/vm-gasm/v2@v2.3.6_sz
-go get chainmaker.org/chainmaker/vm-native/v2@v2.3.8_sz
+go get chainmaker.org/chainmaker/vm-native/v2@v2.3.8_sz_determint
 go get chainmaker.org/chainmaker/vm-wasmer/v2@v2.3.7_sz
 go get chainmaker.org/chainmaker/vm-wxvm/v2@${LAST_PRE_BRANCH}
-go get chainmaker.org/chainmaker/vm/v2@v2.3.8_sz
+go get chainmaker.org/chainmaker/vm/v2@v2.3.8_sz_determint
 go get chainmaker.org/chainmaker/txpool-batch/v2@${PRE_BRANCH}
 go get chainmaker.org/chainmaker/txpool-normal/v2@${PRE_BRANCH}
 go get chainmaker.org/chainmaker/txpool-single/v2@${PRE_BRANCH}
-go get chainmaker.org/chainmaker/sdk-go/v2@v2.3.8_sz
+go get chainmaker.org/chainmaker/sdk-go/v2@v2.3.8_sz_determint
 
 go mod tidy
 

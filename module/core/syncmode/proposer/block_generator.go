@@ -21,3 +21,11 @@ func (bp *BlockProposerImpl) generateNewBlock(proposingHeight uint64, preHash []
 		batchIds,
 		fetchBatches)
 }
+func (bp *DeterministicBlockProposerImpl) generateNewBlock(proposingHeight uint64,
+	preHash []byte, txBatch []*commonpb.Transaction,
+	batchIds []string, fetchBatches [][]*commonpb.Transaction) (
+	*commonpb.Block, error) {
+
+	return bp.blockBuilder.GenerateNewPreBlock(
+		proposingHeight, preHash, txBatch, batchIds, fetchBatches)
+}
