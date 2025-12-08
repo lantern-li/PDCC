@@ -16,6 +16,9 @@ import (
 
 	"chainmaker.org/chainmaker-go/module/core/common/coinbasemgr"
 
+	"github.com/gogo/protobuf/proto"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 	"chainmaker.org/chainmaker-go/module/subscriber"
@@ -34,8 +37,6 @@ import (
 	"chainmaker.org/chainmaker/protocol/v2"
 	batch "chainmaker.org/chainmaker/txpool-batch/v2"
 	"chainmaker.org/chainmaker/utils/v2"
-	"github.com/gogo/protobuf/proto"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -1044,7 +1045,7 @@ func (vb *VerifierBlock) ValidateBlockWithoutExecuting(
 	})
 
 	// 确定性调度不校验block sig，只校验投票签名即可
-	if vb.chainConf.ChainConfig().Scheduler != nil && vb.chainConf.ChainConfig().Scheduler.SchedulerType != configpb.SchedulerType_DETERMINISTIC {
+	if vb.chainConf.ChainConfig().Scheduler != nil && vb.chainConf.ChainConfig().Scheduler.ProcessType != configpb.ProcessType_EXECUTE_AFTER_PROPOSE {
 		if ok, err := utils.VerifyBlockSig(hashType, block, vb.ac); !ok || err != nil {
 			vb.log.Errorf("verify block signature fail,err:%s", err.Error())
 			return nil, fmt.Errorf("(%d,%x - %x,%x) [signature]",

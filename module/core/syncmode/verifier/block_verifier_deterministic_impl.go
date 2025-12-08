@@ -13,7 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	commonErrors "chainmaker.org/chainmaker/common/v2/errors"
-	"chainmaker.org/chainmaker/common/v2/monitor"
 	"chainmaker.org/chainmaker/common/v2/msgbus"
 	"chainmaker.org/chainmaker/localconf/v2"
 	commonpb "chainmaker.org/chainmaker/pb-go/v2/common"
@@ -48,7 +47,7 @@ type DeterministicBlockVerifierImpl struct {
 	log            protocol.Logger                // logger
 	txPool         protocol.TxPool                // tx pool to check if tx is duplicate
 	txFilter       protocol.TxFilter              // tx pool to check if tx is duplicate
-	//mu             sync.Mutex                     // to avoid concurrent map modify
+	// mu             sync.Mutex                     // to avoid concurrent map modify
 	verifierBlock *common.VerifierBlock
 	storeHelper   conf.StoreHelper
 
@@ -56,7 +55,7 @@ type DeterministicBlockVerifierImpl struct {
 	netService            protocol.NetService
 }
 
-func NewDeterministicBlockVerifier(config BlockVerifierConfig, log protocol.Logger) (protocol.BlockVerifier, error) {
+func NewDeterministicBlockVerifier(config BlockVerifierConfig, log protocol.Logger, metricBlockVerifyTime *prometheus.HistogramVec) (BlockVerifier, error) {
 	v := &DeterministicBlockVerifierImpl{
 		chainId:         config.ChainId,
 		msgBus:          config.MsgBus,
@@ -72,9 +71,10 @@ func NewDeterministicBlockVerifier(config BlockVerifierConfig, log protocol.Logg
 		ac:            config.AC,
 		log:           log,
 		txPool:        config.TxPool,
-		storeHelper:   config.StoreHelper,
-		netService:    config.NetService,
-		txFilter:      config.TxFilter,
+		storeHelper:           config.StoreHelper,
+		netService:            config.NetService,
+		txFilter:              config.TxFilter,
+		metricBlockVerifyTime: metricBlockVerifyTime,
 	}
 
 	verifyConf := &common.VerifierBlockConf{
@@ -93,12 +93,6 @@ func NewDeterministicBlockVerifier(config BlockVerifierConfig, log protocol.Logg
 	}
 	v.verifierBlock = common.NewVerifierBlock(verifyConf)
 
-	if localconf.ChainMakerConfig.MonitorConfig.Enabled {
-		v.metricBlockVerifyTime = monitor.NewHistogramVec(monitor.SUBSYSTEM_CORE_VERIFIER, "metric_block_verify_time",
-			"block verify time metric", []float64{0.005, 0.01, 0.015, 0.05, 0.1, 1, 2, 5, 10}, "chainId")
-	}
-	// v220_compat Deprecated
-	config.ChainConf.AddWatch(v)                  //nolint: staticcheck
 	config.MsgBus.Register(msgbus.ChainConfig, v) // todo 确认为什么需要这个topic
 
 	return v, nil
@@ -106,13 +100,13 @@ func NewDeterministicBlockVerifier(config BlockVerifierConfig, log protocol.Logg
 
 // VerifyBlockSync only maxbft use this method
 func (v *DeterministicBlockVerifierImpl) VerifyBlockSync(block *commonpb.Block,
-	mode protocol.VerifyMode) (*consensuspb.VerifyResult, error) {
+	mode protocol.VerifyMode,
+) (*consensuspb.VerifyResult, error) {
 	return v.verifyBlockWithoutDag(block, mode)
 }
 
 // VerifyBlock to check if block is valid
 func (v *DeterministicBlockVerifierImpl) VerifyBlock(block *commonpb.Block, mode protocol.VerifyMode) (err error) {
-
 	/**
 		ps： 确定性调度将verifyMode 分为了三种
 		CONSENSUS_VERIFY：从节点共识验证； SYNC_VERIFY： 同步验证； PROPOSER_VERIFY： 提案节点共识验证。
@@ -120,7 +114,7 @@ func (v *DeterministicBlockVerifierImpl) VerifyBlock(block *commonpb.Block, mode
 		2. sync 模式下...... schedule、verify
 	**/
 
-	if v.chainConf.ChainConfig().Scheduler.SchedulerType == configpb.SchedulerType_DETERMINISTIC && mode != protocol.SYNC_VERIFY {
+	if v.chainConf.ChainConfig().Scheduler.ProcessType == configpb.ProcessType_EXECUTE_ON_PROPOSE && mode != protocol.SYNC_VERIFY {
 		verifyResult, err := v.verifyBlockWithoutDag(block, mode)
 		if err != nil {
 			v.log.Error(err)
@@ -140,8 +134,8 @@ func (v *DeterministicBlockVerifierImpl) VerifyBlock(block *commonpb.Block, mode
 
 // VerifyBlockWithRwSets to check if block is valid
 func (v *DeterministicBlockVerifierImpl) VerifyBlockWithRwSets(block *commonpb.Block,
-	rwsets []*commonpb.TxRWSet, mode protocol.VerifyMode) (err error) {
-
+	rwsets []*commonpb.TxRWSet, mode protocol.VerifyMode,
+) (err error) {
 	// 未开启快速校验或者主节点未将读写集带入，则走原Verify block 逻辑
 	if len(rwsets) == 0 || mode != protocol.SYNC_VERIFY {
 		return v.VerifyBlock(block, mode)
@@ -153,8 +147,8 @@ func (v *DeterministicBlockVerifierImpl) VerifyBlockWithRwSets(block *commonpb.B
 
 // VerifyBlockWithRwSets to check if block is valid
 func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutExecuting(block *commonpb.Block,
-	rwsets []*commonpb.TxRWSet, mode protocol.VerifyMode) (err error) {
-
+	rwsets []*commonpb.TxRWSet, mode protocol.VerifyMode,
+) (err error) {
 	startTick := utils.CurrentTimeMillisSeconds()
 	if err = utils.IsEmptyBlock(block); err != nil {
 		v.log.Error(err)
@@ -196,12 +190,12 @@ func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutExecuting(block *comm
 		return err
 	}
 
-	//startPoolTick := utils.CurrentTimeMillisSeconds()
+	// startPoolTick := utils.CurrentTimeMillisSeconds()
 	newBlock, batchIds, err := common.RecoverBlock(block, mode, v.chainConf, v.txPool, v.ac, v.netService, v.log)
 	if err != nil {
 		return err
 	}
-	//lastPool := utils.CurrentTimeMillisSeconds() - startPoolTick
+	// lastPool := utils.CurrentTimeMillisSeconds() - startPoolTick
 	contractEventMap, err = v.validateBlockWithRWSets(newBlock, lastBlock, mode, txRWSetMap)
 	if err != nil {
 		v.log.Warnf("verify failed [%d](%x),preBlockHash:%x, %s",
@@ -215,7 +209,7 @@ func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutExecuting(block *comm
 	}
 
 	// sync mode, need to verify consensus vote signature
-	//beginConsensCheck := utils.CurrentTimeMillisSeconds()
+	// beginConsensCheck := utils.CurrentTimeMillisSeconds()
 	if protocol.SYNC_VERIFY == mode {
 		if err = v.verifyVoteSig(newBlock); err != nil {
 			v.log.Warnf("verify failed [%d](%x), votesig %s",
@@ -223,7 +217,7 @@ func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutExecuting(block *comm
 			return err
 		}
 	}
-	//consensusCheckUsed := utils.CurrentTimeMillisSeconds() - beginConsensCheck
+	// consensusCheckUsed := utils.CurrentTimeMillisSeconds() - beginConsensCheck
 
 	// verify success, cache block and read write set
 	// solo need this，too！！！
@@ -247,8 +241,8 @@ func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutExecuting(block *comm
 	//	v.msgBus.Publish(msgbus.VerifyResult, parseVerifyResult(newBlock, true, txRWSetMap, nil))
 	//}
 
-	//elapsed := utils.CurrentTimeMillisSeconds() - startTick
-	//v.log.Infof("verify success [%d,%x]"+
+	// elapsed := utils.CurrentTimeMillisSeconds() - startTick
+	// v.log.Infof("verify success [%d,%x]"+
 	//	"(blockSig:%d,vm:%d,txVerify:%d,txRoot:%d,pool:%d,consensusCheckUsed:%d,total:%d)",
 	//	newBlock.Header.BlockHeight, newBlock.Header.BlockHash, timeLasts[common.Time_Statistics_BlockSig],
 	//	timeLasts[common.Time_Statistics_VM], timeLasts[common.Time_Statistics_TxVerify],
@@ -302,8 +296,8 @@ func (v *DeterministicBlockVerifierImpl) OnQuit() {
 // 2. proposer return verify result directly
 // 3. re calc block hash as final hash to commit
 func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutDag(block *commonpb.Block, mode protocol.VerifyMode) (
-	verifyResult *consensuspb.VerifyResult, err error) {
-
+	verifyResult *consensuspb.VerifyResult, err error,
+) {
 	/**
 	1. verify pre Block
 	2. schedule pre block
@@ -487,13 +481,13 @@ func (v *DeterministicBlockVerifierImpl) verifyBlock(block *commonpb.Block, mode
 		return err
 	}
 
-	//startPoolTick := utils.CurrentTimeMillisSeconds()
+	// startPoolTick := utils.CurrentTimeMillisSeconds()
 	newBlock, batchIds, err := common.RecoverBlock(block, mode, v.chainConf, v.txPool, v.ac, v.netService, v.log)
 	if err != nil {
 		v.log.Errorf("RecoverBlock failed, err:%v", err)
 		return err
 	}
-	//lastPool := utils.CurrentTimeMillisSeconds() - startPoolTick
+	// lastPool := utils.CurrentTimeMillisSeconds() - startPoolTick
 
 	//var (
 	//	txRWSetMap       map[string]*commonpb.TxRWSet
@@ -505,7 +499,6 @@ func (v *DeterministicBlockVerifierImpl) verifyBlock(block *commonpb.Block, mode
 	//)
 
 	txRWSetMap, contractEventMap, _, rwSetVerifyFailTx, err := v.validateBlock(newBlock, lastBlock, mode)
-
 	if err != nil {
 		v.log.Warnf("verify failed [%d](%x),preBlockHash:%x, %s",
 			newBlock.Header.BlockHeight, newBlock.Header.BlockHash, newBlock.Header.PreBlockHash, err.Error())
@@ -547,7 +540,7 @@ func (v *DeterministicBlockVerifierImpl) verifyBlock(block *commonpb.Block, mode
 	}
 
 	// sync mode, need to verify consensus vote signature
-	//beginConsensCheck := utils.CurrentTimeMillisSeconds()
+	// beginConsensCheck := utils.CurrentTimeMillisSeconds()
 	if protocol.SYNC_VERIFY == mode {
 		if err = v.verifyVoteSig(newBlock); err != nil {
 			v.log.Warnf("verify failed [%d](%x), vote sig %s",
@@ -555,7 +548,7 @@ func (v *DeterministicBlockVerifierImpl) verifyBlock(block *commonpb.Block, mode
 			return err
 		}
 	}
-	//consensusCheckUsed := utils.CurrentTimeMillisSeconds() - beginConsensCheck
+	// consensusCheckUsed := utils.CurrentTimeMillisSeconds() - beginConsensCheck
 
 	// verify success, cache block and read write set
 	// solo need this，too！！！
@@ -564,7 +557,7 @@ func (v *DeterministicBlockVerifierImpl) verifyBlock(block *commonpb.Block, mode
 		Block:            newBlock,
 		TxRwSetMap:       txRWSetMap,
 		ContractEventMap: contractEventMap,
-		//Layer2TxRoots:    layer2TxRoots,
+		// Layer2TxRoots:    layer2TxRoots,
 	}, false); err != nil {
 		return err
 	}
@@ -594,7 +587,7 @@ func (v *DeterministicBlockVerifierImpl) verifyBlock(block *commonpb.Block, mode
 			parseVerifyResult(newBlock, true, txRWSetMap, nil))
 	}
 	elapsed := utils.CurrentTimeMillisSeconds() - startTick
-	//v.log.Infof("verify success [%d,%x]"+
+	// v.log.Infof("verify success [%d,%x]"+
 	//	"(blockSig:%d,vm:%d,txVerify:%d,txRoot:%d,layer2TxRoot:%d,pool:%d,consensusCheckUsed:%d,total:%d)",
 	//	newBlock.Header.BlockHeight, newBlock.Header.BlockHash, timeLasts[common.Time_Statistics_BlockSig],
 	//	timeLasts[common.Time_Statistics_VM], timeLasts[common.Time_Statistics_TxVerify],
@@ -612,7 +605,8 @@ func (v *DeterministicBlockVerifierImpl) validateBlock(block, lastBlock *commonp
 	map[string]*commonpb.TxRWSet,
 	map[string][]*commonpb.ContractEvent,
 	map[string]int64,
-	*common.RwSetVerifyFailTx, error) {
+	*common.RwSetVerifyFailTx, error,
+) {
 	hashType := v.chainConf.ChainConfig().Crypto.Hash
 	timeLasts := make(map[string]int64)
 	var err error
@@ -653,7 +647,8 @@ func (v *DeterministicBlockVerifierImpl) validateBlock(block, lastBlock *commonp
 
 func (v *DeterministicBlockVerifierImpl) validateBlockWithRWSets(block, lastBlock *commonpb.Block, mode protocol.VerifyMode,
 	txRWSetMap map[string]*commonpb.TxRWSet) (
-	map[string][]*commonpb.ContractEvent, error) {
+	map[string][]*commonpb.ContractEvent, error,
+) {
 	hashType := v.chainConf.ChainConfig().Crypto.Hash
 	var err error
 	var txCapacity uint32
@@ -717,7 +712,6 @@ func (v *DeterministicBlockVerifierImpl) cutBlocks(blocksToCut []*commonpb.Block
 }
 
 func (v *DeterministicBlockVerifierImpl) cutBlocksForBatchPool(blocksToCut []*commonpb.Block, blockToKeep *commonpb.Block) error {
-
 	keepBatchIdsMap := make(map[string]interface{})
 	batchIds, _, err := common.GetBatchIds(blockToKeep)
 	if err != nil {
@@ -757,7 +751,8 @@ func (v *DeterministicBlockVerifierImpl) cutBlocksForBatchPool(blocksToCut []*co
 
 // verifyRepeat to check if the block has verified before
 func (v *DeterministicBlockVerifierImpl) verifyRepeat(block *commonpb.Block,
-	mode protocol.VerifyMode) (isRepeat bool) {
+	mode protocol.VerifyMode,
+) (isRepeat bool) {
 	proposalData := v.proposalCache.GetProposedBlock(block)
 	// Return not repeat if SQL is not enabled or if it is not solo
 	if proposalData == nil {

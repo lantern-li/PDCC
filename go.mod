@@ -3,7 +3,7 @@ module chainmaker.org/chainmaker-go
 go 1.16
 
 require (
-	chainmaker.org/chainmaker/pb-go/v2 v2.3.8-0.20251128100118-aa7ed99da4d0
+	chainmaker.org/chainmaker/pb-go/v2 v2.3.8-0.20251205032408-4619501ebe14
 	code.cloudfoundry.org/bytefmt v0.0.0-20211005130812-5bb3c17173e5
 	github.com/Rican7/retry v0.1.0
 	github.com/Workiva/go-datastructures v1.0.53
@@ -72,7 +72,7 @@ require (
 	chainmaker.org/chainmaker/vm-engine/v2 v2.3.9-0.20251014101717-69b88ad43d10
 	chainmaker.org/chainmaker/vm-evm/v2 v2.3.8-0.20251014101459-542dce77696b
 	chainmaker.org/chainmaker/vm-gasm/v2 v2.3.7-0.20251014083702-b3099fe75f73
-	chainmaker.org/chainmaker/vm-native/v2 v2.3.7-0.20251202063342-5b9016e8277c
+	chainmaker.org/chainmaker/vm-native/v2 v2.3.7-0.20251205061247-4b894aa48da9
 	chainmaker.org/chainmaker/vm-wasmer/v2 v2.3.7-0.20251014074053-aa9593cfa17d
 	chainmaker.org/chainmaker/vm-wxvm/v2 v2.3.6
 	chainmaker.org/chainmaker/vm/v2 v2.3.9-0.20251201072219-2619f35bc75a

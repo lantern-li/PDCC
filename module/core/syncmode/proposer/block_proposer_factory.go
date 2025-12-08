@@ -18,11 +18,11 @@ func (bpf *BlockProposerFactory) NewBlockProposer(config BlockProposerConfig, lo
 		return NewBlockProposer(config, log)
 	}
 
-	schedulerType := schedulerConf.SchedulerType
+	schedulerType := schedulerConf.ProcessType
 	switch schedulerType {
-	case configpb.SchedulerType_DAG:
+	case configpb.ProcessType_EXECUTE_ON_PROPOSE:
 		return NewBlockProposer(config, log)
-	case configpb.SchedulerType_DETERMINISTIC:
+	case configpb.ProcessType_EXECUTE_AFTER_PROPOSE:
 		return NewDeterministicBlockProposer(config, log)
 	default:
 		return nil, errors.New(fmt.Sprintf("new block proposer failed, invalid scheduler type:%s", schedulerType))

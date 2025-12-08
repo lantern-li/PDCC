@@ -15,7 +15,6 @@ import (
 	"chainmaker.org/chainmaker-go/module/core/common/coinbasemgr"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 	commonErrors "chainmaker.org/chainmaker/common/v2/errors"
-	"chainmaker.org/chainmaker/common/v2/monitor"
 	"chainmaker.org/chainmaker/common/v2/msgbus"
 	"chainmaker.org/chainmaker/localconf/v2"
 	commonpb "chainmaker.org/chainmaker/pb-go/v2/common"
@@ -47,7 +46,7 @@ type BlockVerifierImpl struct {
 	log            protocol.Logger                // logger
 	txPool         protocol.TxPool                // tx pool to check if tx is duplicate
 	txFilter       protocol.TxFilter              // tx pool to check if tx is duplicate
-	//mu             sync.Mutex                     // to avoid concurrent map modify
+	// mu             sync.Mutex                     // to avoid concurrent map modify
 	verifierBlock *common.VerifierBlock
 	storeHelper   conf.StoreHelper
 
@@ -55,7 +54,7 @@ type BlockVerifierImpl struct {
 	netService            protocol.NetService
 }
 
-func NewBlockVerifier(config BlockVerifierConfig, log protocol.Logger) (protocol.BlockVerifier, error) {
+func NewBlockVerifier(config BlockVerifierConfig, log protocol.Logger, metricBlockVerifyTime *prometheus.HistogramVec) (BlockVerifier, error) {
 	v := &BlockVerifierImpl{
 		chainId:         config.ChainId,
 		msgBus:          config.MsgBus,
@@ -66,14 +65,15 @@ func NewBlockVerifier(config BlockVerifierConfig, log protocol.Logger) (protocol
 		reentrantLocks: &common.ReentrantLocks{
 			ReentrantLocks: make(map[string]interface{}),
 		},
-		proposalCache: config.ProposedCache,
-		chainConf:     config.ChainConf,
-		ac:            config.AC,
-		log:           log,
-		txPool:        config.TxPool,
-		storeHelper:   config.StoreHelper,
-		netService:    config.NetService,
-		txFilter:      config.TxFilter,
+		proposalCache:         config.ProposedCache,
+		chainConf:             config.ChainConf,
+		ac:                    config.AC,
+		log:                   log,
+		txPool:                config.TxPool,
+		storeHelper:           config.StoreHelper,
+		netService:            config.NetService,
+		txFilter:              config.TxFilter,
+		metricBlockVerifyTime: metricBlockVerifyTime,
 	}
 
 	verifyConf := &common.VerifierBlockConf{
@@ -92,12 +92,6 @@ func NewBlockVerifier(config BlockVerifierConfig, log protocol.Logger) (protocol
 	}
 	v.verifierBlock = common.NewVerifierBlock(verifyConf)
 
-	if localconf.ChainMakerConfig.MonitorConfig.Enabled {
-		v.metricBlockVerifyTime = monitor.NewHistogramVec(monitor.SUBSYSTEM_CORE_VERIFIER, "metric_block_verify_time",
-			"block verify time metric", []float64{0.005, 0.01, 0.015, 0.05, 0.1, 1, 2, 5, 10}, "chainId")
-	}
-	// v220_compat Deprecated
-	config.ChainConf.AddWatch(v) //nolint: staticcheck
 	config.MsgBus.Register(msgbus.ChainConfig, v)
 
 	return v, nil
@@ -105,16 +99,15 @@ func NewBlockVerifier(config BlockVerifierConfig, log protocol.Logger) (protocol
 
 // VerifyBlockSync only maxbft use this method
 func (v *BlockVerifierImpl) VerifyBlockSync(block *commonpb.Block,
-	mode protocol.VerifyMode) (*consensuspb.VerifyResult, error) {
-
+	mode protocol.VerifyMode,
+) (*consensuspb.VerifyResult, error) {
 	// 目前tbft只有确定性调度才会调这里，直接返回nil即可
 	return nil, nil
 }
 
 // VerifyBlock to check if block is valid
 func (v *BlockVerifierImpl) VerifyBlock(block *commonpb.Block, mode protocol.VerifyMode) (err error) {
-
-	//blockVersion := block.Header.BlockVersion
+	// blockVersion := block.Header.BlockVersion
 	startTick := utils.CurrentTimeMillisSeconds()
 	if err = utils.IsEmptyBlock(block); err != nil {
 		v.log.Errorf("%+v, block: %+v", err, block)
@@ -205,9 +198,9 @@ func (v *BlockVerifierImpl) VerifyBlock(block *commonpb.Block, mode protocol.Ver
 	// solo need this，too！！！
 	v.log.Debugf("set proposed block(%d,%x)", newBlock.Header.BlockHeight, newBlock.Header.BlockHash)
 	if err = v.proposalCache.SetProposedBlock(&protocol.ProposalData{
-		Block: newBlock, TxRwSetMap: txRWSetMap, ContractEventMap: contractEventMap},
+		Block: newBlock, TxRwSetMap: txRWSetMap, ContractEventMap: contractEventMap,
+	},
 		false); err != nil {
-
 		return err
 	}
 
@@ -236,8 +229,8 @@ func (v *BlockVerifierImpl) VerifyBlock(block *commonpb.Block, mode protocol.Ver
 
 // VerifyBlockWithRwSets to check if block is valid
 func (v *BlockVerifierImpl) VerifyBlockWithRwSets(block *commonpb.Block,
-	rwsets []*commonpb.TxRWSet, mode protocol.VerifyMode) (err error) {
-
+	rwsets []*commonpb.TxRWSet, mode protocol.VerifyMode,
+) (err error) {
 	startTick := utils.CurrentTimeMillisSeconds()
 	if err = utils.IsEmptyBlock(block); err != nil {
 		v.log.Error(err)
@@ -309,7 +302,8 @@ func (v *BlockVerifierImpl) VerifyBlockWithRwSets(block *commonpb.Block,
 	// solo need this，too！！！
 	v.log.Debugf("set proposed block(%d,%x)", newBlock.Header.BlockHeight, newBlock.Header.BlockHash)
 	if err = v.proposalCache.SetProposedBlock(&protocol.ProposalData{
-		Block: newBlock, TxRwSetMap: txRWSetMap, ContractEventMap: contractEventMap},
+		Block: newBlock, TxRwSetMap: txRWSetMap, ContractEventMap: contractEventMap,
+	},
 		false); err != nil {
 		return err
 	}
@@ -377,7 +371,8 @@ func (v *BlockVerifierImpl) validateBlock(block, lastBlock *commonpb.Block, mode
 	map[string]*commonpb.TxRWSet,
 	map[string][]*commonpb.ContractEvent,
 	map[string]int64,
-	*common.RwSetVerifyFailTx, error) {
+	*common.RwSetVerifyFailTx, error,
+) {
 	hashType := v.chainConf.ChainConfig().Crypto.Hash
 	timeLasts := make(map[string]int64)
 	var err error
@@ -412,7 +407,8 @@ func (v *BlockVerifierImpl) validateBlock(block, lastBlock *commonpb.Block, mode
 
 func (v *BlockVerifierImpl) validateBlockWithRWSets(block, lastBlock *commonpb.Block, mode protocol.VerifyMode,
 	txRWSetMap map[string]*commonpb.TxRWSet) (
-	map[string][]*commonpb.ContractEvent, map[string]int64, error) {
+	map[string][]*commonpb.ContractEvent, map[string]int64, error,
+) {
 	hashType := v.chainConf.ChainConfig().Crypto.Hash
 	timeLasts := make(map[string]int64)
 
@@ -463,7 +459,6 @@ func (v *BlockVerifierImpl) cutBlocks(blocksToCut []*commonpb.Block, blockToKeep
 }
 
 func (v *BlockVerifierImpl) cutBlocksForBatchPool(blocksToCut []*commonpb.Block, blockToKeep *commonpb.Block) error {
-
 	keepBatchIdsMap := make(map[string]interface{})
 	batchIds, _, err := common.GetBatchIds(blockToKeep)
 	if err != nil {
@@ -503,7 +498,8 @@ func (v *BlockVerifierImpl) cutBlocksForBatchPool(blocksToCut []*commonpb.Block,
 
 // verifyRepeat to check if the block has verified before
 func (v *BlockVerifierImpl) verifyRepeat(block *commonpb.Block, startTick int64,
-	mode protocol.VerifyMode) (isRepeat bool) {
+	mode protocol.VerifyMode,
+) (isRepeat bool) {
 	proposedData := v.proposalCache.GetProposedBlock(block)
 	// Return not repeat if SQL is not enabled or if it is not solo
 	if proposedData == nil {

@@ -17,7 +17,6 @@ import (
 
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic"
 	schedulerUtils "chainmaker.org/chainmaker-go/module/core/common/scheduler/utils"
-	"chainmaker.org/chainmaker/common/v2/monitor"
 	"chainmaker.org/chainmaker/localconf/v2"
 	"chainmaker.org/chainmaker/logger/v2"
 
@@ -32,41 +31,37 @@ const (
 
 // SerialScheduler serial scheduler
 type SerialScheduler struct {
-	lock            sync.Mutex
-	exitC           chan bool
-	log             protocol.Logger
-	chainConf       protocol.ChainConf // chain config
-	signer          protocol.SigningMember
-	metricVMRunTime *prometheus.HistogramVec
-	vmHelper        *deterministic.CommonVMHelper // Shared VM execution helper
+	lock                        sync.Mutex
+	exitC                       chan bool
+	log                         protocol.Logger
+	chainConf                   protocol.ChainConf // chain config
+	signer                      protocol.SigningMember
+	metricContractInvokeCounter *prometheus.CounterVec
+	vmHelper                    *deterministic.CommonVMHelper // Shared VM execution helper
 }
 
 // NewSerialScheduler building a serial transaction scheduler
-func NewSerialScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, ac protocol.AccessControlProvider) *SerialScheduler {
-
+func NewSerialScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, ac protocol.AccessControlProvider, metricContractInvokeCounter *prometheus.CounterVec) *SerialScheduler {
 	log := logger.GetLoggerByChain(logger.MODULE_CORE, chainConf.ChainConfig().ChainId)
 	log.DebugDynamic(func() string {
 		return "use the deterministic serial scheduler"
 	})
-	var scheduler = &SerialScheduler{
-		lock:      sync.Mutex{},
-		exitC:     make(chan bool),
-		log:       log,
-		chainConf: chainConf,
+	scheduler := &SerialScheduler{
+		lock:                        sync.Mutex{},
+		exitC:                       make(chan bool),
+		log:                         log,
+		chainConf:                   chainConf,
+		metricContractInvokeCounter: metricContractInvokeCounter,
 	}
 
 	var err error
 	if chainConf.ChainConfig().Core.EnableOptimizeChargeGas {
+		//todo:schedulerUtils.InitSigner 外面创建传进来，防止不释放
 		scheduler.signer, err = schedulerUtils.InitSigner(chainConf.ChainConfig(), localconf.ChainMakerConfig, log)
 		if err != nil {
 			log.Fatalf("init signer of scheduler failed: err = %v", err)
 			return nil
 		}
-	}
-
-	if localconf.ChainMakerConfig.MonitorConfig.Enabled {
-		scheduler.metricVMRunTime = monitor.NewHistogramVec(monitor.SUBSYSTEM_CORE_PROPOSER_SCHEDULER, "metric_vm_run_time",
-			"VM run time metric", []float64{0.005, 0.01, 0.015, 0.05, 0.1, 1, 10}, "chainId")
 	}
 
 	// Initialize common VM helper
@@ -76,7 +71,8 @@ func NewSerialScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, 
 }
 
 func (ts *SerialScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Transaction,
-	snapshot protocol.Snapshot) (map[string]*commonPb.TxRWSet, map[string][]*commonPb.ContractEvent, error) {
+	snapshot protocol.Snapshot,
+) (map[string]*commonPb.TxRWSet, map[string][]*commonPb.ContractEvent, error) {
 	txRwSet, contractEvents, _, err := ts.schedule(block, txBatch, snapshot, protocol.Schedule)
 	if err != nil {
 		return nil, nil, err
@@ -86,7 +82,8 @@ func (ts *SerialScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.T
 
 // SimulateWithDag based on the dag in the block, perform scheduling and execution transactions
 func (ts *SerialScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.Snapshot) (
-	map[string]*commonPb.TxRWSet, map[string]*commonPb.Result, error) {
+	map[string]*commonPb.TxRWSet, map[string]*commonPb.Result, error,
+) {
 	txRwSet, _, txResultMap, err := ts.schedule(block, block.Txs, snapshot, protocol.Simulate)
 	if err != nil {
 		return nil, nil, err
@@ -105,8 +102,8 @@ func (ts *SerialScheduler) Halt() {
 
 func (ts *SerialScheduler) schedule(block *commonPb.Block, txBatch []*commonPb.Transaction,
 	snapshot protocol.Snapshot, mode protocol.ScheduleMode) (map[string]*commonPb.TxRWSet,
-	map[string][]*commonPb.ContractEvent, map[string]*commonPb.Result, error) {
-
+	map[string][]*commonPb.ContractEvent, map[string]*commonPb.Result, error,
+) {
 	ts.lock.Lock()
 	defer ts.lock.Unlock()
 	defer ts.vmHelper.ReleaseContractCache()
@@ -121,7 +118,8 @@ func (ts *SerialScheduler) schedule(block *commonPb.Block, txBatch []*commonPb.T
 	defer cancel()
 
 	finishC := make(chan bool, 1)
-	errC := make(chan error, 1)
+	//容量配置成2 防止 1. goroutine panic，第127行写入errC 2. 主线程收到exitC，第157行尝试写入 → 永久阻塞
+	errC := make(chan error, 2)
 
 	startTime := time.Now()
 	go func() {
@@ -135,7 +133,8 @@ func (ts *SerialScheduler) schedule(block *commonPb.Block, txBatch []*commonPb.T
 		err := ts.handleTxsSerially(ctx, block, txBatch, snapshot, mode)
 		if err != nil {
 			ts.log.Errorf("failed to handle txs serially, error: %s", err)
-			errC <- err
+			//这里不写，errchannel只关注无法处理的error
+			// errC <- err
 		}
 	}()
 
@@ -147,7 +146,7 @@ func (ts *SerialScheduler) schedule(block *commonPb.Block, txBatch []*commonPb.T
 	case <-ctx.Done():
 		// Context cancelled (timeout or explicit cancel)
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			//超时打包已经执行的交易，未执行交易放入交易池等待下次打包，这样存在共识不过的风险，
+			// 超时打包已经执行的交易，未执行交易放入交易池等待下次打包，这样存在共识不过的风险，
 			// 共识节点可能打包的交易不一致，需要讨论。
 			ts.log.Warnf("schedule timeout after %d seconds", ScheduleWithDagTimeout)
 		} else {
@@ -177,8 +176,8 @@ func (ts *SerialScheduler) schedule(block *commonPb.Block, txBatch []*commonPb.T
 		ts.log.DebugDynamic(func() string {
 			return fmt.Sprintf("append charge gas tx to block[%d]", block.Header.BlockHeight)
 		})
-		//TODO add this back
-		//ts.appendChargeGasTx(block, snapshot, senderCollection)
+		// TODO add this back when merge gas
+		// ts.appendChargeGasTx(block, snapshot, senderCollection)
 	}
 
 	// update block's txs(delete the tx which schedule time out.)
@@ -214,10 +213,6 @@ func (ts *SerialScheduler) handleTxsSerially(ctx context.Context, block *commonP
 		if snapshot.IsSealed() {
 			return fmt.Errorf("handleTx(`%v`) snapshot has already sealed", tx.GetPayload().TxId)
 		}
-		var start time.Time
-		if localconf.ChainMakerConfig.MonitorConfig.Enabled {
-			start = time.Now()
-		}
 
 		// execute tx, and get
 		// 1) the read/write set
@@ -236,14 +231,13 @@ func (ts *SerialScheduler) handleTxsSerially(ctx context.Context, block *commonP
 			return fmt.Sprintf("handleTx(`%v`) => ApplyTxSimContext(...) => snapshot.txTable = %v, applySize = %v",
 				tx.GetPayload().TxId, len(snapshot.GetTxTable()), applySize)
 		})
-
+		//串行确定性调度不会有，applyResult等于false的情况，如果有可能存在bug，防守编程
 		if !applyResult {
 			return fmt.Errorf("serial scheduler conflict: tx_id=%s, apply_size=%d", tx.GetPayload().TxId, applySize)
 		}
 
 		if localconf.ChainMakerConfig.MonitorConfig.Enabled {
-			elapsed := time.Since(start)
-			ts.metricVMRunTime.WithLabelValues(tx.Payload.ChainId).Observe(elapsed.Seconds())
+			ts.metricContractInvokeCounter.WithLabelValues(ts.chainConf.ChainConfig().ChainId, tx.Payload.ContractName, commonPb.RuntimeType_NATIVE.String(), "true").Inc()
 		}
 
 		ts.log.DebugDynamic(func() string {

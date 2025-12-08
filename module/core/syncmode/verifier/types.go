@@ -30,3 +30,8 @@ type BlockVerifierConfig struct {
 	NetService      protocol.NetService
 	TxFilter        protocol.TxFilter
 }
+
+type BlockVerifier interface {
+	protocol.BlockVerifier
+	msgbus.Subscriber
+}

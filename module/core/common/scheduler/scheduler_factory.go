@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"chainmaker.org/chainmaker/common/v2/monitor"
 	"chainmaker.org/chainmaker/localconf/v2"
 	"chainmaker.org/chainmaker/logger/v2"
@@ -23,31 +25,53 @@ import (
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 )
 
-type TxSchedulerFactory struct {
+var (
+	// 全局的 Prometheus metrics，所有 scheduler 共享
+	// 避免每次创建 scheduler 时重复注册导致内存泄漏
+	metricContractInvokeCounter *prometheus.CounterVec
+	metricOnce                  sync.Once
+)
+
+// initSchedulerMetrics 初始化全局 metrics（只执行一次）
+func initSchedulerMetrics() {
+	metricOnce.Do(func() {
+		if localconf.ChainMakerConfig.MonitorConfig.Enabled {
+			metricContractInvokeCounter = monitor.NewCounterVec(
+				monitor.SUBSYSTEM_VM,
+				monitor.MetricContractInvokeCounter,
+				monitor.HelpContractInvokeCounterMetric,
+				monitor.ChainId, "contract_name", "runtime_type", "state",
+			)
+		}
+	})
 }
+
+type TxSchedulerFactory struct{}
 
 // NewTxScheduler building a transaction scheduler
 func (sf TxSchedulerFactory) NewTxScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
 	storeHelper conf.StoreHelper, ledgerCache protocol.LedgerCache,
-	ac protocol.AccessControlProvider) protocol.TxScheduler {
-
+	ac protocol.AccessControlProvider,
+) protocol.TxScheduler {
+	// 初始化全局 metrics（只会执行一次）
+	initSchedulerMetrics()
 	scheduler := chainConf.ChainConfig().Scheduler
 	if scheduler == nil {
-		return newTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac)
+		return newTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac, metricContractInvokeCounter)
 	}
 
 	if chainConf.ChainConfig().Scheduler != nil && chainConf.ChainConfig().Scheduler.EnableEvidence {
 		return newTxSchedulerEvidence(vmMgr, chainConf, storeHelper, ledgerCache)
 	}
 
-	switch scheduler.SchedulerType {
-	case config.SchedulerType_DAG:
+	switch scheduler.ProcessType {
+	case config.ProcessType_EXECUTE_ON_PROPOSE:
 		if scheduler.AlgorithmType == config.AlgorithmType_RANDOM {
-			return newTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac)
+			return newTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac, metricContractInvokeCounter)
 		}
-	case config.SchedulerType_DETERMINISTIC:
+	case config.ProcessType_EXECUTE_AFTER_PROPOSE:
 		if scheduler.AlgorithmType == config.AlgorithmType_SERIAL {
-			return serial.NewSerialScheduler(vmMgr, chainConf, ac)
+			return serial.NewSerialScheduler(vmMgr, chainConf, ac, metricContractInvokeCounter)
 		} else if scheduler.AlgorithmType == config.AlgorithmType_REORDER {
 			return reorder.NewReorderTxScheduler(vmMgr, chainConf, storeHelper, ac)
 		}
@@ -57,10 +81,13 @@ func (sf TxSchedulerFactory) NewTxScheduler(vmMgr protocol.VmManager, chainConf 
 
 // newTxScheduler building a regular transaction scheduler
 func newTxScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
-	storeHelper conf.StoreHelper, cache protocol.LedgerCache, ac protocol.AccessControlProvider) *TxScheduler {
+	storeHelper conf.StoreHelper, cache protocol.LedgerCache, ac protocol.AccessControlProvider,
+	metricContractInvokeCounter *prometheus.CounterVec,
+) *TxScheduler {
 	log := logger.GetLoggerByChain(logger.MODULE_CORE, chainConf.ChainConfig().ChainId)
 	log.Debugf("use the common TxScheduler.")
-	var txScheduler = &TxScheduler{
+
+	txScheduler := &TxScheduler{
 		lock:            sync.Mutex{},
 		VmManager:       vmMgr,
 		scheduleFinishC: make(chan bool),
@@ -70,6 +97,8 @@ func newTxScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
 		ledgerCache:     cache,
 		contractCache:   &sync.Map{},
 		ac:              ac,
+		// 使用全局共享的 metric，避免重复注册导致内存泄漏
+		metricContractInvokeCounter: metricContractInvokeCounter,
 	}
 	var err error
 	txScheduler.keyReg, err = regexp.Compile(protocol.DefaultStateRegex)
@@ -81,14 +110,6 @@ func newTxScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
 		log.Fatalf("init signer of TxScheduler failed: err = %v", err)
 	}
 
-	if localconf.ChainMakerConfig.MonitorConfig.Enabled {
-		//txScheduler.metricVMRunTime = monitor.NewHistogramVec(monitor.SUBSYSTEM_CORE_PROPOSER_SCHEDULER, "metric_vm_run_time",
-		//	"VM run time metric", []float64{0.005, 0.01, 0.015, 0.05, 0.1, 1, 2, 5, 10}, "chainId")
-		//
-		txScheduler.metricContractInvokeCounter = monitor.NewCounterVec(monitor.SUBSYSTEM_VM, monitor.MetricContractInvokeCounter,
-			monitor.HelpContractInvokeCounterMetric,
-			monitor.ChainId, "contract_name", "runtime_type", "state")
-	}
 	return txScheduler
 }
 
@@ -96,7 +117,8 @@ func newTxScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
 func initSigner(
 	chainConfig *config.ChainConfig,
 	cmConfig *localconf.CMConfig,
-	log protocol.Logger) (protocol.SigningMember, error) {
+	log protocol.Logger,
+) (protocol.SigningMember, error) {
 	var err error
 	var signingMember protocol.SigningMember
 	nodeConfig := cmConfig.NodeConfig
@@ -130,7 +152,8 @@ func initSigner(
 
 // newTxSchedulerEvidence building a evidence transaction scheduler
 func newTxSchedulerEvidence(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
-	storeHelper conf.StoreHelper, cache protocol.LedgerCache) *TxSchedulerEvidence {
+	storeHelper conf.StoreHelper, cache protocol.LedgerCache,
+) *TxSchedulerEvidence {
 	log := logger.GetLoggerByChain(logger.MODULE_CORE, chainConf.ChainConfig().ChainId)
 	log.Debugf("use the evidence TxScheduler.")
 	txSchedulerEvidence := &TxSchedulerEvidence{

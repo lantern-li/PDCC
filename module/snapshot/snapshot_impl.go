@@ -185,7 +185,7 @@ func (s *SnapshotImpl) GetTxRWSetTable() []*commonPb.TxRWSet {
 			}
 			return info
 		})
-		//log.Debugf(info)
+		// log.Debugf(info)
 	}
 
 	//for _, txRWSet := range s.txRWSetTable {
@@ -210,11 +210,11 @@ func (s *SnapshotImpl) Lock(lockerName, txId string) error {
 	*/
 
 	// 获取合约关键字锁（如果不存在，则构造）
-	//txLockMapLockStartStick := utils.CurrentTimeMillisSeconds()
-	//s.txLockMapLock.RLock()
-	//locker, ok := s.txLockMap[lockerName]
-	//s.txLockMapLock.RUnlock()
-	//txLockMapLockCost := utils.CurrentTimeMillisSeconds() - txLockMapLockStartStick
+	// txLockMapLockStartStick := utils.CurrentTimeMillisSeconds()
+	// s.txLockMapLock.RLock()
+	// locker, ok := s.txLockMap[lockerName]
+	// s.txLockMapLock.RUnlock()
+	// txLockMapLockCost := utils.CurrentTimeMillisSeconds() - txLockMapLockStartStick
 
 	//newTxLockMapStartTick := utils.CurrentTimeMillisSeconds()
 	//if !ok {
@@ -232,11 +232,11 @@ func (s *SnapshotImpl) Lock(lockerName, txId string) error {
 
 	// 检查当前交易是否正在使用锁,如果未使用，则合约关键字锁进行加锁操作，然后记录txid
 	_, ok := s.txLockLog.LoadOrStore(txId, struct{}{}) // 这么设计是由于目前只允许一个交易一个locker
-	//getLockStartTick := utils.CurrentTimeMillisSeconds()
+	// getLockStartTick := utils.CurrentTimeMillisSeconds()
 	if !ok {
 		s.txLock.Lock() // ps: 这笔交易在apply时才进行解锁操作。
 	}
-	//getLockCost := utils.CurrentTimeMillisSeconds() - getLockStartTick
+	// getLockCost := utils.CurrentTimeMillisSeconds() - getLockStartTick
 
 	//s.log.DebugDynamic(func() string {
 	//	return fmt.Sprintf("snapshot lock success[txId:%s, txLockMapLockCost:%v, newTxLockMapCost:%v, getLockCost:%v]",
@@ -253,16 +253,16 @@ func (s *SnapshotImpl) GetKeyWithLock(txExecSeq int, contractName, lockerName, t
 			contractName, lockerName, txId, s.blockHeight)
 	})
 
-	//getLockStartTick := utils.CurrentTimeMillisSeconds()
+	// getLockStartTick := utils.CurrentTimeMillisSeconds()
 	err := s.Lock(lockerName, txId)
 	if err != nil {
 		s.log.Warnf("snapshot GetKeyWithLock fail[contract:%s, txid:%s, lock:%s]",
 			contractName, txId, lockerName)
 		return nil, err
 	}
-	//getLockCost := utils.CurrentTimeMillisSeconds() - getLockStartTick
+	// getLockCost := utils.CurrentTimeMillisSeconds() - getLockStartTick
 
-	//getKeyStartTick := utils.CurrentTimeMillisSeconds()
+	// getKeyStartTick := utils.CurrentTimeMillisSeconds()
 	v, err := s.GetKey(txExecSeq, contractName, key)
 	if err != nil {
 		s.log.Warnf("snapshot GetKeyWithLock fail[contract:%s, txid:%s, lock:%s]",
@@ -282,7 +282,7 @@ func (s *SnapshotImpl) GetKeyWithLock(txExecSeq int, contractName, lockerName, t
 // GetKey from snapshot
 func (s *SnapshotImpl) GetKey(txExecSeq int, contractName string, key []byte) ([]byte, error) {
 	// get key before txExecSeq
-	//snapshotSize := s.GetSnapshotSize()
+	// snapshotSize := s.GetSnapshotSize()
 
 	//s.lock.RLock()
 	//defer s.lock.RUnlock()
@@ -454,7 +454,6 @@ func (s *SnapshotImpl) getBatchFromReadSet(keys []*vmPb.BatchKey) ([]*vmPb.Batch
 // applyOptimize apply the normal tx to snapshot
 func (s *SnapshotImpl) applyNormalTxSimContext(tx *commonPb.Transaction,
 	txSimContext protocol.TxSimContext, runVmSuccess bool) (bool, int) {
-	txId := tx.Payload.TxId
 	// 税总合约从这退出
 	if _, ok := SZContractList[tx.Payload.ContractName]; ok {
 		return s.dealSZTx(txSimContext, protocol.ExecOrderTxTypeNormal,
@@ -464,14 +463,6 @@ func (s *SnapshotImpl) applyNormalTxSimContext(tx *commonPb.Transaction,
 	if s.IsSealed() {
 		return false, s.GetSnapshotSize()
 	}
-
-	// 判断交易是否超时，如果交易超时，则尝试放回重执行。待调度超时后，通过调度超时的方式将交易放回交易池
-	if !runVmSuccess && txSimContext.GetTxResult().ContractResult.Message == "time out" {
-		s.log.Warnf("execute tx[height:%d, txId:%s, contractName:%s, method:%s] time out, try to execute again",
-			s.blockHeight, txId, tx.Payload.ContractName, tx.Payload.Method)
-		return false, s.GetSnapshotSize()
-	}
-
 	// 乐观处理，以所有交易都不冲突的情况进行优先处理
 	txExecSeq := txSimContext.GetTxExecSeq()
 	var txRWSet *commonPb.TxRWSet
@@ -553,8 +544,8 @@ func (s *SnapshotImpl) applyIteratorFirstRun(tx *commonPb.Transaction) (bool, in
 
 // 迭代器交易第二次执行，正式apply到snapshot中
 func (s *SnapshotImpl) applyIteratorSecondRun(tx *commonPb.Transaction,
-	txSimContext protocol.TxSimContext, runVmSuccess bool) (bool, int) {
-
+	txSimContext protocol.TxSimContext, runVmSuccess bool,
+) (bool, int) {
 	txRWSet := txSimContext.GetTxRWSet(runVmSuccess)
 	txResult := txSimContext.GetTxResult()
 
@@ -569,8 +560,8 @@ func (s *SnapshotImpl) applyIteratorSecondRun(tx *commonPb.Transaction,
 
 // applyGasTxSimContext apply gas tx to snapshot
 func (s *SnapshotImpl) applyGasTxSimContext(tx *commonPb.Transaction,
-	txSimContext protocol.TxSimContext, runVmSuccess bool) (bool, int) {
-
+	txSimContext protocol.TxSimContext, runVmSuccess bool,
+) (bool, int) {
 	txRWSet := txSimContext.GetTxRWSet(runVmSuccess)
 	txResult := txSimContext.GetTxResult()
 
@@ -601,7 +592,8 @@ func buildKVMaps(txRWSet *commonPb.TxRWSet) (map[string]*sv, map[string]*sv) {
 
 // ApplyTxSimContext add TxSimContext to the snapshot, return current applied tx num whether success of not
 func (s *SnapshotImpl) ApplyTxSimContext(txSimContext protocol.TxSimContext, specialTxType protocol.ExecOrderTxType,
-	runVmSuccess bool, applySpecialTx bool) (bool, int) {
+	runVmSuccess bool, applySpecialTx bool,
+) (bool, int) {
 	tx := txSimContext.GetTx()
 
 	s.log.DebugDynamic(func() string {
@@ -638,9 +630,10 @@ func (s *SnapshotImpl) ApplyBlock(block *commonPb.Block, txRWSetMap map[string]*
 
 // After the read-write set is generated, add TxSimContext to the snapshot
 func (s *SnapshotImpl) apply(tx *commonPb.Transaction, txRWSet *commonPb.TxRWSet, txResult *commonPb.Result,
-	runVmSuccess bool) {
+	runVmSuccess bool,
+) {
 	// Append to read table
-	//applySeq := len(s.txTable)
+	// applySeq := len(s.txTable)
 	applySeq := s.GetSnapshotSize()
 	// compatible with version lower than 2201, failed transaction should not apply read set to snapshot
 	// that may cause next transaction read out an error value. Failed transaction can produce invalid read set
@@ -687,10 +680,11 @@ func (s *SnapshotImpl) apply(tx *commonPb.Transaction, txRWSet *commonPb.TxRWSet
 
 // After the read-write set is generated, add TxSimContext to the snapshot
 func (s *SnapshotImpl) applyOptimize(tx *commonPb.Transaction, txRWSet *commonPb.TxRWSet, txResult *commonPb.Result,
-	runVmSuccess bool, finalReadKvs, finalWriteKvs map[string]*sv) {
+	runVmSuccess bool, finalReadKvs, finalWriteKvs map[string]*sv,
+) {
 	// Append to read table
 	applySeq := len(s.txTable)
-	//applySeq := s.GetSnapshotSize()
+	// applySeq := s.GetSnapshotSize()
 	// compatible with version lower than 2201, failed transaction should not apply read set to snapshot
 	// that may cause next transaction read out an error value. Failed transaction can produce invalid read set
 	// by read, write and then read again the same value.
@@ -844,8 +838,9 @@ func (s *SnapshotImpl) BuildDAG(isSql bool, txRWSetTable []*commonPb.TxRWSet) *c
 
 // buildDictAndPos build read/write key dict and read/write key pos
 func (s *SnapshotImpl) buildDictAndPos(txRWSetTable []*commonPb.TxRWSet) (map[string][]uint32, map[string][]uint32,
-	map[uint32]map[string]uint32, map[uint32]map[string]uint32) {
-	//Suppose there are at least 4 keys in each transaction，2 read and 2 write
+	map[uint32]map[string]uint32, map[uint32]map[string]uint32,
+) {
+	// Suppose there are at least 4 keys in each transaction，2 read and 2 write
 	readKeyDict := make(map[string][]uint32, len(txRWSetTable)*2)
 	writeKeyDict := make(map[string][]uint32, len(txRWSetTable)*2)
 	readPos := make(map[uint32]map[string]uint32, len(txRWSetTable))
@@ -877,14 +872,15 @@ func (s *SnapshotImpl) buildDictAndPos(txRWSetTable []*commonPb.TxRWSet) (map[st
 }
 
 func (s *SnapshotImpl) buildReachMap(i uint32, txRWSet *commonPb.TxRWSet, readKeyDict, writeKeyDict map[string][]uint32,
-	readPos, writePos map[uint32]map[string]uint32, reachMap []*bitmap.Bitmap) *bitmap.Bitmap {
+	readPos, writePos map[uint32]map[string]uint32, reachMap []*bitmap.Bitmap,
+) *bitmap.Bitmap {
 	readTableItemForI := txRWSet.TxReads
 	writeTableItemForI := txRWSet.TxWrites
 	allReachForI := &bitmap.Bitmap{}
 	allReachForI.Set(int(i))
 	directReachForI := &bitmap.Bitmap{}
 
-	//ReadSet && WriteSet conflict
+	// ReadSet && WriteSet conflict
 	for _, keyForI := range readTableItemForI {
 		readKey := string(keyForI.Key)
 		writeKeyTxs := writeKeyDict[readKey]
@@ -898,7 +894,7 @@ func (s *SnapshotImpl) buildReachMap(i uint32, txRWSet *commonPb.TxRWSet, readKe
 			allReachForI.Or(reachMap[writeKeyTxs[j]])
 		}
 	}
-	//WriteSet and (all ReadSet, WriteSet) conflict
+	// WriteSet and (all ReadSet, WriteSet) conflict
 	for _, keyForI := range writeTableItemForI {
 		writeKey := string(keyForI.Key)
 		readKeyTxs := readKeyDict[writeKey]
@@ -931,10 +927,10 @@ func (s *SnapshotImpl) buildReachMap(i uint32, txRWSet *commonPb.TxRWSet, readKe
 func constructKey(contractName string, key []byte) string {
 	// with higher performance
 	return contractName + string(key)
-	//var builder strings.Builder
-	//builder.WriteString(contractName)
-	//builder.Write(key)
-	//return builder.String()
+	// var builder strings.Builder
+	// builder.WriteString(contractName)
+	// builder.Write(key)
+	// return builder.String()
 }
 
 // SetBlockFingerprint set block fingerprint
@@ -948,7 +944,8 @@ func (s *SnapshotImpl) GetBlockFingerprint() string {
 }
 
 func (s *SnapshotImpl) dealNormalTx(txSimContext protocol.TxSimContext, specialTxType protocol.ExecOrderTxType,
-	runVmSuccess, applySpecialTx bool, tx *commonPb.Transaction) (bool, int) {
+	runVmSuccess, applySpecialTx bool, tx *commonPb.Transaction,
+) (bool, int) {
 	s.log.Infof("what??? deal normal Tx, contractName: %s", tx.Payload.ContractName)
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -991,7 +988,8 @@ func (s *SnapshotImpl) dealNormalTx(txSimContext protocol.TxSimContext, specialT
 }
 
 func (s *SnapshotImpl) dealSZTx(txSimContext protocol.TxSimContext, specialTxType protocol.ExecOrderTxType,
-	runVmSuccess, applySpecialTx bool, tx *commonPb.Transaction) (bool, int) {
+	runVmSuccess, applySpecialTx bool, tx *commonPb.Transaction,
+) (bool, int) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	// it is necessary to check sealed secondly

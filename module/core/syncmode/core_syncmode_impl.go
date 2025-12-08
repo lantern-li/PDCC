@@ -246,7 +246,6 @@ func (c *CoreEngine) OnMessage(message *msgbus.Message) {
 
 				if rwSetMap == nil {
 					c.BlockVerifier.VerifyBlock(block, protocol.CONSENSUS_VERIFY) //nolint: errcheck
-
 				} else {
 					for index, tx := range block.Txs {
 						rwSets[index] = rwSetMap[tx.Payload.TxId]
@@ -312,7 +311,7 @@ func (c *CoreEngine) Start() {
 	c.msgBus.Register(msgbus.TxPoolSignal, c)
 	c.msgBus.Register(msgbus.ConsensusFailTxs, c)
 	c.msgBus.Register(msgbus.ChainConfig, c)
-	//c.msgBus.Register(msgbus.BuildProposal, c)
+	// c.msgBus.Register(msgbus.BuildProposal, c)
 	c.blockProposer.Start() //nolint: errcheck
 }
 
@@ -349,8 +348,7 @@ func (c *CoreEngine) updateChinConfig(chainConfig *chainConfConfig.ChainConfig) 
 		protocol.ParametersValueMaxLength = protocol.DefaultParametersValueMaxSize * 1024 * 1024
 	}
 
-	//todo: 直接用值判断。
-	if chainConfig.Scheduler != nil && (*c.currentScheduler).SchedulerType != (*chainConfig.Scheduler).SchedulerType &&
+	if chainConfig.Scheduler != nil && (*c.currentScheduler).ProcessType != (*chainConfig.Scheduler).ProcessType &&
 		(*c.currentScheduler).AlgorithmType != (*chainConfig.Scheduler).AlgorithmType {
 		c.log.Infof("scheduler type update, new:%+v", *chainConfig.Scheduler)
 		var storeHelper conf.StoreHelper
@@ -364,19 +362,15 @@ func (c *CoreEngine) updateChinConfig(chainConfig *chainConfConfig.ChainConfig) 
 		var schedulerFactory scheduler.TxSchedulerFactory
 		c.txScheduler = schedulerFactory.NewTxScheduler(c.vmMgr, c.chainConf, storeHelper, c.ledgerCache, c.ac)
 
-		// stop old proposer
-
 		err := c.blockProposer.Stop()
 		if err != nil {
-			//todo: add c.log.Panicf,带上error
 			c.log.Errorf("proposer stop  failed: %v", err)
 			c.log.Panicf("proposer stop  failed: %v", err)
 			return
 		}
-		//NOTE: 讨论启停逻辑
+
 		c.blockProposer, err = c.createBlockProposer()
 		if err != nil {
-			//todo: add c.log.Panicf,带上error
 			c.log.Errorf("update block proposer failed: %v", err)
 			c.log.Panicf("update block proposer failed: %v", err)
 			return
@@ -384,7 +378,6 @@ func (c *CoreEngine) updateChinConfig(chainConfig *chainConfConfig.ChainConfig) 
 
 		err = c.updateBlockVerifier()
 		if err != nil {
-			//todo: add c.log.Panicf,带上error
 			c.log.Errorf("update block verifier failed: %v", err)
 			c.log.Panicf("update block verifier failed: %v", err)
 			return
@@ -395,7 +388,6 @@ func (c *CoreEngine) updateChinConfig(chainConfig *chainConfConfig.ChainConfig) 
 		// start new proposer
 		err = c.blockProposer.Start()
 		if err != nil {
-			//todo: add c.log.Panicf,带上error
 			c.log.Errorf("proposer start  failed: %v", err)
 			c.log.Panicf("proposer start  failed: %v", err)
 			return

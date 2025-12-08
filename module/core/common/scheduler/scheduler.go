@@ -72,7 +72,6 @@ type TxScheduler struct {
 	contractCache   *sync.Map
 	ac              protocol.AccessControlProvider
 
-	metricVMRunTime             *prometheus.HistogramVec
 	metricContractInvokeCounter *prometheus.CounterVec
 }
 
