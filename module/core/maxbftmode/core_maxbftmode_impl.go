@@ -8,22 +8,24 @@ package maxbftmode
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
+	"chainmaker.org/chainmaker/common/v2/msgbus"
+	"chainmaker.org/chainmaker/localconf/v2"
+	consensuspb "chainmaker.org/chainmaker/pb-go/v2/consensus"
+	"chainmaker.org/chainmaker/pb-go/v2/consensus/maxbft"
 	txpoolpb "chainmaker.org/chainmaker/pb-go/v2/txpool"
+	"chainmaker.org/chainmaker/protocol/v2"
 
 	"chainmaker.org/chainmaker-go/module/core/common"
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler"
+	"chainmaker.org/chainmaker-go/module/core/common/scheduler/utils"
 	"chainmaker.org/chainmaker-go/module/core/maxbftmode/helper"
 	"chainmaker.org/chainmaker-go/module/core/maxbftmode/proposer"
 	"chainmaker.org/chainmaker-go/module/core/maxbftmode/verifier"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 	"chainmaker.org/chainmaker-go/module/subscriber"
-	"chainmaker.org/chainmaker/common/v2/msgbus"
-	"chainmaker.org/chainmaker/localconf/v2"
-	consensuspb "chainmaker.org/chainmaker/pb-go/v2/consensus"
-	"chainmaker.org/chainmaker/pb-go/v2/consensus/maxbft"
-	"chainmaker.org/chainmaker/protocol/v2"
 )
 
 // CoreEngine is a block handle engine.
@@ -49,6 +51,7 @@ type CoreEngine struct {
 	proposedCache protocol.ProposalCache      // cache proposed block and proposal status
 	log           protocol.Logger             // logger
 	subscriber    *subscriber.EventSubscriber // block subsriber
+	siger         protocol.SigningMember
 }
 
 // NewCoreEngine new a core engine.
@@ -64,16 +67,21 @@ func NewCoreEngine(cf *conf.CoreEngineConfig) (*CoreEngine, error) {
 		chainConf:       cf.ChainConf,
 		log:             cf.Log,
 	}
+	var err error
+	core.siger, err = utils.InitSigner(cf.ChainConf.ChainConfig(), localconf.ChainMakerConfig)
+	if err != nil {
+		log.Fatalf("init signer of TxScheduler failed: err = %v", err)
+	}
+
 	var schedulerFactory scheduler.TxSchedulerFactory
 	core.txScheduler = schedulerFactory.NewTxScheduler(
 		cf.VmMgr,
 		cf.ChainConf,
 		cf.StoreHelper,
 		cf.LedgerCache,
-		cf.AC)
+		cf.AC, core.siger)
 	core.quitC = make(<-chan interface{})
 
-	var err error
 	// new a bock proposer
 	proposerConfig := proposer.BlockProposerConfig{
 		ChainId:         cf.ChainId,
@@ -181,7 +189,6 @@ func (c *CoreEngine) OnMessage(message *msgbus.Message) {
 			c.blockProposer.OnReceiveTxPoolSignal(signal)
 		}
 	}
-
 }
 
 // Start, initialize core engine

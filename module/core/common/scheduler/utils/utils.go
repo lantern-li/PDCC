@@ -22,7 +22,6 @@ import (
 	"chainmaker.org/chainmaker/localconf/v2"
 	acPb "chainmaker.org/chainmaker/pb-go/v2/accesscontrol"
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
-	"chainmaker.org/chainmaker/pb-go/v2/config"
 	configPb "chainmaker.org/chainmaker/pb-go/v2/config"
 	"chainmaker.org/chainmaker/protocol/v2"
 	"chainmaker.org/chainmaker/utils/v2"
@@ -30,9 +29,8 @@ import (
 
 // InitSigner init a signer with node private key
 func InitSigner(
-	chainConfig *config.ChainConfig,
-	cmConfig *localconf.CMConfig,
-	log protocol.Logger) (protocol.SigningMember, error) {
+	chainConfig *configPb.ChainConfig,
+	cmConfig *localconf.CMConfig) (protocol.SigningMember, error) {
 	var err error
 	var signingMember protocol.SigningMember
 	nodeConfig := cmConfig.NodeConfig

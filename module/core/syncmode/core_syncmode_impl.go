@@ -10,6 +10,7 @@ package syncmode
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/gogo/protobuf/proto"
@@ -25,6 +26,7 @@ import (
 
 	"chainmaker.org/chainmaker-go/module/core/common"
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler"
+	"chainmaker.org/chainmaker-go/module/core/common/scheduler/utils"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 	"chainmaker.org/chainmaker-go/module/core/syncmode/proposer"
 	"chainmaker.org/chainmaker-go/module/core/syncmode/verifier"
@@ -61,7 +63,8 @@ type CoreEngine struct {
 	ac               protocol.AccessControlProvider
 	txFilter         protocol.TxFilter
 	storeHelper      conf.StoreHelper
-	currentScheduler *chainConfConfig.SchedulerConfig
+	currentScheduler *chainConfConfig.SchedulerConfig // current scheduler config
+	signer            protocol.SigningMember
 }
 
 // NewCoreEngine new a core engine.
@@ -90,10 +93,14 @@ func NewCoreEngine(cf *conf.CoreEngineConfig) (*CoreEngine, error) {
 	if cf.ChainConf.ChainConfig().Scheduler != nil {
 		core.currentScheduler = cf.ChainConf.ChainConfig().Scheduler
 	}
+	var err error
+	core.signer, err = utils.InitSigner(cf.ChainConf.ChainConfig(), localconf.ChainMakerConfig)
+	if err != nil {
+		log.Fatalf("init signer of TxScheduler failed: err = %v", err)
+	}
 
 	// new a tx scheduler
 	core.txScheduler = createTxScheduler(core)
-	var err error
 
 	// Initialize the block proposer
 	core.blockProposer, err = core.createBlockProposer()
@@ -126,7 +133,7 @@ func NewCoreEngine(cf *conf.CoreEngineConfig) (*CoreEngine, error) {
 func createTxScheduler(c *CoreEngine) protocol.TxScheduler {
 	var schedulerFactory scheduler.TxSchedulerFactory
 	return schedulerFactory.NewTxScheduler(
-		c.vmMgr, c.chainConf, c.storeHelper, c.ledgerCache, c.ac)
+		c.vmMgr, c.chainConf, c.storeHelper, c.ledgerCache, c.ac,c.signer)
 }
 
 // createBlockProposer initializes a block proposer.
@@ -360,7 +367,7 @@ func (c *CoreEngine) updateChinConfig(chainConfig *chainConfConfig.ChainConfig) 
 
 		// update scheduler
 		var schedulerFactory scheduler.TxSchedulerFactory
-		c.txScheduler = schedulerFactory.NewTxScheduler(c.vmMgr, c.chainConf, storeHelper, c.ledgerCache, c.ac)
+		c.txScheduler = schedulerFactory.NewTxScheduler(c.vmMgr, c.chainConf, storeHelper, c.ledgerCache, c.ac,c.signer)
 
 		err := c.blockProposer.Stop()
 		if err != nil {

@@ -35,7 +35,7 @@ type SerialScheduler struct {
 	exitC                       chan bool
 	log                         protocol.Logger
 	chainConf                   protocol.ChainConf // chain config
-	signer                      protocol.SigningMember
+	// signer                      protocol.SigningMember
 	metricContractInvokeCounter *prometheus.CounterVec
 	vmHelper                    *deterministic.CommonVMHelper // Shared VM execution helper
 }
@@ -54,15 +54,15 @@ func NewSerialScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, 
 		metricContractInvokeCounter: metricContractInvokeCounter,
 	}
 
-	var err error
-	if chainConf.ChainConfig().Core.EnableOptimizeChargeGas {
-		//todo:schedulerUtils.InitSigner 外面创建传进来，防止不释放
-		scheduler.signer, err = schedulerUtils.InitSigner(chainConf.ChainConfig(), localconf.ChainMakerConfig, log)
-		if err != nil {
-			log.Fatalf("init signer of scheduler failed: err = %v", err)
-			return nil
-		}
-	}
+	// var err error
+	// if chainConf.ChainConfig().Core.EnableOptimizeChargeGas {
+	// 	//todo:schedulerUtils.InitSigner 外面创建传进来，防止不释放
+	// 	scheduler.signer, err = schedulerUtils.InitSigner(chainConf.ChainConfig(), localconf.ChainMakerConfig, log)
+	// 	if err != nil {
+	// 		log.Fatalf("init signer of scheduler failed: err = %v", err)
+	// 		return nil
+	// 	}
+	// }
 
 	// Initialize common VM helper
 	scheduler.vmHelper = deterministic.NewCommonVMHelper(log, chainConf, vmMgr, ac)

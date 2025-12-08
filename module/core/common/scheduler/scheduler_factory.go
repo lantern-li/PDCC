@@ -19,7 +19,6 @@ import (
 	"chainmaker.org/chainmaker/pb-go/v2/config"
 	"chainmaker.org/chainmaker/protocol/v2"
 
-	"chainmaker.org/chainmaker-go/module/accesscontrol"
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/reorder"
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/serial"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
@@ -51,13 +50,13 @@ type TxSchedulerFactory struct{}
 // NewTxScheduler building a transaction scheduler
 func (sf TxSchedulerFactory) NewTxScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
 	storeHelper conf.StoreHelper, ledgerCache protocol.LedgerCache,
-	ac protocol.AccessControlProvider,
+	ac protocol.AccessControlProvider, signer protocol.SigningMember,
 ) protocol.TxScheduler {
 	// 初始化全局 metrics（只会执行一次）
 	initSchedulerMetrics()
 	scheduler := chainConf.ChainConfig().Scheduler
 	if scheduler == nil {
-		return newTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac, metricContractInvokeCounter)
+		return newTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac, signer, metricContractInvokeCounter)
 	}
 
 	if chainConf.ChainConfig().Scheduler != nil && chainConf.ChainConfig().Scheduler.EnableEvidence {
@@ -67,7 +66,7 @@ func (sf TxSchedulerFactory) NewTxScheduler(vmMgr protocol.VmManager, chainConf 
 	switch scheduler.ProcessType {
 	case config.ProcessType_EXECUTE_ON_PROPOSE:
 		if scheduler.AlgorithmType == config.AlgorithmType_RANDOM {
-			return newTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac, metricContractInvokeCounter)
+			return newTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac, signer, metricContractInvokeCounter)
 		}
 	case config.ProcessType_EXECUTE_AFTER_PROPOSE:
 		if scheduler.AlgorithmType == config.AlgorithmType_SERIAL {
@@ -82,7 +81,7 @@ func (sf TxSchedulerFactory) NewTxScheduler(vmMgr protocol.VmManager, chainConf 
 // newTxScheduler building a regular transaction scheduler
 func newTxScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
 	storeHelper conf.StoreHelper, cache protocol.LedgerCache, ac protocol.AccessControlProvider,
-	metricContractInvokeCounter *prometheus.CounterVec,
+	signer protocol.SigningMember, metricContractInvokeCounter *prometheus.CounterVec,
 ) *TxScheduler {
 	log := logger.GetLoggerByChain(logger.MODULE_CORE, chainConf.ChainConfig().ChainId)
 	log.Debugf("use the common TxScheduler.")
@@ -99,55 +98,14 @@ func newTxScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
 		ac:              ac,
 		// 使用全局共享的 metric，避免重复注册导致内存泄漏
 		metricContractInvokeCounter: metricContractInvokeCounter,
+		signer:                      signer,
 	}
 	var err error
 	txScheduler.keyReg, err = regexp.Compile(protocol.DefaultStateRegex)
 	if err != nil {
 		log.Fatalf("compile default state regex error %v", err)
 	}
-	txScheduler.signer, err = initSigner(chainConf.ChainConfig(), localconf.ChainMakerConfig, log)
-	if err != nil {
-		log.Fatalf("init signer of TxScheduler failed: err = %v", err)
-	}
-
 	return txScheduler
-}
-
-// init a signer with node private key
-func initSigner(
-	chainConfig *config.ChainConfig,
-	cmConfig *localconf.CMConfig,
-	log protocol.Logger,
-) (protocol.SigningMember, error) {
-	var err error
-	var signingMember protocol.SigningMember
-	nodeConfig := cmConfig.NodeConfig
-
-	switch chainConfig.AuthType {
-	case protocol.PermissionedWithCert, protocol.Identity:
-		signingMember, err = accesscontrol.InitCertSigningMember(
-			chainConfig,
-			nodeConfig.OrgId,
-			nodeConfig.PrivKeyFile,
-			nodeConfig.PrivKeyPassword,
-			nodeConfig.CertFile)
-		if err != nil {
-			return nil, fmt.Errorf("InitCertSigningMember failed: err = %v", err)
-		}
-	case protocol.PermissionedWithKey, protocol.Public:
-		signingMember, err = accesscontrol.InitPKSigningMember(
-			chainConfig.Crypto.Hash,
-			nodeConfig.OrgId,
-			nodeConfig.PrivKeyFile,
-			nodeConfig.PrivKeyPassword)
-		if err != nil {
-			return nil, fmt.Errorf("InitPKSigningMember failed: err = %v", err)
-		}
-	default:
-		return nil, fmt.Errorf("unknown auth type: %v", chainConfig.AuthType)
-	}
-
-	return signingMember, nil
 }
 
 // newTxSchedulerEvidence building a evidence transaction scheduler

@@ -19,7 +19,6 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"chainmaker.org/chainmaker-go/module/core/common/scheduler"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 	"chainmaker.org/chainmaker-go/module/subscriber"
 	"chainmaker.org/chainmaker/common/v2/bytehelper"
@@ -39,12 +38,10 @@ import (
 	"chainmaker.org/chainmaker/utils/v2"
 )
 
-var (
-	//proposeRepeatTimer *time.Timer //timer controls the propose repeat interval
-	//ProposeRepeatTimerMap = make(map[string]*time.Timer)
+// proposeRepeatTimer *time.Timer //timer controls the propose repeat interval
+// ProposeRepeatTimerMap = make(map[string]*time.Timer)
 
-	ProposeRepeatTimerMap sync.Map
-)
+var ProposeRepeatTimerMap sync.Map
 
 const (
 	DEFAULTDURATION = 1000 // default proposal duration, millis seconds
@@ -111,8 +108,8 @@ func NewBlockBuilder(conf *BlockBuilderConf) *BlockBuilder {
 func (bb *BlockBuilder) GenerateNewBlock(
 	proposingHeight uint64, preHash []byte, txBatch []*commonPb.Transaction,
 	batchIds []string, fetchBatches [][]*commonPb.Transaction) (
-	*commonPb.Block, []int64, error) {
-
+	*commonPb.Block, []int64, error,
+) {
 	timeLasts := make([]int64, 0)
 	currentHeight, _ := bb.ledgerCache.CurrentHeight()
 	lastBlock := bb.findLastBlockFromCache(proposingHeight, preHash, currentHeight)
@@ -138,8 +135,8 @@ func (bb *BlockBuilder) GenerateNewBlock(
 
 	// validate tx and verify ACL，split into 2 slice according to result
 	// validatedTxs are txs passed validate and should be executed by contract
-	var aclFailTxs = make([]*commonPb.Transaction, 0) // No need to ACL check, this slice is empty
-	var validatedTxs = txBatch
+	aclFailTxs := make([]*commonPb.Transaction, 0) // No need to ACL check, this slice is empty
+	validatedTxs := txBatch
 
 	// txScheduler handle：
 	// 1. execute transaction and fill the result, include rw set digest, and remove from txBatch
@@ -187,7 +184,7 @@ func (bb *BlockBuilder) GenerateNewBlock(
 	}
 	timeLasts = append(timeLasts, finalizeLasts)
 	// get txs schedule timeout and put back to txpool
-	var txsTimeout = make([]*commonPb.Transaction, 0)
+	txsTimeout := make([]*commonPb.Transaction, 0)
 	if len(txRWSetMap) < len(txBatch) {
 		// if tx not in txRWSetMap, tx should be put back to txpool
 		for _, tx := range txBatch {
@@ -243,13 +240,15 @@ func (bb *BlockBuilder) GenerateNewBlock(
 }
 
 func (bb *BlockBuilder) fillAdditionalData(block *commonPb.Block,
-	batchIDs []string, fetchBatches [][]*commonPb.Transaction) error {
+	batchIDs []string, fetchBatches [][]*commonPb.Transaction,
+) error {
 	return bb.fillBatchPoolAdditionalData(batchIDs, fetchBatches, block)
 }
 
 // fillBatchPoolAdditionalData fill the additional data for batch pool
 func (bb *BlockBuilder) fillBatchPoolAdditionalData(batchIds []string,
-	fetchBatches [][]*commonPb.Transaction, block *commonPb.Block) error {
+	fetchBatches [][]*commonPb.Transaction, block *commonPb.Block,
+) error {
 	// maxbft等出空块的共识场景下，空块不需要往区块中添加交易批次信息
 	if TxPoolType == batch.TxPoolType && len(block.Txs) != 0 {
 		var batchIdBytes []byte
@@ -278,8 +277,8 @@ func (bb *BlockBuilder) fillBatchPoolAdditionalData(batchIds []string,
 func (bb *BlockBuilder) GenerateNewPreBlock(
 	proposingHeight uint64, preHash []byte, txBatch []*commonPb.Transaction,
 	batchIds []string, fetchBatches [][]*commonPb.Transaction) (
-	*commonPb.Block, error) {
-
+	*commonPb.Block, error,
+) {
 	currentHeight, _ := bb.ledgerCache.CurrentHeight()
 	lastBlock := bb.findLastBlockFromCache(proposingHeight, preHash, currentHeight)
 	if lastBlock == nil {
@@ -301,7 +300,7 @@ func (bb *BlockBuilder) GenerateNewPreBlock(
 	block.Txs = txBatch
 	block.Header.TxCount = uint32(len(txBatch))
 
-	//finalizeStartTick := utils.CurrentTimeMillisSeconds()
+	// finalizeStartTick := utils.CurrentTimeMillisSeconds()
 	txRWSetMap := make(map[string]*commonPb.TxRWSet)
 	contractEventMap := make(map[string][]*commonPb.ContractEvent)
 	err = FinalizeBlock(
@@ -311,13 +310,13 @@ func (bb *BlockBuilder) GenerateNewPreBlock(
 		bb.chainConf.ChainConfig().Crypto.Hash,
 		false,
 		bb.log)
-	//proposeTimeCost[Time_Statistics_Finalize] = utils.CurrentTimeMillisSeconds() - finalizeStartTick
+	// proposeTimeCost[Time_Statistics_Finalize] = utils.CurrentTimeMillisSeconds() - finalizeStartTick
 	if err != nil {
 		return nil, fmt.Errorf("finalizeBlock block(%d,%s) error %s",
 			block.Header.BlockHeight, hex.EncodeToString(block.Header.BlockHash), err)
 	}
 
-	//填充AdditionalData
+	// 填充AdditionalData
 	err = bb.fillAdditionalData(block, batchIds, fetchBatches)
 	if err != nil {
 		bb.log.Error("failed to fill additional data,error %s", err)
@@ -340,7 +339,8 @@ func (bb *BlockBuilder) GenerateNewPreBlock(
 }
 
 func (bb *BlockBuilder) findLastBlockFromCache(proposingHeight uint64, preHash []byte,
-	currentHeight uint64) *commonPb.Block {
+	currentHeight uint64,
+) *commonPb.Block {
 	var lastBlock *commonPb.Block
 	if currentHeight+1 == proposingHeight {
 		lastBlock = bb.ledgerCache.GetLastCommittedBlock()
@@ -354,7 +354,8 @@ func initNewBlock(
 	lastBlock *commonPb.Block,
 	identity protocol.SigningMember,
 	chainId string,
-	chainConf protocol.ChainConf, isConfigBlock bool) (*commonPb.Block, error) {
+	chainConf protocol.ChainConf, isConfigBlock bool,
+) (*commonPb.Block, error) {
 	// get node pk from identity
 	proposer, err := identity.GetMember()
 	if err != nil {
@@ -404,8 +405,8 @@ func FinalizeBlock(
 	aclFailTxs []*commonPb.Transaction,
 	hashType string,
 	withResult bool,
-	logger protocol.Logger) error {
-
+	logger protocol.Logger,
+) error {
 	if aclFailTxs != nil && len(aclFailTxs) > 0 { //nolint: gosimple
 		// append acl check failed txs to the end of block.Txs
 		block.Txs = append(block.Txs, aclFailTxs...)
@@ -437,7 +438,6 @@ func FinalizeBlock(
 			if err != nil {
 				errsC <- err
 			}
-
 		}(tx, rwSet, i)
 	}
 	wg.Wait()
@@ -446,7 +446,7 @@ func FinalizeBlock(
 		return err
 	}
 	wg.Add(3)
-	//calc tx root
+	// calc tx root
 	go func() {
 		defer wg.Done()
 		var err error
@@ -459,7 +459,7 @@ func FinalizeBlock(
 			return fmt.Sprintf("GetMerkleRoot(%s) get %x", hashType, block.Header.TxRoot)
 		})
 	}()
-	//calc rwset root
+	// calc rwset root
 	go func() {
 		defer wg.Done()
 		var err error
@@ -471,7 +471,7 @@ func FinalizeBlock(
 			}
 		}
 	}()
-	//calc dag hash
+	// calc dag hash
 	go func() {
 		defer wg.Done()
 		// DagDigest
@@ -501,8 +501,8 @@ func getTxHash(tx *commonPb.Transaction,
 	blockHeader *commonPb.BlockHeader,
 	withResult bool,
 	logger protocol.Logger) (
-	[]byte, error) {
-
+	[]byte, error,
+) {
 	if !withResult {
 		// calculate complete tx hash, include tx.Header, tx.Payload
 		var txHash []byte
@@ -725,14 +725,15 @@ func NewVerifierBlock(conf *VerifierBlockConf) *VerifierBlock {
 		txScheduler:     conf.TxScheduler,
 		txFilter:        conf.TxFilter,
 	}
-	var schedulerFactory scheduler.TxSchedulerFactory
-	verifyBlock.txScheduler = schedulerFactory.NewTxScheduler(
-		verifyBlock.vmMgr,
-		verifyBlock.chainConf,
-		conf.StoreHelper,
-		conf.LedgerCache,
-		conf.Ac,
-	)
+	// 删除这部分代码：外面已经更新创建
+	// var schedulerFactory scheduler.TxSchedulerFactory
+	// verifyBlock.txScheduler = schedulerFactory.NewTxScheduler(
+	// 	verifyBlock.vmMgr,
+	// 	verifyBlock.chainConf,
+	// 	conf.StoreHelper,
+	// 	conf.LedgerCache,
+	// 	conf.Ac,
+	// )
 	return verifyBlock
 }
 
@@ -764,8 +765,8 @@ func (vb *VerifierBlock) FetchLastBlock(block *commonPb.Block) (*commonPb.Block,
 // ValidateBlock validate block and transactions
 func (vb *VerifierBlock) ValidateBlock(
 	block, lastBlock *commonPb.Block, hashType string, timeLasts map[string]int64, mode protocol.VerifyMode) (
-	map[string]*commonPb.TxRWSet, map[string][]*commonPb.ContractEvent, map[string]int64, *RwSetVerifyFailTx, error) {
-
+	map[string]*commonPb.TxRWSet, map[string][]*commonPb.ContractEvent, map[string]int64, *RwSetVerifyFailTx, error,
+) {
 	// verify block stamp
 	if vb.chainConf.ChainConfig().Block.BlockTimestampVerify && mode == protocol.CONSENSUS_VERIFY {
 		currentTime := utils.CurrentTimeSeconds()
@@ -826,7 +827,7 @@ func (vb *VerifierBlock) ValidateBlock(
 	// 1. 空交易
 	// 2. recoveryBlock
 	// verify if txs are duplicate in this block
-	//if TxPoolType != batch.TxPoolType {
+	// if TxPoolType != batch.TxPoolType {
 
 	if duplicate, errors := IsTxDuplicate(block.Txs); duplicate {
 		return nil, nil, timeLasts, nil, fmt.Errorf("tx duplicate, errors: %v", errors)
@@ -902,7 +903,8 @@ func (vb *VerifierBlock) ValidateBlock(
 func (vb *VerifierBlock) ValidateBlockWithRWSets(
 	block *commonPb.Block, hashType string, timeLasts map[string]int64,
 	txRWSetMap map[string]*commonPb.TxRWSet, mode protocol.VerifyMode) (
-	map[string][]*commonPb.ContractEvent, map[string]int64, error) {
+	map[string][]*commonPb.ContractEvent, map[string]int64, error,
+) {
 	// 1.block verify
 	if err := IsBlockHashValid(block, vb.chainConf.ChainConfig().Crypto.Hash); err != nil {
 		return nil, timeLasts, err
@@ -928,7 +930,7 @@ func (vb *VerifierBlock) ValidateBlockWithRWSets(
 
 	// we must new a snapshot for the vacant block,
 	// otherwise the subsequent snapshot can not link to the previous snapshot.
-	//snapshot := vb.snapshotManager.NewSnapshot(lastBlock, block)
+	// snapshot := vb.snapshotManager.NewSnapshot(lastBlock, block)
 	if len(block.Txs) == 0 {
 		// verify TxRoot
 		startRootsTick := utils.CurrentTimeMillisSeconds()
@@ -1027,7 +1029,8 @@ func (vb *VerifierBlock) verifyBlockTimestamp(block *commonPb.Block, mode protoc
 // ValidateBlockWithoutExecuting validateBlock, validate block and transactions without executing txs
 func (vb *VerifierBlock) ValidateBlockWithoutExecuting(
 	block *commonPb.Block, hashType string, txRWSetMap map[string]*commonPb.TxRWSet, mode protocol.VerifyMode) (
-	map[string][]*commonPb.ContractEvent, error) {
+	map[string][]*commonPb.ContractEvent, error,
+) {
 	// 1.block verify
 	if err := IsBlockHashValid(block, vb.chainConf.ChainConfig().Crypto.Hash); err != nil {
 		return nil, err
@@ -1039,7 +1042,7 @@ func (vb *VerifierBlock) ValidateBlockWithoutExecuting(
 		}
 	}
 	// verify block sig and also verify identity and auth of block proposer
-	//startSigTick := utils.CurrentTimeMillisSeconds()
+	// startSigTick := utils.CurrentTimeMillisSeconds()
 	vb.log.DebugDynamic(func() string {
 		return fmt.Sprintf("verify block \n %s", utils.FormatBlock(block))
 	})
@@ -1052,21 +1055,21 @@ func (vb *VerifierBlock) ValidateBlockWithoutExecuting(
 				block.Header.BlockHeight, block.Header.BlockHash, block.Header.Proposer, block.Header.Signature)
 		}
 	}
-	//sigLasts := utils.CurrentTimeMillisSeconds() - startSigTick
-	//timeLasts[Time_Statistics_BlockSig] = sigLasts
+	// sigLasts := utils.CurrentTimeMillisSeconds() - startSigTick
+	// timeLasts[Time_Statistics_BlockSig] = sigLasts
 
 	// we must new a snapshot for the vacant block,
 	// otherwise the subsequent snapshot can not link to the previous snapshot.
-	//snapshot := vb.snapshotManager.NewSnapshot(lastBlock, block)
+	// snapshot := vb.snapshotManager.NewSnapshot(lastBlock, block)
 	if len(block.Txs) == 0 {
 		// verify TxRoot
-		//startRootsTick := utils.CurrentTimeMillisSeconds()
+		// startRootsTick := utils.CurrentTimeMillisSeconds()
 		err := CheckBlockDigests(block, nil, hashType, vb.log)
 		if err != nil {
 			return nil, err
 		}
-		//rootsLast := utils.CurrentTimeMillisSeconds() - startRootsTick
-		//timeLasts[Time_Statistics_TxRoot] = rootsLast
+		// rootsLast := utils.CurrentTimeMillisSeconds() - startRootsTick
+		// timeLasts[Time_Statistics_TxRoot] = rootsLast
 		return nil, nil
 	}
 
@@ -1079,11 +1082,11 @@ func (vb *VerifierBlock) ValidateBlockWithoutExecuting(
 	//	return nil, nil, timeLasts, fmt.Errorf("simulate %s", err)
 	//}
 
-	//vmLasts := utils.CurrentTimeMillisSeconds() - startVMTick
-	//timeLasts[Time_Statistics_VM] = vmLasts
+	// vmLasts := utils.CurrentTimeMillisSeconds() - startVMTick
+	// timeLasts[Time_Statistics_VM] = vmLasts
 
 	// 2.transaction verify
-	//startTxTick := utils.CurrentTimeMillisSeconds()
+	// startTxTick := utils.CurrentTimeMillisSeconds()
 	verifierTxConf := &VerifierTxConfig{
 		Block:         block,
 		TxResultMap:   txResultMap,
@@ -1099,8 +1102,8 @@ func (vb *VerifierBlock) ValidateBlockWithoutExecuting(
 	txHashes, err := verifiertx.verifierTxsWithRWSet(block)
 	vb.log.Infof("verifierTxs txHashCount:%d, txCount:%d, %x", len(txHashes), len(block.Txs),
 		block.Header.TxRoot)
-	//txLasts := utils.CurrentTimeMillisSeconds() - startTxTick
-	//timeLasts[Time_Statistics_TxVerify] = txLasts
+	// txLasts := utils.CurrentTimeMillisSeconds() - startTxTick
+	// timeLasts[Time_Statistics_TxVerify] = txLasts
 	if err != nil {
 		return nil, fmt.Errorf("verify failed [%d](%x), %s ",
 			block.Header.BlockHeight, block.Header.BlockHash, err)
@@ -1119,13 +1122,13 @@ func (vb *VerifierBlock) ValidateBlockWithoutExecuting(
 		contractEventMap[tx.Payload.TxId] = events
 	}
 	// verify TxRoot
-	//startRootsTick := utils.CurrentTimeMillisSeconds()
+	// startRootsTick := utils.CurrentTimeMillisSeconds()
 	err = CheckBlockDigests(block, txHashes, hashType, vb.log)
 	if err != nil {
 		return contractEventMap, err
 	}
-	//rootsLast := utils.CurrentTimeMillisSeconds() - startRootsTick
-	//timeLasts[Time_Statistics_TxRoot] = rootsLast
+	// rootsLast := utils.CurrentTimeMillisSeconds() - startRootsTick
+	// timeLasts[Time_Statistics_TxRoot] = rootsLast
 
 	return contractEventMap, nil
 }
@@ -1135,8 +1138,8 @@ func (vb *VerifierBlock) ValidateBlockWithoutExecuting(
 // ValidateBlockWithoutSimulate, validate block and transactions without simulate block
 func (vb *VerifierBlock) ValidateBlockWithoutSimulate(
 	block, lastBlock *commonPb.Block, hashType string, timeLasts map[string]int64, mode protocol.VerifyMode) (
-	map[string]*commonPb.TxRWSet, map[string][]*commonPb.ContractEvent, map[string]int64, *RwSetVerifyFailTx, error) {
-
+	map[string]*commonPb.TxRWSet, map[string][]*commonPb.ContractEvent, map[string]int64, *RwSetVerifyFailTx, error,
+) {
 	// verify block stamp
 	if err := vb.verifyBlockTimestamp(block, mode); err != nil {
 		return nil, nil, timeLasts, nil, err
@@ -1147,13 +1150,13 @@ func (vb *VerifierBlock) ValidateBlockWithoutSimulate(
 	}
 
 	// verify block sig and also verify identity and auth of block proposer
-	//startSigTick := utils.CurrentTimeMillisSeconds()
+	// startSigTick := utils.CurrentTimeMillisSeconds()
 	vb.log.DebugDynamic(func() string {
 		return fmt.Sprintf("verify block \n %s", utils.FormatBlock(block))
 	})
 
-	//sigLasts := utils.CurrentTimeMillisSeconds() - startSigTick
-	//timeLasts[Time_Statistics_BlockSig] = sigLasts
+	// sigLasts := utils.CurrentTimeMillisSeconds() - startSigTick
+	// timeLasts[Time_Statistics_BlockSig] = sigLasts
 
 	err := CheckVacuumBlock(block, vb.chainConf.ChainConfig().Consensus.Type)
 	if err != nil {
@@ -1166,13 +1169,13 @@ func (vb *VerifierBlock) ValidateBlockWithoutSimulate(
 			return nil, nil, timeLasts, nil, err
 		}
 		// verify TxRoot
-		//startRootsTick := utils.CurrentTimeMillisSeconds()
+		// startRootsTick := utils.CurrentTimeMillisSeconds()
 		err = CheckBlockDigests(block, nil, hashType, vb.log)
 		if err != nil {
 			return nil, nil, timeLasts, nil, err
 		}
-		//rootsLast := utils.CurrentTimeMillisSeconds() - startRootsTick
-		//timeLasts[Time_Statistics_TxRoot] = rootsLast
+		// rootsLast := utils.CurrentTimeMillisSeconds() - startRootsTick
+		// timeLasts[Time_Statistics_TxRoot] = rootsLast
 		return nil, nil, timeLasts, nil, err
 	}
 
@@ -1182,7 +1185,7 @@ func (vb *VerifierBlock) ValidateBlockWithoutSimulate(
 	}
 
 	// 2.transaction verify (交易查重、交易验证签名)
-	//startTxTick := utils.CurrentTimeMillisSeconds()
+	// startTxTick := utils.CurrentTimeMillisSeconds()
 	verifierTxConf := &VerifierTxConfig{
 		Block:         block,
 		ChainConf:     vb.chainConf,
@@ -1194,8 +1197,8 @@ func (vb *VerifierBlock) ValidateBlockWithoutSimulate(
 	}
 	verifiertx := NewVerifierTx(verifierTxConf)
 	txHashes, _, rwSetVerifyFailTx, err := verifiertx.verifierTxsWithoutResult(block, mode, NormalVerifyMode)
-	//txLasts := utils.CurrentTimeMillisSeconds() - startTxTick
-	//timeLasts[Time_Statistics_TxVerify] = txLasts
+	// txLasts := utils.CurrentTimeMillisSeconds() - startTxTick
+	// timeLasts[Time_Statistics_TxVerify] = txLasts
 	if err != nil {
 		err = fmt.Errorf("verify failed [%d](%x), %s ",
 			block.Header.BlockHeight, block.Header.BlockHash, err)
@@ -1203,15 +1206,15 @@ func (vb *VerifierBlock) ValidateBlockWithoutSimulate(
 	}
 
 	// verify TxRoot
-	//startRootsTick := utils.CurrentTimeMillisSeconds()
+	// startRootsTick := utils.CurrentTimeMillisSeconds()
 	if err := IsMerkleRootValid(block, txHashes, hashType); err != nil {
 		vb.log.Error(err)
 		return nil, nil, timeLasts, rwSetVerifyFailTx, err
 
 	}
 
-	//rootsLast := utils.CurrentTimeMillisSeconds() - startRootsTick
-	//timeLasts[Time_Statistics_TxRoot] = rootsLast
+	// rootsLast := utils.CurrentTimeMillisSeconds() - startRootsTick
+	// timeLasts[Time_Statistics_TxRoot] = rootsLast
 
 	return nil, nil, timeLasts, nil, nil
 }
@@ -1387,8 +1390,7 @@ func (chain *BlockCommitterImpl) AddBlock(block *commonPb.Block) (err error) {
 	commitBlock := getCommittedBlock(lastProposed, block, chain.chainConf)
 
 	checkLasts := utils.CurrentTimeMillisSeconds() - startTick
-	dbLasts, snapshotLasts, confLasts, otherLasts, pubEvent, filterLasts, blockInfo, err :=
-		chain.commonCommit.CommitBlock(commitBlock, rwSetMap, conEventMap)
+	dbLasts, snapshotLasts, confLasts, otherLasts, pubEvent, filterLasts, blockInfo, err := chain.commonCommit.CommitBlock(commitBlock, rwSetMap, conEventMap)
 	if err != nil {
 		chain.log.Errorf("block common commit failed: %s, blockHeight: (%d)",
 			err.Error(), lastProposed.Header.BlockHeight)
@@ -1463,8 +1465,7 @@ func getCommittedBlock(lastProposed, block *commonPb.Block, chainConf protocol.C
 	}
 
 	if _, ok := lastProposed.AdditionalData.ExtraData[batch.BatchPoolAddtionalDataKey]; ok {
-		commitBlock.AdditionalData.ExtraData[batch.BatchPoolAddtionalDataKey] =
-			lastProposed.AdditionalData.ExtraData[batch.BatchPoolAddtionalDataKey]
+		commitBlock.AdditionalData.ExtraData[batch.BatchPoolAddtionalDataKey] = lastProposed.AdditionalData.ExtraData[batch.BatchPoolAddtionalDataKey]
 	}
 
 	// This code is primarily used to iterate through the 'additionalData' and populate
@@ -1485,15 +1486,16 @@ func RetryAndRemoveTxs(
 	txPool protocol.TxPool,
 	txsRetry []*commonPb.Transaction,
 	txsRem []*commonPb.Transaction,
-	log protocol.Logger) {
-
+	log protocol.Logger,
+) {
 	txPool.RetryAndRemoveTxs(
 		coinbasemgr.FilterCoinBaseTxOrGasTx(txsRetry),
 		coinbasemgr.FilterCoinBaseTxOrGasTx(txsRem))
 }
 
 func (chain *BlockCommitterImpl) syncWithTxPool(block *commonPb.Block, height uint64) (
-	[]*commonPb.Transaction, []string, []string, error) {
+	[]*commonPb.Transaction, []string, []string, error,
+) {
 	proposedBlocks := chain.proposalCache.GetProposedBlocksAt(height)
 	txRetry := make([]*commonPb.Transaction, 0, len(block.Txs))
 	batchRetry := make([]string, 0, len(block.Txs))
@@ -1548,7 +1550,8 @@ func (chain *BlockCommitterImpl) syncWithTxPool(block *commonPb.Block, height ui
 // nolint: ineffassign, staticcheck
 // checkLastProposedBlock check the last proposed block
 func (chain *BlockCommitterImpl) checkLastProposedBlock(block *commonPb.Block) (
-	*protocol.ProposalData, error) {
+	*protocol.ProposalData, error,
+) {
 	err := chain.verifier.VerifyBlock(block, protocol.SYNC_VERIFY)
 	if err != nil {
 		chain.log.Error("block verify failed [%d](hash:%x), %s",
@@ -1605,8 +1608,8 @@ func IfOpenConsensusMessageTurbo(chainConf protocol.ChainConf) bool {
 func GetProposerId(
 	ac protocol.AccessControlProvider,
 	netService protocol.NetService,
-	proposer *accesscontrol.Member) (string, error) {
-
+	proposer *accesscontrol.Member,
+) (string, error) {
 	member, err := ac.NewMember(proposer)
 	if err != nil {
 		return "", err
@@ -1623,7 +1626,8 @@ func GetProposerId(
 
 // GetTurboBlock get turbo block
 func GetTurboBlock(block, turboBlock *commonPb.Block,
-	chainConf protocol.ChainConf, logger protocol.Logger) *commonPb.Block {
+	chainConf protocol.ChainConf, logger protocol.Logger,
+) *commonPb.Block {
 	turboBlock.Header = block.Header
 	turboBlock.Dag = block.Dag
 	turboBlock.AdditionalData = block.AdditionalData
@@ -1675,8 +1679,8 @@ func RecoverBlock(
 	txPool protocol.TxPool,
 	ac protocol.AccessControlProvider,
 	netService protocol.NetService,
-	logger protocol.Logger) (*commonPb.Block, []string, error) {
-
+	logger protocol.Logger,
+) (*commonPb.Block, []string, error) {
 	if block.Header.TxCount == 0 {
 		return block, nil, nil
 	}
@@ -1696,8 +1700,8 @@ func recoverBlockByBatch(
 	txPool protocol.TxPool,
 	ac protocol.AccessControlProvider,
 	netService protocol.NetService,
-	logger protocol.Logger) (*commonPb.Block, []string, error) {
-
+	logger protocol.Logger,
+) (*commonPb.Block, []string, error) {
 	if block.Header.TxCount != 0 && mode != protocol.SYNC_VERIFY &&
 		chainConf.ChainConfig().Consensus.Type != consensus.ConsensusType_RAFT {
 
@@ -1753,12 +1757,11 @@ func recoverBlockByBatch(
 			proposerId,
 			block.Header.BlockHeight,
 			timeOut)
-
 		if err != nil {
 			return nil, nil, err
 		}
 
-		//in most cases the number is the same
+		// in most cases the number is the same
 		newTxs := make([]*commonPb.Transaction, 0, int(block.Header.TxCount))
 		for _, tx := range txs {
 			newTxs = append(newTxs, tx...)
@@ -1815,8 +1818,8 @@ func recoverBlock(
 	txPool protocol.TxPool,
 	ac protocol.AccessControlProvider,
 	netService protocol.NetService,
-	logger protocol.Logger) (*commonPb.Block, []string, error) {
-
+	logger protocol.Logger,
+) (*commonPb.Block, []string, error) {
 	if IfOpenConsensusMessageTurbo(chainConf) && mode != protocol.SYNC_VERIFY &&
 		len(block.Txs) != 0 && block.Txs[0].Payload != nil {
 
@@ -1872,7 +1875,6 @@ func recoverBlock(
 		Txs:            block.Txs,
 		AdditionalData: block.AdditionalData,
 	}, nil, nil
-
 }
 
 func recoverBlockWithCoinBaseTx(
@@ -1881,7 +1883,8 @@ func recoverBlockWithCoinBaseTx(
 	txPool protocol.TxPool,
 	maxRetryTime, retryInterval uint64,
 	proposerId string,
-	logger protocol.Logger) (*commonPb.Block, []string, error) {
+	logger protocol.Logger,
+) (*commonPb.Block, []string, error) {
 	txIds = txIds[:len(txIds)-1]
 
 	if !coinbasemgr.IsGasTx(block.Txs[block.Header.TxCount-1]) {
@@ -1911,8 +1914,8 @@ func recoverBlockWithCoinBaseTx(
 
 // SerializeTxBatchInfo serialize tx batch info
 func SerializeTxBatchInfo(batchIds []string, txs []*commonPb.Transaction,
-	fetchBatches [][]*commonPb.Transaction, logger protocol.Logger) ([]byte, error) {
-
+	fetchBatches [][]*commonPb.Transaction, logger protocol.Logger,
+) ([]byte, error) {
 	fetchTxs := make([]*commonPb.Transaction, 0)
 	for _, fetchBatch := range fetchBatches {
 		fetchTxs = append(fetchTxs, fetchBatch...)
@@ -1946,7 +1949,6 @@ func SerializeTxBatchInfo(batchIds []string, txs []*commonPb.Transaction,
 
 // DeserializeTxBatchInfo deserialize tx batch info
 func DeserializeTxBatchInfo(data []byte) (*commonPb.TxBatchInfo, error) {
-
 	txBatchInfo := new(commonPb.TxBatchInfo)
 	err := proto.Unmarshal(data, txBatchInfo)
 	if err != nil {
