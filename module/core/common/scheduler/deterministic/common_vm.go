@@ -872,7 +872,7 @@ func (h *CommonVMHelper) ExecuteTx(tx *commonPb.Transaction, snapshot protocol.S
 	// STEP1: init sim-context
 	txSimContext := vm.NewTxSimContext(h.vmManager, snapshot, tx, blockVersion, h.log)
 	h.log.DebugDynamic(func() string {
-		return fmt.Sprintf("NewTxSimContext finished for tx id:%s,tx.Result =", tx.Payload.GetTxId(), tx.Result)
+		return fmt.Sprintf("NewTxSimContext finished for tx id:%s,tx.Result =%v", tx.Payload.GetTxId(), tx.Result)
 	})
 	// STEP2: tx check, including gas
 	enableGas := h.CheckGasEnable()

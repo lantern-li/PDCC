@@ -24,6 +24,8 @@ chainmaker.org/chainmaker/consensus-solo/v2 v2.3.5 h1:3a9Fq34Pzzmbg9OydiobSqgv1i
 chainmaker.org/chainmaker/consensus-solo/v2 v2.3.5/go.mod h1:vIGGFfNKgGYdIBj2N/ruaO3QL4MityftT5A3TJtuMuE=
 chainmaker.org/chainmaker/consensus-tbft/v2 v2.3.8-0.20251201070936-9a06cb0105b2 h1:OOC8ulbFTlCyRut0dbWl8jugLYkCAE3WjrCCdaQ0pPg=
 chainmaker.org/chainmaker/consensus-tbft/v2 v2.3.8-0.20251201070936-9a06cb0105b2/go.mod h1:Jtr5+9fLZSrPruHbOnInXWvZKRMYK5X2MxRQB5aXw7w=
+chainmaker.org/chainmaker/consensus-tbft/v2 v2.3.8-0.20251215054558-6e876946de93 h1:Sm7a8KteuB72zph7eJgHDFmpU90Kf7LzJAXMF23T2uA=
+chainmaker.org/chainmaker/consensus-tbft/v2 v2.3.8-0.20251215054558-6e876946de93/go.mod h1:ChLYL9ZxEQAmqKV+1Q4tnBs6IcZL14qtB3K/qiW/Bo8=
 chainmaker.org/chainmaker/consensus-utils/v2 v2.3.5/go.mod h1:CKZL+fgw6gGj4tdAvFRHwUNslRuJD1hM48T8KC1TErw=
 chainmaker.org/chainmaker/consensus-utils/v2 v2.3.6-0.20251015040541-087ff7faed86 h1:uttigkT0tlbBY/o0fhhnwjCfjsWsoGXxusFhL5DxXg0=
 chainmaker.org/chainmaker/consensus-utils/v2 v2.3.6-0.20251015040541-087ff7faed86/go.mod h1:68UG8BtjFu9/w1qGdISu4V5AICkuaZeWqcFQgNgu0jk=
@@ -117,6 +119,8 @@ chainmaker.org/chainmaker/vm-wxvm/v2 v2.3.6/go.mod h1:4yi2fppiW59uTzfEdABqZ8Rkyv
 chainmaker.org/chainmaker/vm/v2 v2.3.9-0.20251014073908-42b4daeec1a0/go.mod h1:5HXJ3uqPD4XYhnoD/jWUbSVY8fHHcm1jC80rP4P8I/A=
 chainmaker.org/chainmaker/vm/v2 v2.3.9-0.20251201072219-2619f35bc75a h1:+cYJCB+xyYC8YoBzqjTb9//rL7SvQSNF5l87t1IcrjQ=
 chainmaker.org/chainmaker/vm/v2 v2.3.9-0.20251201072219-2619f35bc75a/go.mod h1:CReoaJG1hQuqgUl2kG9mA7ygk0aoUKUw9hf1uH4l08w=
+chainmaker.org/chainmaker/vm/v2 v2.3.9-0.20251215055559-93d1e468252d h1:YPzLB5MPlTvQJ9duu6J6YgMCqK0DIUPqEJFSfzw8Zo0=
+chainmaker.org/chainmaker/vm/v2 v2.3.9-0.20251215055559-93d1e468252d/go.mod h1:FeQCKeO2bmzUgT+yrPjVZ6SR0Xhiy4Y9ce8Zw9XsPrQ=
 chainmaker.org/third_party/badger/v3 v3.0.0 h1:8fPIUB8dyCCPu2QbQbp6r4QcixYVK7KOdfSEUeMZPVc=
 chainmaker.org/third_party/badger/v3 v3.0.0/go.mod h1:RHo4/GmYcKKh5Lxu63wLEMHJ70Pac2JqZRYGhlyAo2M=
 chainmaker.org/third_party/bitset v0.0.0-20250827033140-c958f2649ebe h1:FGwwnRrJ+5diLtSfmV6xBbmGWPXawKvrO5uTHq/FDPA=

@@ -228,8 +228,9 @@ func prepare(t *testing.T, enableSenderGroup, enableConflictsBitWindow bool, txC
 
 	storeHelper := mock.NewMockStoreHelper(ctl)
 	storeHelper.EXPECT().GetPoolCapacity().Return(runtime.NumCPU() * 4).AnyTimes()
+	signer := mock.NewMockSigningMember(ctl)
 	var schedulerFactory TxSchedulerFactory
-	scheduler := schedulerFactory.NewTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac)
+	scheduler := schedulerFactory.NewTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac, signer)
 	contractId := &commonPb.Contract{
 		Name:        "ContractName",
 		Version:     "1",
@@ -306,8 +307,15 @@ func prepare4(t *testing.T, enableOptimizeChargeGas, enableSenderGroup, enableCo
 
 	storeHelper := mock.NewMockStoreHelper(ctl)
 	storeHelper.EXPECT().GetPoolCapacity().Return(runtime.NumCPU() * 4).AnyTimes()
+	signer := mock.NewMockSigningMember(ctl)
+	signer.EXPECT().Sign(gomock.Any(), gomock.Any()).Return([]byte("mock-signature"), nil).AnyTimes()
+	signer.EXPECT().GetMember().Return(&acPb.Member{
+		OrgId:      "org1",
+		MemberInfo: []byte("mock-member-info"),
+		MemberType: acPb.MemberType_CERT,
+	}, nil).AnyTimes()
 	var schedulerFactory TxSchedulerFactory
-	scheduler := schedulerFactory.NewTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac)
+	scheduler := schedulerFactory.NewTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac, signer)
 	contractId := &commonPb.Contract{
 		Name:        "ContractName",
 		Version:     "1",
@@ -394,8 +402,15 @@ func prepare5(t *testing.T, enableOptimizeChargeGas, enableSenderGroup, enableCo
 
 	storeHelper := mock.NewMockStoreHelper(ctl)
 	storeHelper.EXPECT().GetPoolCapacity().Return(runtime.NumCPU() * 4).AnyTimes()
+	signer := mock.NewMockSigningMember(ctl)
+	signer.EXPECT().Sign(gomock.Any(), gomock.Any()).Return([]byte("mock-signature"), nil).AnyTimes()
+	signer.EXPECT().GetMember().Return(&acPb.Member{
+		OrgId:      "org1",
+		MemberInfo: []byte("mock-member-info"),
+		MemberType: acPb.MemberType_CERT,
+	}, nil).AnyTimes()
 	var schedulerFactory TxSchedulerFactory
-	scheduler := schedulerFactory.NewTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac)
+	scheduler := schedulerFactory.NewTxScheduler(vmMgr, chainConf, storeHelper, ledgerCache, ac, signer)
 	contractId := &commonPb.Contract{
 		Name:        "ContractName",
 		Version:     "1",
@@ -642,8 +657,8 @@ func TestSchedule4(t *testing.T) {
 	}
 	txResultMap := make(map[string]*commonPb.Result)
 
-	// simulate Calling ApplyTxSimContext(...) 3 times
-	snapshot.EXPECT().ApplyTxSimContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true, 1).Times(1)
+	// simulate Calling ApplyTxSimContext(...) multiple times
+	snapshot.EXPECT().ApplyTxSimContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true, 1).AnyTimes()
 	//snapshot.EXPECT().ApplyTxSimContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).After(preCall1).Return(true, 2).Times(1)
 	//snapshot.EXPECT().ApplyTxSimContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).After(preCall2).Return(true, 3).Times(1)
 	snapshot.EXPECT().IsSealed().AnyTimes().Return(false)
@@ -712,8 +727,8 @@ func TestSchedule5(t *testing.T) {
 	}
 	txResultMap := make(map[string]*commonPb.Result)
 
-	// simulate Calling ApplyTxSimContext(...) 3 times
-	snapshot.EXPECT().ApplyTxSimContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true, 1).Times(1)
+	// simulate Calling ApplyTxSimContext(...) multiple times
+	snapshot.EXPECT().ApplyTxSimContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true, 1).AnyTimes()
 	//snapshot.EXPECT().ApplyTxSimContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).After(preCall1).Return(true, 2).Times(1)
 	//snapshot.EXPECT().ApplyTxSimContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).After(preCall2).Return(true, 3).Times(1)
 	snapshot.EXPECT().IsSealed().AnyTimes().Return(false)

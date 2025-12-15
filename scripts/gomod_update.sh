@@ -31,7 +31,7 @@ fi
 cd ..
 
 go get chainmaker.org/chainmaker/lws@${LWS_BRANCH}
-go get chainmaker.org/chainmaker/chainconf/v2@v2.3.4_sz_determint
+go get chainmaker.org/chainmaker/chainconf/v2@v2.3.5
 go get chainmaker.org/chainmaker/common/v2@v2.3.8_sz
 go get chainmaker.org/chainmaker/localconf/v2@v2.3.7_sz
 go get chainmaker.org/chainmaker/logger/v2@${LOGGER_BRANCH}

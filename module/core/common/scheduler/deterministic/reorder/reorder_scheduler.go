@@ -220,7 +220,6 @@ func (ts *ReorderTxScheduler) preExecuteTxs(goRoutinePool *ants.Pool,
 	// launch the go routine to dispatch tx to runningTxC
 	// goroutine 1: 分发交易（支持取消）
 	go func() {
-		defer close(runningTxC) // ← 重要：关闭 channel
 		for i, tx := range txBatch {
 			select {
 			case <-ctx.Done():
@@ -235,10 +234,7 @@ func (ts *ReorderTxScheduler) preExecuteTxs(goRoutinePool *ants.Pool,
 		counter := 0
 		for {
 			select {
-			case txI, ok := <-runningTxC:
-				if !ok { // ← channel 已关闭
-					return
-				}
+			case txI:= <-runningTxC:
 				// additional timeoutC check to avoid timeoutC starving,避免单笔交易，导致无法退出
 				select {
 				case <-ctx.Done():
@@ -286,7 +282,9 @@ func (ts *ReorderTxScheduler) preExecuteTxs(goRoutinePool *ants.Pool,
 					txResults[txR.Index] = txR
 				}
 				counter++
-				ts.log.Debugf("schedule tx index %d, count %d", txR.Index, counter)
+				ts.log.DebugDynamic(func() string {
+					return fmt.Sprintf("schedule tx index %d, count %d", txR.Index, counter)
+				})
 				if counter == txBatchSize {
 					ts.scheduleFinishC <- true
 					return

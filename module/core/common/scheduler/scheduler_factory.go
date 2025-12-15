@@ -108,7 +108,7 @@ func newTxScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
 	return txScheduler
 }
 
-// newTxSchedulerEvidence building a evidence transaction scheduler
+// newTxSchedulerEvidence building an evidence transaction scheduler
 func newTxSchedulerEvidence(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
 	storeHelper conf.StoreHelper, cache protocol.LedgerCache,
 ) *TxSchedulerEvidence {
