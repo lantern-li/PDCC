@@ -100,6 +100,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		ws.log.Infof("Round %d: selected %d transactions for scheduling, remainTxs=%d", roundNum, batchSize, len(txBatch))
 
 		// 2. 执行阶段：将selectedTxs并发地在当前相同的snapshot上执行。
+		execStageStart := time.Now()
 		var wg sync.WaitGroup
 
 		execInfos := make([]txExecInfo, len(selectedTxs))
@@ -126,6 +127,8 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		}
 		wg.Wait()
 
+		ws.log.Infof("[ExecutionStage] execute %d txs finished, total cost=%v", len(selectedTxs), time.Since(execStageStart))
+
 		// 3. 重排序阶段：依据每笔交易的执行时间，进行重排序，执行时间长的排在前面。
 		// 执行时间长的排在前面
 		//sort.Slice(execInfos, func(i, j int) bool {
@@ -133,6 +136,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		//}) // todo：后续设计非确定性的算法再排序
 
 		// 4. 版本标记阶段：并发地将每笔交易的写集进行版本标记。
+		versionMarkStart := time.Now()
 		var versionWG sync.WaitGroup
 		for txIndex, execInfo := range execInfos {
 			versionWG.Add(1)
@@ -153,8 +157,10 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			}(txIndex, execInfo)
 		}
 		versionWG.Wait()
+		ws.log.Infof("[versionMarkStage]: total cost=%v", time.Since(versionMarkStart))
 
 		// 5.写集合并阶段：并发地将每笔交易的写集WS(TXi)进行合并，生成写集多版本总表MasterWS。
+		writeSetMergingStart := time.Now()
 		type MasterWriteSet map[string][]*commonPb.VersionedTxWrite // string：string(Write.Key)
 		masterWS := make(MasterWriteSet)
 
@@ -183,6 +189,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 				masterWS[key] = append(masterWS[key], vwList...)
 			}
 		}
+		ws.log.Infof("[writeSetMergingStage]: total cost=%v", time.Since(writeSetMergingStart))
 
 		// 6.冲突检测阶段、提交阶段、再检查阶段
 		//冲突检测RAW：依据MasterWS，对每笔交易的读集进行冲突检测，检测通过则立即启动协程应用写集，检测不通过则标记abort并记录冲突依赖。
@@ -190,6 +197,8 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		//再检查：当所有交易都完成了RAW检测后，立即触发再检查阶段。针对所有被abort的交易，串行地进行检查，
 		//        检查规则：检查记录的冲突依赖前序交易是否都被abort了，如果是则挽救该交易；只要有一个前序交易没被abort，则继续abort。
 		//等待：等待所有通过RAW检测的交易和被rechecking挽救的交易都完成写集应用。
+
+		checkCommitAndRecheckingStart := time.Now()
 
 		// abort 标记：初始均为 false。 true 表示该交易需要被abort
 		abortFlags := make([]bool, len(execInfos))
@@ -245,11 +254,13 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		// 等待所有成功交易完成写入 Cache（包括通过RAW的和被rechecking挽救的）
 		applyWG.Wait()
 
+		ws.log.Infof("[checkCommitAndRecheckingStage]: total cost=%v", time.Since(checkCommitAndRecheckingStart))
+
 		// 7. 将 ws.snapshotCache 中的写集直接应用到 snapshot.writeTable 中，并清空 ws.snapshotCache
 		// 这样下一批交易执行时，可以直接从 snapshot.writeTable 中读取，而不用从 DB 中读取
-		ws.log.Info("Applying snapshotCache to snapshot.writeTable")
+		applyWriteCacheToSnapshotStart := time.Now()
 		appliedCount := ws.applySnapshotCacheToSnapshot(snapshot) // todo：后续考虑性能优化，不对snapshot进行适配
-		ws.log.Infof("Applied %d writes from snapshotCache to snapshot.writeTable", appliedCount)
+		ws.log.Infof("[applyWriteCacheToSnapshotStage]: total cost=%v, applynum:%d", time.Since(applyWriteCacheToSnapshotStart), appliedCount)
 
 		// 清空 snapshotCache
 		//cacheSize := ws.getSnapshotCacheSize()

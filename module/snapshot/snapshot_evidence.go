@@ -244,3 +244,12 @@ func (s *SnapshotEvidence) ApplyBlock(block *commonPb.Block, txRWSetMap map[stri
 	}
 	s.delegate.ApplyBlock(block, txRWSetMap)
 }
+
+// ApplyWritesToWriteTable 批量应用写集到 writeTable
+// 委托给内部的 SnapshotImpl 实现
+func (s *SnapshotEvidence) ApplyWritesToWriteTable(writes []*commonPb.TxWrite) {
+	if s.delegate == nil {
+		return
+	}
+	s.delegate.ApplyWritesToWriteTable(writes)
+}
