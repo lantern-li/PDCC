@@ -332,7 +332,7 @@ func (s *SnapshotImpl) GetKeys(txExecSeq int, keys []*vmPb.BatchKey) ([]*vmPb.Ba
 		return writeSetValues, nil
 	}
 
-	if readSetValues, emptyReadSetKeys, done = s.getBatchFromReadSet(emptyWriteSetKeys); done {
+	if readSetValues, emptyReadSetKeys, done = s.getBatchFromReadSet(emptyWriteSetKeys); done { //todo：这里的逻辑是对的，是优化的点。
 		return append(readSetValues, writeSetValues...), nil
 	}
 
@@ -762,6 +762,31 @@ func (s *SnapshotImpl) Seal() {
 	s.sealed.Store(true)
 	s.log.Infof("block apply time[%d] is %d, %d, %d", s.blockHeight,
 		s.applyConflictTime.Load(), s.applyAddReadTime.Load(), s.applyAddWriteTime.Load())
+}
+
+// ApplyWritesToWriteTable 批量应用写集到 writeTable
+// 用于确定性调度器wria直接将一批交易的写集应用到 snapshot，使得后续交易可以读取到这些写入
+// 参数：writes - 需要应用的写操作列表
+func (s *SnapshotImpl) ApplyWritesToWriteTable(writes []*commonPb.TxWrite) {
+	if s.IsSealed() {
+		s.log.Warn("Snapshot is sealed, cannot apply writes to writeTable")
+		return
+	}
+
+	// 使用当前 txTable 大小作为 applySeq
+	// 注意：这个 seq 主要用于冲突检测，在确定性调度器中意义不大
+	applySeq := len(s.txTable)
+
+	for _, write := range writes {
+		finalKey := constructKey(write.ContractName, write.Key)
+		wsv := &sv{
+			seq:   applySeq,
+			value: write.Value,
+		}
+		s.writeTable.putByLock(finalKey, wsv)
+	}
+
+	s.log.Debugf("Applied %d writes to writeTable with seq=%d", len(writes), applySeq)
 }
 
 // todo here

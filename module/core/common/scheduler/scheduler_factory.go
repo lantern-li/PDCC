@@ -21,6 +21,7 @@ import (
 
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/reorder"
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/serial"
+	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/wria"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 )
 
@@ -73,6 +74,8 @@ func (sf TxSchedulerFactory) NewTxScheduler(vmMgr protocol.VmManager, chainConf 
 			return serial.NewSerialScheduler(vmMgr, chainConf, ac, metricContractInvokeCounter)
 		} else if scheduler.AlgorithmType == config.AlgorithmType_REORDER {
 			return reorder.NewReorderTxScheduler(vmMgr, chainConf, storeHelper, ac)
+		} else if scheduler.AlgorithmType == config.AlgorithmType_WRIA {
+			return wria.NewWriaScheduler(vmMgr, chainConf, storeHelper, ac)
 		}
 	}
 	panic(fmt.Sprintf("invaild scheduler config  %+v", scheduler))

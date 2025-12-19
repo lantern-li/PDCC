@@ -35,8 +35,8 @@ go get chainmaker.org/chainmaker/chainconf/v2@v2.3.5
 go get chainmaker.org/chainmaker/common/v2@v2.3.8_sz
 go get chainmaker.org/chainmaker/localconf/v2@v2.3.7_sz
 go get chainmaker.org/chainmaker/logger/v2@${LOGGER_BRANCH}
-go get chainmaker.org/chainmaker/pb-go/v2@v2.3.7_sz_determint
-go get chainmaker.org/chainmaker/protocol/v2@v2.3.10_sz_determint
+go get chainmaker.org/chainmaker/pb-go/v2@v2.3.7_sz_determint_wria
+go get chainmaker.org/chainmaker/protocol/v2@v2.3.10_sz_determint_wria
 go get chainmaker.org/chainmaker/utils/v2@v2.3.6_qc_sz
 go get chainmaker.org/chainmaker/net-common@${NET_COMMON_BRANCH}
 go get chainmaker.org/chainmaker/net-libp2p@${NET_LIBP2P_BRANCH}
