@@ -129,7 +129,7 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	}
 
 	txBatchSize := len(txBatch)
-	ts.log.Infof("schedule tx batch start, block %d, size = %d", block.Header.BlockHeight, txBatchSize)
+	ts.log.Infof("nd schedule tx batch start, block %d, size = %d", block.Header.BlockHeight, txBatchSize)
 
 	var goRoutinePool *ants.Pool
 	poolCapacity := ts.StoreHelper.GetPoolCapacity()

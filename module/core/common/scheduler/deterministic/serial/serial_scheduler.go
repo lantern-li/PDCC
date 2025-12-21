@@ -31,10 +31,10 @@ const (
 
 // SerialScheduler serial scheduler
 type SerialScheduler struct {
-	lock                        sync.Mutex
-	exitC                       chan bool
-	log                         protocol.Logger
-	chainConf                   protocol.ChainConf // chain config
+	lock      sync.Mutex
+	exitC     chan bool
+	log       protocol.Logger
+	chainConf protocol.ChainConf // chain config
 	// signer                      protocol.SigningMember
 	metricContractInvokeCounter *prometheus.CounterVec
 	vmHelper                    *deterministic.CommonVMHelper // Shared VM execution helper
@@ -109,7 +109,7 @@ func (ts *SerialScheduler) schedule(block *commonPb.Block, txBatch []*commonPb.T
 	defer ts.vmHelper.ReleaseContractCache()
 
 	txBatchSize := len(txBatch)
-	ts.log.Infof("schedule tx batch start, block_number = %v, size = %d", block.Header.BlockHeight, txBatchSize)
+	ts.log.Infof("serial schedule tx batch start, block_number = %v, size = %d", block.Header.BlockHeight, txBatchSize)
 
 	enableOptimizeChargeGas := schedulerUtils.IsOptimizeChargeGasEnabled(ts.chainConf)
 

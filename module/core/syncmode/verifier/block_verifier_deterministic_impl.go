@@ -66,11 +66,11 @@ func NewDeterministicBlockVerifier(config BlockVerifierConfig, log protocol.Logg
 		reentrantLocks: &common.ReentrantLocks{
 			ReentrantLocks: make(map[string]interface{}),
 		},
-		proposalCache: config.ProposedCache,
-		chainConf:     config.ChainConf,
-		ac:            config.AC,
-		log:           log,
-		txPool:        config.TxPool,
+		proposalCache:         config.ProposedCache,
+		chainConf:             config.ChainConf,
+		ac:                    config.AC,
+		log:                   log,
+		txPool:                config.TxPool,
 		storeHelper:           config.StoreHelper,
 		netService:            config.NetService,
 		txFilter:              config.TxFilter,
@@ -376,6 +376,7 @@ func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutDag(block *commonpb.B
 
 	snapshot := v.snapshotManager.NewSnapshot(lastBlock, newBlock)
 	startVMTick := utils.CurrentTimeMillisSeconds()
+	// 主节点和从节点都在这里执行
 	txRWSetMap, _, err := v.txScheduler.Schedule(newBlock, newBlock.Txs, snapshot)
 	vmUsed := utils.CurrentTimeMillisSeconds() - startVMTick
 

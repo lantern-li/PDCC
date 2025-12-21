@@ -145,3 +145,12 @@ func newTxSchedulerEvidence(vmMgr protocol.VmManager, chainConf protocol.ChainCo
 	//}
 	return txSchedulerEvidence
 }
+
+// NewTxSchedulerForTest creates a TxScheduler for testing purposes
+// 用于测试，可以自定义 metricContractInvokeCounter
+func NewTxSchedulerForTest(vmMgr protocol.VmManager, chainConf protocol.ChainConf,
+	storeHelper conf.StoreHelper, cache protocol.LedgerCache, ac protocol.AccessControlProvider,
+	signer protocol.SigningMember, metricContractInvokeCounter *prometheus.CounterVec,
+) *TxScheduler {
+	return newTxScheduler(vmMgr, chainConf, storeHelper, cache, ac, signer, metricContractInvokeCounter)
+}

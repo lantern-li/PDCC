@@ -37,12 +37,14 @@ type txExecInfo struct {
 
 // WriaScheduler A deterministic parallel scheduler
 type WriaScheduler struct {
-	lock          sync.Mutex
-	log           protocol.Logger
-	chainConf     protocol.ChainConf
-	storeHelper   conf.StoreHelper
-	vmHelper      *deterministic.CommonVMHelper // Shared VM execution helper
-	snapshotCache sync.Map                      // key: string(Write.Key), value: *commonPb.VersionedTxWrite
+	lock           sync.Mutex
+	log            protocol.Logger
+	chainConf      protocol.ChainConf
+	storeHelper    conf.StoreHelper
+	vmHelper       *deterministic.CommonVMHelper // Shared VM execution helper
+	snapshotCache  sync.Map                      // key: string(Write.Key), value: *commonPb.VersionedTxWrite
+	txRWSetMap     map[string]*commonPb.TxRWSet  // key: string(txId), value: *commonPb.TxRWSet
+	txRWSetMapLock sync.Mutex                    // lock for txRWSetMap concurrent access
 }
 
 // NewWriaScheduler creates a new WRIA transaction scheduler
@@ -57,6 +59,7 @@ func NewWriaScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, st
 		log:         log,
 		chainConf:   chainConf,
 		storeHelper: storeHelper,
+		txRWSetMap:  make(map[string]*commonPb.TxRWSet), // 初始化 txRWSetMap
 		// snapshotCache sync.Map 不需要初始化
 	}
 
@@ -88,8 +91,6 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			break
 		}
 
-		ws.log.Infof("Round %d: processing batch, remaining txs=%d", roundNum, len(txBatch))
-
 		//1. 选择阶段：依据BatchSize从当前txBatch中选取前BatchSize个序号最小交易进行调度，txBatch为剩余交易池
 		batchSize := BatchSize
 		if batchSize > len(txBatch) {
@@ -102,16 +103,14 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		// 2. 执行阶段：将selectedTxs并发地在当前相同的snapshot上执行。
 		execStageStart := time.Now()
 		var wg sync.WaitGroup
-
 		execInfos := make([]txExecInfo, len(selectedTxs))
-
 		for i, tx := range selectedTxs {
 			wg.Add(1)
 			go func(idx int, transaction *commonPb.Transaction) {
 				defer wg.Done()
 
 				start := time.Now()
-				txSimContext, _, runTxSuccess := ws.vmHelper.ExecuteTx(transaction, snapshot, block) // TODO: 后续可细化失败处理
+				txSimContext, _, runTxSuccess := ws.vmHelper.ExecuteTx(transaction, snapshot, block)
 				costTime := time.Since(start)
 
 				txRWSet := txSimContext.GetTxRWSet(runTxSuccess)
@@ -126,10 +125,9 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			}(i, tx)
 		}
 		wg.Wait()
-
 		ws.log.Infof("[ExecutionStage] execute %d txs finished, total cost=%v", len(selectedTxs), time.Since(execStageStart))
 
-		// 3. 重排序阶段：依据每笔交易的执行时间，进行重排序，执行时间长的排在前面。
+		// 3. 确定性重排序阶段：依据每笔交易的执行时间/读写集的大小，进行重排序，大的排在前面。
 		// 执行时间长的排在前面
 		//sort.Slice(execInfos, func(i, j int) bool {
 		//	return execInfos[i].cost > execInfos[j].cost
@@ -228,12 +226,12 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 					conflictDeps[txIndex] = conflictingTxs
 				}
 
-				// 2. 若未 abort，立即启动协程应用写集（不阻塞RAW检测）
+				// 2. 若未 abort，立即启动协程应用写集到当前SnapShot中（不阻塞RAW检测）
 				if !abortFlags[txIndex] {
 					applyWG.Add(1)
 					go func(i int, info txExecInfo) {
 						defer applyWG.Done()
-						ws.applyWSToSnapshotCache(info.txWriteSetWithVersion)
+						ws.applyWSToSnapshotCache(info.txRWSet, info.txWriteSetWithVersion)
 					}(txIndex, info)
 				}
 
@@ -270,27 +268,30 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		// 8. 将上一批中最终被abort的交易放回剩余交易池txBatch，从剩余交易池中选取前BatchSize个交易进行下一轮调度
 		// 收集被 abort 的交易
 		abortedTxs := make([]*commonPb.Transaction, 0)
-		committedCount := 0
+		committedTxs := 0
 		for i := range execInfos {
 			if abortFlags[i] {
 				abortedTxs = append(abortedTxs, execInfos[i].tx) // 使用execInfos[i].tx以支持重排序
 			} else {
-				committedCount++ // todo：先统计着，后续考虑移除，不要消耗性能
+				// 将这笔交易加进block.Txs
+				execInfos[i].tx.Result = execInfos[i].txSimContext.GetTxResult() //注意这里
+				block.Txs = append(block.Txs, execInfos[i].tx)                   // 已完成的交易按序加到block.Txs，这就是该调度产生的可序列化串行顺序
+				committedTxs++
 			}
 		}
 
-		ws.log.Infof("Round %d completed: committed=%d, aborted=%d", roundNum, committedCount, len(abortedTxs))
+		ws.log.Infof("Round %d completed: committed=%d, aborted=%d", roundNum, committedTxs, len(abortedTxs)) //todo:committedTxs后续将会作为调度信息
 
 		// 将被 abort 的交易放回 txBatch 头部（prepend）
 		if len(abortedTxs) > 0 {
 			txBatch = append(abortedTxs, txBatch...)
-			ws.log.Infof("Prepended %d aborted transactions back to txBatch, new txBatch size=%d", len(abortedTxs), len(txBatch))
+			ws.log.Infof("Prepended %d aborted transactions back to remaining txBatch, remaining txBatch size=%d", len(abortedTxs), len(txBatch))
 		}
 	}
 
 	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v", roundNum, time.Since(startTime))
 
-	return nil, nil, nil
+	return ws.txRWSetMap, nil, nil
 }
 
 // isRAWConflictWithDeps 检查交易是否存在RAW冲突，并返回导致冲突的前序交易列表
@@ -361,7 +362,7 @@ func (ws *WriaScheduler) rechecking(execInfos []txExecInfo, abortFlags []bool, c
 			applyWG.Add(1)
 			go func(idx int, execInfo txExecInfo) {
 				defer applyWG.Done()
-				ws.applyWSToSnapshotCache(execInfo.txWriteSetWithVersion)
+				ws.applyWSToSnapshotCache(execInfo.txRWSet, execInfo.txWriteSetWithVersion)
 			}(txIndex, info)
 		} else {
 			ws.log.Infof("Transaction %d remains aborted, at least one of %d conflicting dependencies was committed",
@@ -397,11 +398,24 @@ func (ws *WriaScheduler) recheckTransaction(txIndex int, conflictingTxs []int, a
 	return true
 }
 
-// applyWSToSnapshotCache 将写集应用到 snapshot cache 中
+// applyWSToSnapshotCache 将写集应用到 snapshot cache 中，同时将原生读写集存储到全局 map
 // 规则：只有当 record.version 在 cache 中是最大时，才应用到 cache —— CAS 在线合并方案
 // 支持多协程并发安全地写入
-func (ws *WriaScheduler) applyWSToSnapshotCache(WS []*commonPb.VersionedTxWrite) {
-	for _, vw := range WS {
+// 参数：
+//   - txRWSet: 原生的交易读写集
+//   - txWritesWithVersion: 带版本的写集
+func (ws *WriaScheduler) applyWSToSnapshotCache(txRWSet *commonPb.TxRWSet, txWritesWithVersion []*commonPb.VersionedTxWrite) {
+	// 1. 先把这笔交易的读写集合加到全局的 map[string]*commonPb.TxRWSet 中
+	if txRWSet != nil && txRWSet.TxId != "" {
+		ws.txRWSetMapLock.Lock()
+		ws.txRWSetMap[txRWSet.TxId] = txRWSet // 这里加锁保证安全
+		ws.txRWSetMapLock.Unlock()
+		ws.log.Debugf("Stored TxRWSet for txID=%s with %d reads and %d writes",
+			txRWSet.TxId, len(txRWSet.TxReads), len(txRWSet.TxWrites))
+	}
+
+	// 2. 将带版本的写集应用到 snapshot cache 中
+	for _, vw := range txWritesWithVersion {
 		key := string(vw.Write.Key)
 
 		// 使用 CAS 循环来保证并发安全
