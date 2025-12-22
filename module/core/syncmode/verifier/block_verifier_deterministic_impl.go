@@ -378,6 +378,7 @@ func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutDag(block *commonpb.B
 	startVMTick := utils.CurrentTimeMillisSeconds()
 	// 主节点和从节点都在这里执行
 	txRWSetMap, _, err := v.txScheduler.Schedule(newBlock, newBlock.Txs, snapshot)
+	v.log.Infof("Schedule over")
 	vmUsed := utils.CurrentTimeMillisSeconds() - startVMTick
 
 	if !utils.CanProposeEmptyBlock(v.chainConf.ChainConfig().Consensus.Type) && len(newBlock.Txs) == 0 {

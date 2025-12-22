@@ -1395,6 +1395,7 @@ func (chain *BlockCommitterImpl) AddBlock(block *commonPb.Block) (err error) {
 		chain.log.Errorf("block common commit failed: %s, blockHeight: (%d)",
 			err.Error(), lastProposed.Header.BlockHeight)
 	}
+	chain.log.Infof("CommitBlock over")
 
 	// Remove txs from txpool. Remove will invoke proposeSignal from txpool if pool size > txcount
 	startPoolTick := utils.CurrentTimeMillisSeconds()

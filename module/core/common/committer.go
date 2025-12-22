@@ -53,11 +53,13 @@ func (cb *CommitBlock) CommitBlock(
 	}
 	// put block
 	startDBTick := utils.CurrentTimeMillisSeconds()
+	cb.log.Infof("start put block")
 	if err = cb.store.PutBlock(block, rwSet); err != nil {
 		// if put db error, then panic
 		cb.log.Error(err)
 		panic(err)
 	}
+	cb.log.Infof("put block over")
 	cb.ledgerCache.SetLastCommittedBlock(block)
 	dbLasts = utils.CurrentTimeMillisSeconds() - startDBTick
 
@@ -83,6 +85,7 @@ func (cb *CommitBlock) CommitBlock(
 		return 0, 0, 0, 0, 0, 0, nil, err
 	}
 	snapshotLasts = utils.CurrentTimeMillisSeconds() - startSnapshotTick
+	cb.log.Infof("snapshotManager NotifyBlockCommitted over")
 	// v220_compat Deprecated
 	if block.Header.BlockVersion < blockVersion230 {
 		// notify chainConf to update config when config block committed

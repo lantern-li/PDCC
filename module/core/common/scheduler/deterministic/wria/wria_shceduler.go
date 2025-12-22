@@ -77,6 +77,9 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 	defer ws.vmHelper.ReleaseContractCache()
 	ws.log.Infof("WRIA schedule start, block_number = %v, tx_count = %d", block.Header.BlockHeight, len(txBatch))
 
+	ws.txRWSetMap = make(map[string]*commonPb.TxRWSet)
+	block.Txs = nil // ← 添加这行！清空 block.Txs
+
 	// 循环调度，直到 txBatch 为空或超时
 	startTime := time.Now()
 	timeoutDuration := time.Duration(ScheduleTimeout) * time.Second
@@ -289,7 +292,10 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		}
 	}
 
-	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v", roundNum, time.Since(startTime))
+	totalTime := time.Since(startTime)
+	tps := float64(len(block.Txs)) / totalTime.Seconds()
+	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v, total txs=%d, TPS=%.2f",
+		roundNum, totalTime, len(block.Txs), tps)
 
 	return ws.txRWSetMap, nil, nil
 }
