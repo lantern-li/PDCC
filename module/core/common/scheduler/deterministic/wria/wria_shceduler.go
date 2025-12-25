@@ -315,8 +315,8 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 
 	totalTime := time.Since(startTime)
 	tps := float64(len(block.Txs)) / totalTime.Seconds()
-	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v, total txs=%d, TPS=%.2f",
-		roundNum, totalTime, len(block.Txs), tps)
+	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v, total txs=%d, TPS=%.2f, blockheight=%d",
+		roundNum, totalTime, len(block.Txs), tps, block.Header.BlockHeight)
 
 	return ws.txRWSetMap, nil, nil
 }
