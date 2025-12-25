@@ -8,6 +8,7 @@ package wria
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,7 +24,11 @@ import (
 const (
 	ScheduleTimeout        = 10
 	ScheduleWithDagTimeout = 20
-	BatchSize              = 40 // todo:这里先设定BatchSize为40，后续动态调整
+)
+
+var (
+	// BatchSize 批处理大小，自动设置为 CPU 核心数的 4 倍
+	BatchSize = runtime.NumCPU() * 4
 )
 
 // txExecInfo 存储交易执行的相关信息
@@ -76,7 +81,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 	ws.lock.Lock()
 	defer ws.lock.Unlock()
 	defer ws.vmHelper.ReleaseContractCache()
-	ws.log.Infof("WRIA schedule start, block_number = %v, tx_count = %d", block.Header.BlockHeight, len(txBatch))
+	ws.log.Infof("WRIA schedule start, block_number = %v, tx_count = %d, batchsize = %d", block.Header.BlockHeight, len(txBatch), BatchSize)
 
 	ws.txRWSetMap = make(map[string]*commonPb.TxRWSet)
 	block.Txs = nil // ← 添加这行！清空 block.Txs
