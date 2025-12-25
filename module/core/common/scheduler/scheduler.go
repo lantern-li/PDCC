@@ -405,6 +405,37 @@ func handleTx(block *commonPb.Block, snapshot protocol.Snapshot,
 	ts.log.DebugDynamic(func() string {
 		return fmt.Sprintf("handleTx(`%v`) => executeTx(...) => runVmSuccess = %v", tx.GetPayload().TxId, runVmSuccess)
 	})
+	//txRWSet := txSimContext.GetTxRWSet(runVmSuccess)
+	//
+	//// 打印读集和写集信息
+	//if txRWSet != nil {
+	//	readCount := 0
+	//	writeCount := 0
+	//	if txRWSet.TxReads != nil {
+	//		readCount = len(txRWSet.TxReads)
+	//	}
+	//	if txRWSet.TxWrites != nil {
+	//		writeCount = len(txRWSet.TxWrites)
+	//	}
+	//
+	//	ts.log.Infof("交易[%s] 读集数量: %d, 写集数量: %d", tx.GetPayload().TxId, readCount, writeCount)
+	//
+	//	// 打印读集详情
+	//	if txRWSet.TxReads != nil {
+	//		for i, read := range txRWSet.TxReads {
+	//			ts.log.Infof("  读集[%d]: Key=%s, ContractName=%s, Value=%s",
+	//				i, string(read.Key), read.ContractName, string(read.Value))
+	//		}
+	//	}
+	//
+	//	// 打印写集详情
+	//	if txRWSet.TxWrites != nil {
+	//		for i, write := range txRWSet.TxWrites {
+	//			ts.log.Infof("  写集[%d]: Key=%s, ContractName=%s, Value=%s",
+	//				i, string(write.Key), write.ContractName, string(write.Value))
+	//		}
+	//	}
+	//}
 
 	// Apply failed means this tx's read set conflict with other txs' write set
 	applyResult, applySize := snapshot.ApplyTxSimContext(txSimContext, specialTxType,

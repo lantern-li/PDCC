@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package wria
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -22,7 +23,7 @@ import (
 const (
 	ScheduleTimeout        = 10
 	ScheduleWithDagTimeout = 20
-	BatchSize              = 30 // todo:这里先设定BatchSize为30
+	BatchSize              = 40 // todo:这里先设定BatchSize为40，后续动态调整
 )
 
 // txExecInfo 存储交易执行的相关信息
@@ -101,12 +102,16 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		}
 		selectedTxs := txBatch[:batchSize:batchSize]
 		txBatch = txBatch[batchSize:]
-		ws.log.Infof("Round %d: selected %d transactions for scheduling, remainTxs=%d", roundNum, batchSize, len(txBatch))
+		ws.log.DebugDynamic(func() string {
+			return fmt.Sprintf("Round %d: selected %d transactions for scheduling, remainTxs=%d", roundNum, batchSize, len(txBatch))
+		})
 
 		// 2. 执行阶段：将selectedTxs并发地在当前相同的snapshot上执行。
-		execStageStart := time.Now()
 		var wg sync.WaitGroup
 		execInfos := make([]txExecInfo, len(selectedTxs))
+
+		execStageStart := time.Now() // 记录开始时间
+
 		for i, tx := range selectedTxs {
 			wg.Add(1)
 			go func(idx int, transaction *commonPb.Transaction) {
@@ -128,7 +133,10 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			}(i, tx)
 		}
 		wg.Wait()
-		ws.log.Infof("[ExecutionStage] execute %d txs finished, total cost=%v", len(selectedTxs), time.Since(execStageStart))
+
+		ws.log.DebugDynamic(func() string {
+			return fmt.Sprintf("[ExecutionStage] execute %d txs finished, total cost=%v", len(selectedTxs), time.Since(execStageStart))
+		})
 
 		// 3. 确定性重排序阶段：依据每笔交易的执行时间/读写集的大小，进行重排序，大的排在前面。
 		// 执行时间长的排在前面
@@ -158,10 +166,13 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			}(txIndex, execInfo)
 		}
 		versionWG.Wait()
-		ws.log.Infof("[versionMarkStage]: total cost=%v", time.Since(versionMarkStart))
+		ws.log.DebugDynamic(func() string {
+			return fmt.Sprintf("[versionMarkStage]: total cost=%v", time.Since(versionMarkStart))
+		})
 
 		// 5.写集合并阶段：并发地将每笔交易的写集WS(TXi)进行合并，生成写集多版本总表MasterWS。
 		writeSetMergingStart := time.Now()
+
 		type MasterWriteSet map[string][]*commonPb.VersionedTxWrite // string：string(Write.Key)
 		masterWS := make(MasterWriteSet)
 
@@ -190,7 +201,9 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 				masterWS[key] = append(masterWS[key], vwList...)
 			}
 		}
-		ws.log.Infof("[writeSetMergingStage]: total cost=%v", time.Since(writeSetMergingStart))
+		ws.log.DebugDynamic(func() string {
+			return fmt.Sprintf("[writeSetMergingStage]: total cost=%v", time.Since(writeSetMergingStart))
+		})
 
 		// 6.冲突检测阶段、提交阶段、再检查阶段
 		//冲突检测RAW：依据MasterWS，对每笔交易的读集进行冲突检测，检测通过则立即启动协程应用写集，检测不通过则标记abort并记录冲突依赖。
@@ -255,13 +268,17 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		// 等待所有成功交易完成写入 Cache（包括通过RAW的和被rechecking挽救的）
 		applyWG.Wait()
 
-		ws.log.Infof("[checkCommitAndRecheckingStage]: total cost=%v", time.Since(checkCommitAndRecheckingStart))
+		ws.log.DebugDynamic(func() string {
+			return fmt.Sprintf("[checkCommitAndRecheckingStage]: total cost=%v", time.Since(checkCommitAndRecheckingStart))
+		})
 
 		// 7. 将 ws.snapshotCache 中的写集直接应用到 snapshot.writeTable 中，并清空 ws.snapshotCache
 		// 这样下一批交易执行时，可以直接从 snapshot.writeTable 中读取，而不用从 DB 中读取
 		applyWriteCacheToSnapshotStart := time.Now()
 		appliedCount := ws.applySnapshotCacheToSnapshot(snapshot) // todo：后续考虑性能优化，不对snapshot进行适配
-		ws.log.Infof("[applyWriteCacheToSnapshotStage]: total cost=%v, applynum:%d", time.Since(applyWriteCacheToSnapshotStart), appliedCount)
+		ws.log.DebugDynamic(func() string {
+			return fmt.Sprintf("[applyWriteCacheToSnapshotStage]: total cost=%v, applynum:%d", time.Since(applyWriteCacheToSnapshotStart), appliedCount)
+		})
 
 		// 清空 snapshotCache
 		//cacheSize := ws.getSnapshotCacheSize()
@@ -283,12 +300,16 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			}
 		}
 
-		ws.log.Infof("Round %d completed: committed=%d, aborted=%d", roundNum, committedTxs, len(abortedTxs)) //todo:committedTxs后续将会作为调度信息
+		ws.log.DebugDynamic(func() string {
+			return fmt.Sprintf("Round %d completed: committed=%d, aborted=%d", roundNum, committedTxs, len(abortedTxs))
+		})
 
 		// 将被 abort 的交易放回 txBatch 头部（prepend）
 		if len(abortedTxs) > 0 {
 			txBatch = append(abortedTxs, txBatch...)
-			ws.log.Infof("Prepended %d aborted transactions back to remaining txBatch, remaining txBatch size=%d", len(abortedTxs), len(txBatch))
+			ws.log.DebugDynamic(func() string {
+				return fmt.Sprintf("Prepended %d aborted transactions back to remaining txBatch, remaining txBatch size=%d", len(abortedTxs), len(txBatch))
+			})
 		}
 	}
 
@@ -342,7 +363,9 @@ func isRAWConflictWithDeps(txIndex int, readSet []*commonPb.TxRead, masterWS map
 // 该函数在所有交易完成RAW检测后被调用
 // 检查规则：对于被abort的交易，检查其记录的冲突依赖前序交易是否都被abort了，如果是则挽救该交易
 func (ws *WriaScheduler) rechecking(execInfos []txExecInfo, abortFlags []bool, conflictDeps [][]int, applyWG *sync.WaitGroup) {
-	ws.log.Info("Starting rechecking phase for aborted transactions")
+	ws.log.DebugDynamic(func() string {
+		return "Starting rechecking phase for aborted transactions"
+	})
 
 	rescuedCount := 0
 	totalAborted := 0
@@ -362,8 +385,7 @@ func (ws *WriaScheduler) rechecking(execInfos []txExecInfo, abortFlags []bool, c
 		if isRescued {
 			// 交易被挽救，更新abort标记，并启动协程应用写集（不阻塞串行检查）
 			abortFlags[txIndex] = false
-			ws.log.Infof("Transaction %d rescued during rechecking, had %d conflicting dependencies (all aborted)",
-				txIndex, len(conflictDeps[txIndex]))
+			ws.log.Infof("Transaction %d rescued during rechecking, had %d conflicting dependencies (all aborted)", txIndex, len(conflictDeps[txIndex]))
 			rescuedCount++
 			applyWG.Add(1)
 			go func(idx int, execInfo txExecInfo) {
@@ -371,12 +393,15 @@ func (ws *WriaScheduler) rechecking(execInfos []txExecInfo, abortFlags []bool, c
 				ws.applyWSToSnapshotCache(execInfo.txRWSet, execInfo.txWriteSetWithVersion)
 			}(txIndex, info)
 		} else {
-			ws.log.Infof("Transaction %d remains aborted, at least one of %d conflicting dependencies was committed",
-				txIndex, len(conflictDeps[txIndex]))
+			ws.log.DebugDynamic(func() string {
+				return fmt.Sprintf("Transaction %d remains aborted, at least one of %d conflicting dependencies was committed", txIndex, len(conflictDeps[txIndex]))
+			})
 		}
 	}
 
-	ws.log.Infof("Rechecking phase completed: rescued %d out of %d aborted transactions", rescuedCount, totalAborted)
+	ws.log.DebugDynamic(func() string {
+		return fmt.Sprintf("Rechecking phase completed: rescued %d out of %d aborted transactions", rescuedCount, totalAborted)
+	})
 }
 
 // recheckTransaction 对单个被abort的交易进行再检查
@@ -392,15 +417,15 @@ func (ws *WriaScheduler) recheckTransaction(txIndex int, conflictingTxs []int, a
 	for _, conflictTxIdx := range conflictingTxs {
 		if !abortFlags[conflictTxIdx] {
 			// 前序交易没有被abort（即被提交了），当前交易无法被挽救
-			ws.log.Infof("Transaction %d cannot be rescued: depends on committed transaction %d",
-				txIndex, conflictTxIdx)
+			ws.log.DebugDynamic(func() string {
+				return fmt.Sprintf("Transaction %d cannot be rescued: depends on committed transaction %d", txIndex, conflictTxIdx)
+			})
 			return false
 		}
 	}
 
 	// 所有产生RAW冲突的前序交易都被abort了，当前交易可以被挽救
-	ws.log.Infof("Transaction %d can be rescued: all %d conflicting predecessors were aborted",
-		txIndex, len(conflictingTxs))
+	ws.log.Infof("Transaction %d can be rescued: all %d conflicting predecessors were aborted", txIndex, len(conflictingTxs))
 	return true
 }
 
@@ -416,8 +441,9 @@ func (ws *WriaScheduler) applyWSToSnapshotCache(txRWSet *commonPb.TxRWSet, txWri
 		ws.txRWSetMapLock.Lock()
 		ws.txRWSetMap[txRWSet.TxId] = txRWSet // 这里加锁保证安全
 		ws.txRWSetMapLock.Unlock()
-		ws.log.Debugf("Stored TxRWSet for txID=%s with %d reads and %d writes",
-			txRWSet.TxId, len(txRWSet.TxReads), len(txRWSet.TxWrites))
+		ws.log.DebugDynamic(func() string {
+			return fmt.Sprintf("Stored TxRWSet for txID=%s with %d reads and %d writes", txRWSet.TxId, len(txRWSet.TxReads), len(txRWSet.TxWrites))
+		})
 	}
 
 	// 2. 将带版本的写集应用到 snapshot cache 中
@@ -441,8 +467,9 @@ func (ws *WriaScheduler) applyWSToSnapshotCache(txRWSet *commonPb.TxRWSet, txWri
 					Write:   vw.Write,
 				}) {
 					// CAS 更新成功
-					ws.log.Infof("Updated cache for key=%s with version=%d (previous version=%d)",
-						key, vw.Version, cached.Version)
+					ws.log.DebugDynamic(func() string {
+						return fmt.Sprintf("Updated cache for key=%s with version=%d (previous version=%d)", key, vw.Version, cached.Version)
+					})
 					break
 				}
 				// CAS 更新失败（其他协程修改了值），重试
@@ -457,7 +484,9 @@ func (ws *WriaScheduler) applyWSToSnapshotCache(txRWSet *commonPb.TxRWSet, txWri
 
 			if !exist {
 				// 成功存储新值
-				ws.log.Infof("Stored new cache entry for key=%s with version=%d", key, vw.Version)
+				ws.log.DebugDynamic(func() string {
+					return fmt.Sprintf("Stored new cache entry for key=%s with version=%d", key, vw.Version)
+				})
 				break
 			}
 
