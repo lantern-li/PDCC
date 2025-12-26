@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,7 +21,7 @@ type TPSData struct {
 	TPS         float64
 }
 
-// parseLogFile 从日志文件中解析TPS数据
+// parseLogFile 从日志文件中解析TPS数据（确定性调度器，如WRIA）
 func parseLogFile(logPath string) ([]TPSData, error) {
 	file, err := os.Open(logPath)
 	if err != nil {
@@ -42,6 +43,45 @@ func parseLogFile(logPath string) ([]TPSData, error) {
 			totalTxs, _ := strconv.Atoi(matches[2])
 			tps, _ := strconv.ParseFloat(matches[3], 64)
 			blockHeight, _ := strconv.Atoi(matches[4])
+
+			data = append(data, TPSData{
+				BlockHeight: blockHeight,
+				TotalTxs:    totalTxs,
+				TPS:         tps,
+			})
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("读取文件错误: %w", err)
+	}
+
+	return data, nil
+}
+
+// parseNonDeterministicLogFile 从日志文件中解析TPS数据（非确定性调度器）
+// 日志格式: schedule tx batch finished, block 7461, success 1000, ... tps 23498.839498061967
+func parseNonDeterministicLogFile(logPath string) ([]TPSData, error) {
+	file, err := os.Open(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("无法打开日志文件: %w", err)
+	}
+	defer file.Close()
+
+	// 正则表达式匹配: block XXXX, success XXX, ... tps XXXX.XXX
+	pattern := regexp.MustCompile(`block (\d+), success (\d+),.*tps ([\d.]+)`)
+
+	var data []TPSData
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		matches := pattern.FindStringSubmatch(line)
+
+		if len(matches) == 4 {
+			blockHeight, _ := strconv.Atoi(matches[1])
+			totalTxs, _ := strconv.Atoi(matches[2])
+			tps, _ := strconv.ParseFloat(matches[3], 64)
 
 			data = append(data, TPSData{
 				BlockHeight: blockHeight,
@@ -103,13 +143,13 @@ func calculateStats(data []TPSData) {
 }
 
 // createLineChart 创建BlockHeight vs TPS折线图
-func createLineChart(data []TPSData) *charts.Line {
+func createLineChart(data []TPSData, schedulerName string) *charts.Line {
 	line := charts.NewLine()
 
 	// 设置全局选项
 	line.SetGlobalOptions(
 		charts.WithTitleOpts(opts.Title{
-			Title:    "WRIA调度器性能分析: Block Height vs TPS",
+			Title:    fmt.Sprintf("%s调度器性能分析: Block Height vs TPS", schedulerName),
 			Subtitle: "区块高度与TPS的关系",
 		}),
 		charts.WithTooltipOpts(opts.Tooltip{}),
@@ -146,12 +186,12 @@ func createLineChart(data []TPSData) *charts.Line {
 }
 
 // createBarChart 创建TPS分布柱状图
-func createBarChart(data []TPSData) *charts.Bar {
+func createBarChart(data []TPSData, schedulerName string) *charts.Bar {
 	bar := charts.NewBar()
 
 	bar.SetGlobalOptions(
 		charts.WithTitleOpts(opts.Title{
-			Title:    "WRIA调度器性能分析: TPS趋势",
+			Title:    fmt.Sprintf("%s调度器性能分析: TPS趋势", schedulerName),
 			Subtitle: "按区块高度显示TPS变化",
 		}),
 		charts.WithTooltipOpts(opts.Tooltip{}),
@@ -182,13 +222,28 @@ func createBarChart(data []TPSData) *charts.Bar {
 }
 
 func main() {
+	// 命令行参数
+	schedulerType := flag.String("type", "deterministic", "调度器类型: deterministic (确定性调度器，如WRIA) 或 nondeterministic (非确定性调度器)")
+	flag.Parse()
+
 	// 日志文件路径
-	logPath := filepath.Join("build", "release", "chainmaker-v2.3.8-wx-org.chainmaker.org", "log", "system.log.2025122515")
+	logPath := filepath.Join("build", "release", "chainmaker-v2.3.8-wx-org.chainmaker.org", "log", "system.log")
 
-	fmt.Printf("正在解析日志文件: %s\n", logPath)
+	var schedulerName string
+	var data []TPSData
+	var err error
 
-	// 解析日志
-	data, err := parseLogFile(logPath)
+	// 根据调度器类型选择不同的解析函数
+	if *schedulerType == "nondeterministic" {
+		schedulerName = "非确定性"
+		fmt.Printf("正在解析日志文件 (非确定性调度器): %s\n", logPath)
+		data, err = parseNonDeterministicLogFile(logPath)
+	} else {
+		schedulerName = "确定性 (WRIA)"
+		fmt.Printf("正在解析日志文件 (确定性调度器): %s\n", logPath)
+		data, err = parseLogFile(logPath)
+	}
+
 	if err != nil {
 		fmt.Printf("错误: %v\n", err)
 		os.Exit(1)
@@ -207,8 +262,8 @@ func main() {
 	// 创建图表
 	page := components.NewPage()
 	page.AddCharts(
-		createLineChart(data),
-		createBarChart(data),
+		createLineChart(data, schedulerName),
+		createBarChart(data, schedulerName),
 	)
 
 	// 保存HTML文件
