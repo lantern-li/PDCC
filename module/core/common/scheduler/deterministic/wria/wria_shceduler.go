@@ -390,7 +390,9 @@ func (ws *WriaScheduler) rechecking(execInfos []txExecInfo, abortFlags []bool, c
 		if isRescued {
 			// 交易被挽救，更新abort标记，并启动协程应用写集（不阻塞串行检查）
 			abortFlags[txIndex] = false
-			ws.log.Infof("Transaction %d rescued during rechecking, had %d conflicting dependencies (all aborted)", txIndex, len(conflictDeps[txIndex]))
+			ws.log.DebugDynamic(func() string {
+				return fmt.Sprintf("Transaction %d rescued during rechecking, had %d conflicting dependencies (all aborted)", txIndex, len(conflictDeps[txIndex]))
+			})
 			rescuedCount++
 			applyWG.Add(1)
 			go func(idx int, execInfo txExecInfo) {
@@ -430,7 +432,9 @@ func (ws *WriaScheduler) recheckTransaction(txIndex int, conflictingTxs []int, a
 	}
 
 	// 所有产生RAW冲突的前序交易都被abort了，当前交易可以被挽救
-	ws.log.Infof("Transaction %d can be rescued: all %d conflicting predecessors were aborted", txIndex, len(conflictingTxs))
+	ws.log.DebugDynamic(func() string {
+		return fmt.Sprintf("Transaction %d can be rescued: all %d conflicting predecessors were aborted", txIndex, len(conflictingTxs))
+	})
 	return true
 }
 
