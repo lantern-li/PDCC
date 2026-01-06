@@ -7,17 +7,13 @@ require (
 	code.cloudfoundry.org/bytefmt v0.0.0-20211005130812-5bb3c17173e5
 	github.com/Rican7/retry v0.1.0
 	github.com/Workiva/go-datastructures v1.0.53
-	github.com/c-bata/go-prompt v0.2.2
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
-	github.com/google/shlex v0.0.0-20181106134648-c34317bd91bf
-	github.com/gosuri/uiprogress v0.0.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0
 	github.com/hokaccha/go-prettyjson v0.0.0-20201222001619-a42f9ac2ec8e
 	github.com/holiman/uint256 v1.2.0
-	github.com/hpcloud/tail v1.0.0
 	github.com/linvon/cuckoo-filter v0.4.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/mr-tron/base58 v1.2.0
@@ -26,9 +22,9 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.10.1
+	github.com/spf13/viper v1.10.1 // indirect
 	github.com/stretchr/testify v1.8.3
-	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
+	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954 // indirect
 	github.com/tidwall/pretty v1.2.0
 	github.com/tjfoc/gmsm v1.4.1
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802
@@ -77,12 +73,9 @@ require (
 	chainmaker.org/chainmaker/vm-wxvm/v2 v2.3.6
 	chainmaker.org/chainmaker/vm/v2 v2.3.9-0.20251215055559-93d1e468252d
 	github.com/go-echarts/go-echarts/v2 v2.2.4
-	github.com/gosuri/uilive v0.0.4 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
-	github.com/mattn/go-tty v0.0.0-20180907095812-13ff1204f104 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/pkg/term v0.0.0-20180730021639-bffc007b7fd5 // indirect
 	golang.org/x/sync v0.2.0
 	google.golang.org/protobuf v1.31.0
 )

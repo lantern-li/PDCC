@@ -469,7 +469,7 @@ func (s *SnapshotImpl) applyNormalTxSimContext(tx *commonPb.Transaction,
 	var txResult *commonPb.Result
 
 	// Only when the virtual machine is running normally can the read-write set be saved, or write fake conflicted key
-	txRWSet = txSimContext.GetTxRWSet(runVmSuccess)
+	txRWSet = txSimContext.GetTxRWSet(runVmSuccess) //执行失败的交易只会返回其读集
 	s.log.Debugf("【gas calc】%v, ApplyTxSimContext, txRWSet = %v", txSimContext.GetTx().Payload.TxId, txRWSet)
 	txResult = txSimContext.GetTxResult()
 	// 提前准备好要处理的数据

@@ -524,7 +524,7 @@ func (ws *WriaScheduler) clearSnapshotCache() {
 // 这样下一批交易执行时，可以直接从 snapshot.writeTable 中读取，而不用从 DB 中读取
 // 返回应用的写操作数量
 func (ws *WriaScheduler) applySnapshotCacheToSnapshot(snap protocol.Snapshot) int {
-	// 收集 snapshotCache 中的所有写操作
+	// 收集 snapshotCache 中的所有写操作 todo：考虑对每个写条目并发的写
 	writes := make([]*commonPb.TxWrite, 0)
 	ws.snapshotCache.Range(func(key, value interface{}) bool {
 		versionedWrite, ok := value.(*commonPb.VersionedTxWrite)
