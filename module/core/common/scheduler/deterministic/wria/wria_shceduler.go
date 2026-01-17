@@ -455,59 +455,66 @@ func (ws *WriaScheduler) applyWSToSnapshotCache(txRWSet *commonPb.TxRWSet, txWri
 		})
 	}
 
-	// 2. 将带版本的写集应用到 snapshot cache 中
+	// 2. 将带版本的写集并发应用到 snapshot cache 中
+	var wg sync.WaitGroup
 	for _, vw := range txWritesWithVersion {
-		key := string(vw.Write.Key)
+		wg.Add(1)
+		go func(versionedWrite *commonPb.VersionedTxWrite) {
+			defer wg.Done()
 
-		// 使用 CAS 循环来保证并发安全
-		for {
-			// 1. 尝试加载当前值
-			if existing, ok := ws.snapshotCache.Load(key); ok {
-				cached := existing.(*commonPb.VersionedTxWrite)
+			key := string(versionedWrite.Write.Key)
 
-				// 2. 如果当前版本不是最大版本，直接跳过
-				if vw.Version <= cached.Version { // todo :会等于吗？
-					break
+			// 使用 CAS 循环来保证并发安全
+			for {
+				// 1. 尝试加载当前值
+				if existing, ok := ws.snapshotCache.Load(key); ok {
+					cached := existing.(*commonPb.VersionedTxWrite)
+
+					// 2. 如果当前版本不是最大版本，直接跳过
+					if versionedWrite.Version <= cached.Version { // todo :会等于吗？
+						break
+					}
+
+					// 3. 当前版本更大，尝试使用 CAS 更新
+					if ws.snapshotCache.CompareAndSwap(key, existing, &commonPb.VersionedTxWrite{
+						Version: versionedWrite.Version,
+						Write:   versionedWrite.Write,
+					}) {
+						// CAS 更新成功
+						ws.log.DebugDynamic(func() string {
+							return fmt.Sprintf("Updated cache for key=%s with version=%d (previous version=%d)", key, versionedWrite.Version, cached.Version)
+						})
+						break
+					}
+					// CAS 更新失败（其他协程修改了值），重试
+					continue
 				}
 
-				// 3. 当前版本更大，尝试使用 CAS 更新
-				if ws.snapshotCache.CompareAndSwap(key, existing, &commonPb.VersionedTxWrite{
-					Version: vw.Version,
-					Write:   vw.Write,
-				}) {
-					// CAS 更新成功
+				// 4. key 不存在，尝试存储新值
+				actual, exist := ws.snapshotCache.LoadOrStore(key, &commonPb.VersionedTxWrite{
+					Version: versionedWrite.Version,
+					Write:   versionedWrite.Write,
+				})
+
+				if !exist {
+					// 成功存储新值
 					ws.log.DebugDynamic(func() string {
-						return fmt.Sprintf("Updated cache for key=%s with version=%d (previous version=%d)", key, vw.Version, cached.Version)
+						return fmt.Sprintf("Stored new cache entry for key=%s with version=%d", key, versionedWrite.Version)
 					})
 					break
 				}
-				// CAS 更新失败（其他协程修改了值），重试
-				continue
-			}
 
-			// 4. key 不存在，尝试存储新值
-			actual, exist := ws.snapshotCache.LoadOrStore(key, &commonPb.VersionedTxWrite{
-				Version: vw.Version,
-				Write:   vw.Write,
-			})
-
-			if !exist {
-				// 成功存储新值
-				ws.log.DebugDynamic(func() string {
-					return fmt.Sprintf("Stored new cache entry for key=%s with version=%d", key, vw.Version)
-				})
-				break
+				// 5. LoadOrStore 期间其他协程已经存储了值，需要重新检查版本
+				cached := actual.(*commonPb.VersionedTxWrite)
+				if versionedWrite.Version < cached.Version {
+					// 其他协程存储的版本更大，跳过
+					break
+				}
+				// 其他协程存储的版本更小，继续循环尝试更新
 			}
-
-			// 5. LoadOrStore 期间其他协程已经存储了值，需要重新检查版本
-			cached := actual.(*commonPb.VersionedTxWrite)
-			if vw.Version < cached.Version {
-				// 其他协程存储的版本更大，跳过
-				break
-			}
-			// 其他协程存储的版本更小，继续循环尝试更新
-		}
+		}(vw)
 	}
+	wg.Wait()
 }
 
 // clearSnapshotCache 清空 snapshot cache
