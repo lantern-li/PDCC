@@ -28,7 +28,7 @@ const (
 
 var (
 	// BatchSize 批处理大小，自动设置为 CPU 核心数的 4 倍
-	BatchSize = runtime.NumCPU() * 4
+	BatchSize = runtime.NumCPU() * 4 // 这个应该设置为物理核心数还是逻辑核心数量？todo 似乎操作系统只能读到逻辑核心数量？
 )
 
 // txExecInfo 存储交易执行的相关信息
@@ -247,7 +247,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 					conflictDeps[txIndex] = conflictingTxs
 				}
 
-				// 2. 若未 abort，立即启动协程应用写集到当前SnapShot中（不阻塞RAW检测）
+				// 2. 若未 abort，立即启动协程应用写集到当前SnapShot中
 				if !abortFlags[txIndex] {
 					applyWG.Add(1)
 					go func(i int, info txExecInfo) {
@@ -301,7 +301,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 				// 将这笔交易加进block.Txs
 				execInfos[i].tx.Result = execInfos[i].txSimContext.GetTxResult() //注意这里
 				block.Txs = append(block.Txs, execInfos[i].tx)                   // 已完成的交易按序加到block.Txs，这就是该调度产生的可序列化串行顺序
-				committedTxs++
+				committedTxs++                                                   // 非确定性调度中可以作为调度信心
 			}
 		}
 
@@ -501,8 +501,8 @@ func (ws *WriaScheduler) applyWSToSnapshotCache(txRWSet *commonPb.TxRWSet, txWri
 
 			// 5. LoadOrStore 期间其他协程已经存储了值，需要重新检查版本
 			cached := actual.(*commonPb.VersionedTxWrite)
-			if vw.Version <= cached.Version { // todo :会等于吗？
-				// 其他协程存储的版本更大或相等，跳过
+			if vw.Version < cached.Version {
+				// 其他协程存储的版本更大，跳过
 				break
 			}
 			// 其他协程存储的版本更小，继续循环尝试更新
