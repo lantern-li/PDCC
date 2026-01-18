@@ -49,7 +49,7 @@ type WriaScheduler struct {
 	storeHelper    conf.StoreHelper
 	vmHelper       *deterministic.CommonVMHelper // Shared VM execution helper
 	snapshotCache  sync.Map                      // key: string(Write.Key), value: *commonPb.VersionedTxWrite
-	txRWSetMap     map[string]*commonPb.TxRWSet  // key: string(txId), value: *commonPb.TxRWSet
+	txRWSetMap     map[string]*commonPb.TxRWSet  // key: string(txId), value: *commonPb.TxRWSet  todo chainmaker的这个也要改
 	txRWSetMapLock sync.Mutex                    // lock for txRWSetMap concurrent access
 }
 
@@ -283,7 +283,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		appliedCount := ws.applySnapshotCacheToSnapshot(snapshot) // todo：后续考虑性能优化，不对snapshot进行适配
 		ws.log.DebugDynamic(func() string {
 			return fmt.Sprintf("[applyWriteCacheToSnapshotStage]: total cost=%v, applynum:%d", time.Since(applyWriteCacheToSnapshotStart), appliedCount)
-		})
+		}) // todo:先测试下这种对snapshot的适配会额外产生多少开销。 batch size 为40时候，120key，约为20～50us
 
 		// 清空 snapshotCache
 		//cacheSize := ws.getSnapshotCacheSize()
