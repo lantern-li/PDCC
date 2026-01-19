@@ -26,6 +26,15 @@ func (bp *DeterministicBlockProposerImpl) generateNewBlock(proposingHeight uint6
 	batchIds []string, fetchBatches [][]*commonpb.Transaction) (
 	*commonpb.Block, error) {
 
+	//// For SOLO consensus with deterministic scheduling, we need to execute transactions in propose phase
+	//// because SOLO consensus implementation expects transactions to be executed
+	//isSolo := bp.chainConf.ChainConfig().Consensus.Type == 0 // ConsensusType_SOLO
+	//if isSolo {
+	//	block, _, err := bp.blockBuilder.GenerateNewBlock(
+	//		proposingHeight, preHash, txBatch, batchIds, fetchBatches)
+	//	return block, err
+	//}
+
 	return bp.blockBuilder.GenerateNewPreBlock(
 		proposingHeight, preHash, txBatch, batchIds, fetchBatches)
 }

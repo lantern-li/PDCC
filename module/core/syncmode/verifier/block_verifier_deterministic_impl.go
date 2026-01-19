@@ -644,6 +644,14 @@ func (v *DeterministicBlockVerifierImpl) validateBlock(block, lastBlock *commonp
 		return v.verifierBlock.ValidateBlock(block, lastBlock, hashType, timeLasts, mode)
 	}
 
+	//// 对于SOLO共识，如果是确定性调度（EXECUTE_AFTER_PROPOSE），需要执行交易
+	//// For SOLO consensus with deterministic scheduling (EXECUTE_AFTER_PROPOSE), transactions must be executed
+	//isSolo := consensuspb.ConsensusType_SOLO == v.chainConf.ChainConfig().Consensus.Type
+	//isExecuteAfterPropose := v.chainConf.ChainConfig().Scheduler.ProcessType == configpb.ProcessType_EXECUTE_AFTER_PROPOSE
+	//if isSolo && isExecuteAfterPropose {
+	//	return v.verifierBlock.ValidateBlock(block, lastBlock, hashType, timeLasts, mode)
+	//}
+
 	return v.verifierBlock.ValidateBlockWithoutSimulate(block, lastBlock, hashType, timeLasts, mode)
 }
 

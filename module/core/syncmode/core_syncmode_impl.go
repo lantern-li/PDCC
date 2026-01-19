@@ -64,7 +64,7 @@ type CoreEngine struct {
 	txFilter         protocol.TxFilter
 	storeHelper      conf.StoreHelper
 	currentScheduler *chainConfConfig.SchedulerConfig // current scheduler config
-	signer            protocol.SigningMember
+	signer           protocol.SigningMember
 }
 
 // NewCoreEngine new a core engine.
@@ -133,7 +133,7 @@ func NewCoreEngine(cf *conf.CoreEngineConfig) (*CoreEngine, error) {
 func createTxScheduler(c *CoreEngine) protocol.TxScheduler {
 	var schedulerFactory scheduler.TxSchedulerFactory
 	return schedulerFactory.NewTxScheduler(
-		c.vmMgr, c.chainConf, c.storeHelper, c.ledgerCache, c.ac,c.signer)
+		c.vmMgr, c.chainConf, c.storeHelper, c.ledgerCache, c.ac, c.signer)
 }
 
 // createBlockProposer initializes a block proposer.
@@ -238,7 +238,7 @@ func (c *CoreEngine) OnMessage(message *msgbus.Message) {
 		if proposeStatus, ok := message.Payload.(bool); ok {
 			c.blockProposer.OnReceiveProposeStatusChange(proposeStatus)
 		}
-	case msgbus.VerifyBlock:
+	case msgbus.VerifyBlock: // 这里收到共识引擎发来的验证区块消息。 然后核心引擎进行验证
 		go func() {
 			if block, ok := message.Payload.(*commonpb.Block); ok {
 				c.BlockVerifier.VerifyBlock(block, protocol.CONSENSUS_VERIFY) //nolint: errcheck
@@ -261,7 +261,7 @@ func (c *CoreEngine) OnMessage(message *msgbus.Message) {
 				}
 			}
 		}()
-	case msgbus.CommitBlock:
+	case msgbus.CommitBlock: //这里收到共识引擎发来的落库区块消息。 然后核心引擎进行落库
 		go func() {
 			if block, ok := message.Payload.(*commonpb.Block); ok {
 				if err := c.BlockCommitter.AddBlock(block); err != nil {
@@ -367,7 +367,7 @@ func (c *CoreEngine) updateChinConfig(chainConfig *chainConfConfig.ChainConfig) 
 
 		// update scheduler
 		var schedulerFactory scheduler.TxSchedulerFactory
-		c.txScheduler = schedulerFactory.NewTxScheduler(c.vmMgr, c.chainConf, storeHelper, c.ledgerCache, c.ac,c.signer)
+		c.txScheduler = schedulerFactory.NewTxScheduler(c.vmMgr, c.chainConf, storeHelper, c.ledgerCache, c.ac, c.signer)
 
 		err := c.blockProposer.Stop()
 		if err != nil {
