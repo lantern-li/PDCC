@@ -144,13 +144,17 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		})
 
 		// 3. 确定性重排序阶段：依据每笔交易的执行时间/读写集的大小，进行重排序，大的排在前面。
+		//deterministicReorderStart := time.Now()
 		// 执行时间长的排在前面
 		//sort.Slice(execInfos, func(i, j int) bool {
 		//	return execInfos[i].cost > execInfos[j].cost
-		//}) // todo：后续设计非确定性的算法再排序
+		//}) // todo：后续设计非确定性的算法再排序 用stable
+		//ws.log.DebugDynamic(func() string {
+		//	return fmt.Sprintf("[deterministicReorderStage]: total cost=%v", time.Since(deterministicReorderStart))
+		//})
 
-		// 4. 版本标记阶段：并发地将每笔交易的写集进行版本标记。
-		versionMarkStart := time.Now()
+		// 4. 写集合并阶段：先并发地将每笔交易的写集进行版本标记。
+		writeSetMergingStart := time.Now()
 		var versionWG sync.WaitGroup
 		for txIndex, execInfo := range execInfos {
 			versionWG.Add(1)
@@ -171,13 +175,8 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			}(txIndex, execInfo)
 		}
 		versionWG.Wait()
-		ws.log.DebugDynamic(func() string {
-			return fmt.Sprintf("[versionMarkStage]: total cost=%v", time.Since(versionMarkStart))
-		})
 
-		// 5.写集合并阶段：并发地将每笔交易的写集WS(TXi)进行合并，生成写集多版本总表MasterWS。
-		writeSetMergingStart := time.Now()
-
+		// 4.写集合并阶段：并发地将每笔交易的写集WS(TXi)进行合并，生成写集多版本总表MasterWS。
 		type MasterWriteSet map[string][]*commonPb.VersionedTxWrite // string：string(Write.Key)
 		masterWS := make(MasterWriteSet)
 
@@ -210,7 +209,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			return fmt.Sprintf("[writeSetMergingStage]: total cost=%v", time.Since(writeSetMergingStart))
 		})
 
-		// 6.冲突检测阶段、提交阶段、再检查阶段
+		// 5.冲突检测阶段、提交阶段、再检查阶段
 		//冲突检测RAW：依据MasterWS，对每笔交易的读集进行冲突检测，检测通过则立即启动协程应用写集，检测不通过则标记abort并记录冲突依赖。
 		//提交：对于通过了RAW检测的交易，立即启动协程将其写集应用到snapshot cache中（不阻塞）。
 		//再检查：当所有交易都完成了RAW检测后，立即触发再检查阶段。针对所有被abort的交易，串行地进行检查，
@@ -300,7 +299,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			} else {
 				// 将这笔交易加进block.Txs
 				execInfos[i].tx.Result = execInfos[i].txSimContext.GetTxResult() //注意这里
-				block.Txs = append(block.Txs, execInfos[i].tx)                   // 已完成的交易按序加到block.Txs，这就是该调度产生的可序列化串行顺序
+				block.Txs = append(block.Txs, execInfos[i].tx)                   // 已完成的交易按序加到block.Txs，这就是该调度产生的可序列化串行顺序 todo 调度信息
 				committedTxs++                                                   // 非确定性调度中可以作为调度信心
 			}
 		}

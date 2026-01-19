@@ -22,7 +22,7 @@ type TPSData struct {
 }
 
 // parseLogFile 从日志文件中解析TPS数据（确定性调度器，如WRIA）
-func parseLogFile(logPath string) ([]TPSData, error) {
+func parseLogFileTps(logPath string) ([]TPSData, error) {
 	file, err := os.Open(logPath)
 	if err != nil {
 		return nil, fmt.Errorf("无法打开日志文件: %w", err)
@@ -241,7 +241,7 @@ func main() {
 	} else {
 		schedulerName = "确定性 (WRIA)"
 		fmt.Printf("正在解析日志文件 (确定性调度器): %s\n", logPath)
-		data, err = parseLogFile(logPath)
+		data, err = parseLogFileTps(logPath)
 	}
 
 	if err != nil {
