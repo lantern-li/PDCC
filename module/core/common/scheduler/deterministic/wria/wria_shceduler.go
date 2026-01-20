@@ -9,6 +9,7 @@ package wria
 import (
 	"fmt"
 	"runtime"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -38,6 +39,8 @@ type txExecInfo struct {
 	txRWSet               *commonPb.TxRWSet
 	txReadSet             []*commonPb.TxRead
 	txWriteSetWithVersion []*commonPb.VersionedTxWrite
+	originalIndex         int // 原始索引，用于确定性排序
+	rwSetCount            int // 读写集总数量，用于重排序
 }
 
 // WriaScheduler A deterministic parallel scheduler
@@ -126,10 +129,12 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 				txRWSet := txSimContext.GetTxRWSet(runTxSuccess)
 
 				execInfos[idx] = txExecInfo{
-					tx:           transaction,
-					txSimContext: txSimContext,
-					txRWSet:      txRWSet,
-					txReadSet:    txRWSet.TxReads,
+					tx:            transaction,
+					txSimContext:  txSimContext,
+					txRWSet:       txRWSet,
+					txReadSet:     txRWSet.TxReads,
+					originalIndex: idx,
+					rwSetCount:    len(txRWSet.TxReads) + len(txRWSet.TxWrites),
 				}
 			}(i, tx)
 		}
@@ -139,12 +144,22 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			return fmt.Sprintf("[ExecutionStage] execute %d txs finished, total cost=%v", len(selectedTxs), time.Since(execStageStart))
 		})
 
-		// 3. 确定性重排序阶段：依据每笔交易的执行时间/读写集的大小，进行重排序，大的排在前面。
-		//deterministicReorderStart := time.Now()
+		// 3. 确定性重排序阶段：依据每笔交易读写集的数量，进行重排序。每笔交易读写集的数量越多，越靠前。
+		deterministicReorderStart := time.Now()
 
-		//ws.log.DebugDynamic(func() string {
-		//	return fmt.Sprintf("[deterministicReorderStage]: total cost=%v", time.Since(deterministicReorderStart))
-		//})
+		// 使用 sort.SliceStable 保证稳定排序（相同 rwSetCount 时保持原始顺序）
+		sort.SliceStable(execInfos, func(i, j int) bool {
+			// 首先按 rwSetCount 降序排序（数量多的靠前）
+			if execInfos[i].rwSetCount != execInfos[j].rwSetCount {
+				return execInfos[i].rwSetCount > execInfos[j].rwSetCount
+			}
+			// rwSetCount 相同时，按原始索引升序排序（保证确定性）
+			return execInfos[i].originalIndex < execInfos[j].originalIndex
+		})
+
+		ws.log.DebugDynamic(func() string {
+			return fmt.Sprintf("[DeterministicReorderStage]: total cost=%v", time.Since(deterministicReorderStart))
+		})
 
 		// 4. 写集合并阶段：先并发地将每笔交易的写集进行版本标记。
 		writeSetMergingStart := time.Now()
