@@ -790,7 +790,9 @@ func (s *SnapshotImpl) ApplyWritesToWriteTable(writes []*commonPb.TxWrite) {
 			}
 			s.writeTable.putByLock(finalKey, wsv)
 		}
-		s.log.Debugf("Applied %d writes to writeTable with seq=%d (serial)", len(writes), applySeq)
+		s.log.DebugDynamic(func() string {
+			return fmt.Sprintf("Applied %d writes to writeTable with seq=%d (serial)", len(writes), applySeq)
+		})
 		return
 	}
 
@@ -825,7 +827,9 @@ func (s *SnapshotImpl) ApplyWritesToWriteTable(writes []*commonPb.TxWrite) {
 	}
 
 	wg.Wait()
-	s.log.Debugf("Applied %d writes to writeTable with seq=%d (concurrent)", len(writes), applySeq)
+	s.log.DebugDynamic(func() string {
+		return fmt.Sprintf("Applied %d writes to writeTable with seq=%d (concurrent)", len(writes), applySeq)
+	})
 }
 
 // todo here

@@ -34,7 +34,6 @@ var (
 // txExecInfo 存储交易执行的相关信息
 type txExecInfo struct {
 	tx                    *commonPb.Transaction
-	cost                  time.Duration
 	txSimContext          protocol.TxSimContext
 	txRWSet               *commonPb.TxRWSet
 	txReadSet             []*commonPb.TxRead
@@ -122,15 +121,12 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			go func(idx int, transaction *commonPb.Transaction) {
 				defer wg.Done()
 
-				start := time.Now()
 				txSimContext, _, runTxSuccess := ws.vmHelper.ExecuteTx(transaction, snapshot, block)
-				costTime := time.Since(start)
 
 				txRWSet := txSimContext.GetTxRWSet(runTxSuccess)
 
 				execInfos[idx] = txExecInfo{
 					tx:           transaction,
-					cost:         costTime,
 					txSimContext: txSimContext,
 					txRWSet:      txRWSet,
 					txReadSet:    txRWSet.TxReads,
@@ -145,10 +141,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 
 		// 3. 确定性重排序阶段：依据每笔交易的执行时间/读写集的大小，进行重排序，大的排在前面。
 		//deterministicReorderStart := time.Now()
-		// 执行时间长的排在前面
-		//sort.Slice(execInfos, func(i, j int) bool {
-		//	return execInfos[i].cost > execInfos[j].cost
-		//}) // todo：后续设计非确定性的算法再排序 用stable
+
 		//ws.log.DebugDynamic(func() string {
 		//	return fmt.Sprintf("[deterministicReorderStage]: total cost=%v", time.Since(deterministicReorderStart))
 		//})
