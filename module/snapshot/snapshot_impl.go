@@ -765,7 +765,7 @@ func (s *SnapshotImpl) Seal() {
 }
 
 // ApplyWritesToWriteTable 批量应用写集到 writeTable
-// 用于确定性调度器wria直接将一批交易的写集应用到 snapshot，使得后续交易可以读取到这些写入
+// 用于确定性调度器Wria直接将一批交易的写集应用到 snapshot，使得后续交易可以读取到这些写入
 // 参数：writes - 需要应用的写操作列表
 func (s *SnapshotImpl) ApplyWritesToWriteTable(writes []*commonPb.TxWrite) {
 	if s.IsSealed() {
@@ -773,20 +773,59 @@ func (s *SnapshotImpl) ApplyWritesToWriteTable(writes []*commonPb.TxWrite) {
 		return
 	}
 
+	writeCount := len(writes)
+
 	// 使用当前 txTable 大小作为 applySeq
 	// 注意：这个 seq 主要用于冲突检测，在确定性调度器中意义不大
 	applySeq := len(s.txTable)
 
-	for _, write := range writes {
-		finalKey := constructKey(write.ContractName, write.Key)
-		wsv := &sv{
-			seq:   applySeq,
-			value: write.Value,
+	// 如果写入数量较少，串行处理更高效（避免 goroutine 创建开销）
+	const concurrentThreshold = 50
+	if writeCount < concurrentThreshold {
+		for _, write := range writes {
+			finalKey := constructKey(write.ContractName, write.Key)
+			wsv := &sv{
+				seq:   applySeq,
+				value: write.Value,
+			}
+			s.writeTable.putByLock(finalKey, wsv)
 		}
-		s.writeTable.putByLock(finalKey, wsv)
+		s.log.Debugf("Applied %d writes to writeTable with seq=%d (serial)", len(writes), applySeq)
+		return
 	}
 
-	s.log.Debugf("Applied %d writes to writeTable with seq=%d", len(writes), applySeq)
+	// 并发处理：将 writes 分成多个批次并发执行
+	// 由于 writes 中的 key 都不同（由调度器保证），可以安全并发
+	numWorkers := 8 // 使用固定数量的 worker，避免创建过多 goroutine
+	batchSize := (writeCount + numWorkers - 1) / numWorkers
+
+	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		start := i * batchSize
+		end := start + batchSize
+		if end > writeCount {
+			end = writeCount
+		}
+		if start >= writeCount {
+			break
+		}
+
+		wg.Add(1)
+		go func(batch []*commonPb.TxWrite) {
+			defer wg.Done()
+			for _, write := range batch {
+				finalKey := constructKey(write.ContractName, write.Key)
+				wsv := &sv{
+					seq:   applySeq,
+					value: write.Value,
+				}
+				s.writeTable.putByLock(finalKey, wsv)
+			}
+		}(writes[start:end])
+	}
+
+	wg.Wait()
+	s.log.Debugf("Applied %d writes to writeTable with seq=%d (concurrent)", len(writes), applySeq)
 }
 
 // todo here

@@ -524,8 +524,14 @@ func (ws *WriaScheduler) clearSnapshotCache() {
 // 这样下一批交易执行时，可以直接从 snapshot.writeTable 中读取，而不用从 DB 中读取
 // 返回应用的写操作数量
 func (ws *WriaScheduler) applySnapshotCacheToSnapshot(snap protocol.Snapshot) int {
-	// 收集 snapshotCache 中的所有写操作 todo：考虑对每个写条目并发的写
-	writes := make([]*commonPb.TxWrite, 0)
+	// 先获取 cache 大小，预分配 slice 容量
+	cacheSize := ws.getSnapshotCacheSize()
+	if cacheSize == 0 {
+		return 0
+	}
+
+	// 收集 snapshotCache 中的所有写操作
+	writes := make([]*commonPb.TxWrite, 0, cacheSize)
 	ws.snapshotCache.Range(func(key, value interface{}) bool {
 		versionedWrite, ok := value.(*commonPb.VersionedTxWrite)
 		if !ok {
@@ -537,10 +543,11 @@ func (ws *WriaScheduler) applySnapshotCacheToSnapshot(snap protocol.Snapshot) in
 		return true
 	})
 
-	// 批量应用到 snapshot.writeTable（使用接口方法）
-	if len(writes) > 0 {
-		snap.ApplyWritesToWriteTable(writes)
-	}
+	// 批量应用到 snapshot.writeTable
+	// ApplyWritesToWriteTable 内部已实现智能并发：
+	// - 写入数 < 50：串行处理（避免 goroutine 开销）
+	// - 写入数 >= 50：8 个 worker 并发处理
+	snap.ApplyWritesToWriteTable(writes)
 
 	return len(writes)
 }
