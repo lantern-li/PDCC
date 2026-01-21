@@ -118,6 +118,7 @@ func (ts *ReorderTxScheduler) schedule(block *commonPb.Block, txBatch []*commonP
 	txBatchSize := len(txBatch)
 	ts.log.Infof("schedule tx batch start, block_number = %v, size = %d", block.Header.BlockHeight, txBatchSize)
 
+	startTime := time.Now()
 	var goRoutinePool *ants.Pool
 	var err error
 	poolCapacity := ts.storeHelper.GetPoolCapacity()
@@ -128,8 +129,6 @@ func (ts *ReorderTxScheduler) schedule(block *commonPb.Block, txBatch []*commonP
 		return nil, nil, err
 	}
 	defer goRoutinePool.Release()
-
-	startTime := time.Now()
 
 	// Record processed tx length
 	processedTxBatchLen := make([]uint32, 0)
@@ -192,9 +191,9 @@ func (ts *ReorderTxScheduler) schedule(block *commonPb.Block, txBatch []*commonP
 	block.Txs = snapshot.GetTxTable()
 
 	timeCostD := time.Since(startTime)
-	ts.log.Infof("schedule tx batch finished, success %d, txs pre-execution cost %v, "+
+	ts.log.Infof("schedule tx batch finished, block %d, success %d, txs pre-execution cost %v, "+
 		"txs result process cost %v, repeat and serial cost %v, "+
-		"dag building cost %v, total used %v, tps %v", len(block.Txs), timeCostA,
+		"dag building cost %v, total used %v, tps %v", block.Header.BlockHeight, len(block.Txs), timeCostA,
 		timeCostB-timeCostA, timeCostC-timeCostB, timeCostD-timeCostC, timeCostD,
 		float64(len(block.Txs))/(float64(timeCostD)/1e9))
 
@@ -234,7 +233,7 @@ func (ts *ReorderTxScheduler) preExecuteTxs(goRoutinePool *ants.Pool,
 		counter := 0
 		for {
 			select {
-			case txI:= <-runningTxC:
+			case txI := <-runningTxC:
 				// additional timeoutC check to avoid timeoutC starving,避免单笔交易，导致无法退出
 				select {
 				case <-ctx.Done():

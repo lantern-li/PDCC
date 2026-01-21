@@ -129,7 +129,8 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	}
 
 	txBatchSize := len(txBatch)
-	ts.log.Infof("nd schedule tx batch start, block %d, size = %d", block.Header.BlockHeight, txBatchSize)
+	ts.log.Infof("occ schedule tx batch start, block %d, size = %d", block.Header.BlockHeight, txBatchSize)
+	startTime := time.Now()
 
 	var goRoutinePool *ants.Pool
 	poolCapacity := ts.StoreHelper.GetPoolCapacity()
@@ -140,7 +141,6 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 	defer goRoutinePool.Release()
 
 	timeoutC := time.After(ScheduleTimeout * time.Second)
-	startTime := time.Now()
 
 	runningTxC := make(chan *commonPb.Transaction, txBatchSize)
 	finishC := make(chan bool)

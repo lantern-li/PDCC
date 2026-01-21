@@ -137,6 +137,45 @@ func parseOcc2LogFile(logPath string) ([]TPSData, error) {
 	return data, nil
 }
 
+// parseReorderLogFile 从日志文件中解析TPS数据（Reorder调度器）
+// 日志格式: schedule tx batch finished, block 7, success 1000, txs pre-execution cost 23.903252ms, ... tps 19649.08695605187
+func parseReorderLogFile(logPath string) ([]TPSData, error) {
+	file, err := os.Open(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("无法打开日志文件: %w", err)
+	}
+	defer file.Close()
+
+	// 正则表达式匹配: block X, success XXX, ... tps XXXX.XXX
+	pattern := regexp.MustCompile(`block (\d+), success (\d+),.*tps ([\d.]+)`)
+
+	var data []TPSData
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		matches := pattern.FindStringSubmatch(line)
+
+		if len(matches) == 4 {
+			blockHeight, _ := strconv.Atoi(matches[1])
+			totalTxs, _ := strconv.Atoi(matches[2])
+			tps, _ := strconv.ParseFloat(matches[3], 64)
+
+			data = append(data, TPSData{
+				BlockHeight: blockHeight,
+				TotalTxs:    totalTxs,
+				TPS:         tps,
+			})
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("读取文件错误: %w", err)
+	}
+
+	return data, nil
+}
+
 // calculateStats 计算统计信息
 func calculateStats(data []TPSData) {
 	if len(data) == 0 {
@@ -262,7 +301,7 @@ func createBarChart(data []TPSData, schedulerName string) *charts.Bar {
 
 func main() {
 	// 命令行参数
-	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1 或 occ2")
+	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2 或 reorder")
 	flag.Parse()
 
 	// 日志文件路径
@@ -282,6 +321,10 @@ func main() {
 		schedulerName = "OCC2"
 		fmt.Printf("正在解析日志文件 (OCC2): %s\n", logPath)
 		data, err = parseOcc2LogFile(logPath)
+	case "reorder":
+		schedulerName = "Reorder"
+		fmt.Printf("正在解析日志文件 (Reorder): %s\n", logPath)
+		data, err = parseReorderLogFile(logPath)
 	default:
 		schedulerName = "WRIA"
 		fmt.Printf("正在解析日志文件 (WRIA): %s\n", logPath)
