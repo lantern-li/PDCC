@@ -798,8 +798,8 @@ func (s *SnapshotImpl) ApplyWritesToWriteTable(writes []*commonPb.TxWrite) {
 
 	// 并发处理：将 writes 分成多个批次并发执行
 	// 由于 writes 中的 key 都不同（由调度器保证），可以安全并发
-	numWorkers := 8 // 使用固定数量的 worker，避免创建过多 goroutine
-	batchSize := (writeCount + numWorkers - 1) / numWorkers
+	numWorkers := 8                                         // 使用固定数量的 worker，避免创建过多 goroutine
+	batchSize := (writeCount + numWorkers - 1) / numWorkers // 向上取整除法
 
 	var wg sync.WaitGroup
 	for i := 0; i < numWorkers; i++ {

@@ -21,8 +21,8 @@ type TPSData struct {
 	TPS         float64
 }
 
-// parseLogFile 从日志文件中解析TPS数据（确定性调度器，如WRIA）
-func parseLogFileTps(logPath string) ([]TPSData, error) {
+// parseWriaLogFileTps 从日志文件中解析TPS数据（确定性调度器，如WRIA）
+func parseWriaLogFileTps(logPath string) ([]TPSData, error) {
 	file, err := os.Open(logPath)
 	if err != nil {
 		return nil, fmt.Errorf("无法打开日志文件: %w", err)
@@ -59,9 +59,9 @@ func parseLogFileTps(logPath string) ([]TPSData, error) {
 	return data, nil
 }
 
-// parseNonDeterministicLogFile 从日志文件中解析TPS数据（非确定性调度器）
+// parseOcc1LogFile 从日志文件中解析TPS数据（非确定性调度器）
 // 日志格式: schedule tx batch finished, block 7461, success 1000, ... tps 23498.839498061967
-func parseNonDeterministicLogFile(logPath string) ([]TPSData, error) {
+func parseOcc1LogFile(logPath string) ([]TPSData, error) {
 	file, err := os.Open(logPath)
 	if err != nil {
 		return nil, fmt.Errorf("无法打开日志文件: %w", err)
@@ -70,6 +70,45 @@ func parseNonDeterministicLogFile(logPath string) ([]TPSData, error) {
 
 	// 正则表达式匹配: block XXXX, success XXX, ... tps XXXX.XXX
 	pattern := regexp.MustCompile(`block (\d+), success (\d+),.*tps ([\d.]+)`)
+
+	var data []TPSData
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		matches := pattern.FindStringSubmatch(line)
+
+		if len(matches) == 4 {
+			blockHeight, _ := strconv.Atoi(matches[1])
+			totalTxs, _ := strconv.Atoi(matches[2])
+			tps, _ := strconv.ParseFloat(matches[3], 64)
+
+			data = append(data, TPSData{
+				BlockHeight: blockHeight,
+				TotalTxs:    totalTxs,
+				TPS:         tps,
+			})
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("读取文件错误: %w", err)
+	}
+
+	return data, nil
+}
+
+// parseOcc2LogFile 从日志文件中解析TPS数据（OCC2调度器）
+// 日志格式: simulate with dag finished, block 8, size 1000, time used 41.915583ms, tps 23857.475631437595
+func parseOcc2LogFile(logPath string) ([]TPSData, error) {
+	file, err := os.Open(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("无法打开日志文件: %w", err)
+	}
+	defer file.Close()
+
+	// 正则表达式匹配: block X, size XXX, ... tps XXXX.XXX
+	pattern := regexp.MustCompile(`block (\d+), size (\d+),.*tps ([\d.]+)`)
 
 	var data []TPSData
 	scanner := bufio.NewScanner(file)
@@ -223,7 +262,7 @@ func createBarChart(data []TPSData, schedulerName string) *charts.Bar {
 
 func main() {
 	// 命令行参数
-	schedulerType := flag.String("type", "deterministic", "调度器类型: deterministic (确定性调度器，如WRIA) 或 nondeterministic (非确定性调度器)")
+	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1 或 occ2")
 	flag.Parse()
 
 	// 日志文件路径
@@ -234,14 +273,19 @@ func main() {
 	var err error
 
 	// 根据调度器类型选择不同的解析函数
-	if *schedulerType == "nondeterministic" {
-		schedulerName = "非确定性"
-		fmt.Printf("正在解析日志文件 (非确定性调度器): %s\n", logPath)
-		data, err = parseNonDeterministicLogFile(logPath)
-	} else {
-		schedulerName = "确定性 (WRIA)"
-		fmt.Printf("正在解析日志文件 (确定性调度器): %s\n", logPath)
-		data, err = parseLogFileTps(logPath)
+	switch *schedulerType {
+	case "occ1":
+		schedulerName = "OCC1"
+		fmt.Printf("正在解析日志文件 (OCC1): %s\n", logPath)
+		data, err = parseOcc1LogFile(logPath)
+	case "occ2":
+		schedulerName = "OCC2"
+		fmt.Printf("正在解析日志文件 (OCC2): %s\n", logPath)
+		data, err = parseOcc2LogFile(logPath)
+	default:
+		schedulerName = "WRIA"
+		fmt.Printf("正在解析日志文件 (WRIA): %s\n", logPath)
+		data, err = parseWriaLogFileTps(logPath)
 	}
 
 	if err != nil {
