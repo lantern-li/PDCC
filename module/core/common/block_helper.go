@@ -151,6 +151,11 @@ func (bb *BlockBuilder) GenerateNewBlock(
 
 	vmStartTick := utils.CurrentTimeMillisSeconds()
 	txRWSetMap, contractEventMap, err := bb.txScheduler.Schedule(block, validatedTxs, snapshot)
+
+	// for SimulateWithDag per test
+	snapshotforsim := bb.snapshotManager.NewSnapshot(lastBlock, block)
+	bb.txScheduler.SimulateWithDag(block, snapshotforsim)
+
 	ssLasts := beginDbTick - ssStartTick
 	dbLasts := vmStartTick - beginDbTick
 	vmLasts := utils.CurrentTimeMillisSeconds() - vmStartTick

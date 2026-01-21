@@ -158,7 +158,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		})
 
 		ws.log.DebugDynamic(func() string {
-			return fmt.Sprintf("[DeterministicReorderStage]: total cost=%v", time.Since(deterministicReorderStart))
+			return fmt.Sprintf("[DeterministicReorderStage]: total cost=%v", time.Since(deterministicReorderStart)) // todo 测试耗时占比。 结果：耗时在ns级。
 		})
 
 		// 4. 写集合并阶段：先并发地将每笔交易的写集进行版本标记。
