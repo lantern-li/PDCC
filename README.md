@@ -15,4 +15,4 @@ Please visit the following links to get started with ChainMaker.
 # Declaration
 Project chainMaker-go is in early phase currently. Participation and contribution are highly encouraged. Issues and feedback are welcome to be submitted to [ISSUES](https://git.chainmaker.org.cn/chainmaker/chainmaker-go/-/issues).
 
-chainmaker-go项目当前为开源初期阶段，我们鼓励开发者踊跃参与和贡献。您可以将相关反馈提交至 [ISSUES](https://git.chainmaker.org.cn/chainmaker/issue/-/issues) 。
+chainmaker-go项目当前为开源初期阶段，我们鼓励开发者踊跃参与和贡献。您可以将相关反馈提交至 [ISSUES](https://git.chainmaker.org.cn/chainmaker/issue/-/issues) 
