@@ -252,7 +252,7 @@ func (ts *TxScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Trans
 		"dag building cost %v, total used %v, tps %v", block.Header.BlockHeight, len(block.Dag.Vertexes), timeCostA,
 		timeCostB-timeCostA, timeCostB, float64(len(block.Dag.Vertexes))/(float64(timeCostB)/1e9))
 
-	txRWSetMap := ts.getTxRWSetTable(snapshot, block)
+	txRWSetMap := ts.getTxRWSetTable(snapshot, block) // 里面会block.Txs = snapshot.GetTxTable()
 	contractEventMap := ts.getContractEventMap(block)
 
 	return txRWSetMap, contractEventMap, nil

@@ -28,8 +28,8 @@ const (
 )
 
 var (
-	// BatchSize 批处理大小，自动设置为 CPU 核心数的 4 倍
-	BatchSize = runtime.NumCPU() * 4 // 这个应该设置为物理核心数还是逻辑核心数量？todo 似乎操作系统只能读到逻辑核心数量？
+	// BatchSize 批处理大小，自动设置为 CPU 核心数的 4 倍（todo：注意得是runtime.NumCPU() 的整数倍，这样每个CPU核都会分到一样多的任务）
+	BatchSize = runtime.NumCPU() * 4 //
 )
 
 // txExecInfo 存储交易执行的相关信息
