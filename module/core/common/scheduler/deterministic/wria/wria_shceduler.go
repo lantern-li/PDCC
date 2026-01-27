@@ -316,6 +316,20 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			return fmt.Sprintf("Round %d completed: committed=%d, aborted=%d", roundNum, committedTxs, len(abortedTxs))
 		})
 
+		// 计算提交率
+		totalTxs := committedTxs + len(abortedTxs)
+		commitRate := 0.0
+		if totalTxs > 0 {
+			commitRate = float64(committedTxs) / float64(totalTxs)
+		}
+		ws.log.Infof(
+			"Round %d completed: committed=%d, aborted=%d, commitRate=%.2f%%",
+			roundNum,
+			committedTxs,
+			len(abortedTxs),
+			commitRate*100,
+		)
+
 		// 将被 abort 的交易放回 txBatch 头部（prepend）
 		if len(abortedTxs) > 0 {
 			txBatch = append(abortedTxs, txBatch...)
