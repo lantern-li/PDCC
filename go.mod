@@ -3,7 +3,7 @@ module chainmaker.org/chainmaker-go
 go 1.16
 
 require (
-	chainmaker.org/chainmaker/pb-go/v2 v2.3.8-0.20251217065425-caeb103912d2
+	chainmaker.org/chainmaker/pb-go/v2 v2.3.8-0.20260128021703-cadfe1ee1fa6
 	code.cloudfoundry.org/bytefmt v0.0.0-20211005130812-5bb3c17173e5
 	github.com/Rican7/retry v0.1.0
 	github.com/Workiva/go-datastructures v1.0.53

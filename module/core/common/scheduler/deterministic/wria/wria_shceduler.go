@@ -25,11 +25,8 @@ import (
 const (
 	ScheduleTimeout        = 10
 	ScheduleWithDagTimeout = 20
-)
-
-var (
-	// BatchSize 批处理大小，自动设置为 CPU 核心数的 4 倍（todo：注意得是runtime.NumCPU() 的整数倍，这样每个CPU核都会分到一样多的任务）
-	BatchSize = runtime.NumCPU() * 4 //
+	// DefaultBatchSizeMultiplier 默认批处理大小倍数（相对于CPU核心数）
+	DefaultBatchSizeMultiplier = 10
 )
 
 // txExecInfo 存储交易执行的相关信息
@@ -53,6 +50,7 @@ type WriaScheduler struct {
 	snapshotCache  sync.Map                      // key: string(Write.Key), value: *commonPb.VersionedTxWrite
 	txRWSetMap     map[string]*commonPb.TxRWSet  // key: string(txId), value: *commonPb.TxRWSet  todo chainmaker的这个也要改
 	txRWSetMapLock sync.Mutex                    // lock for txRWSetMap concurrent access
+	batchSize      int                           // 批处理大小，从配置文件读取或使用默认值
 }
 
 // NewWriaScheduler creates a new WRIA transaction scheduler
@@ -62,12 +60,24 @@ func NewWriaScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, st
 		return "use the deterministic WRIA scheduler"
 	})
 
+	// 从配置文件读取 batch_size，如果未配置则使用默认值（CPU核心数 * 10）
+	batchSize := int(chainConf.ChainConfig().Scheduler.GetBatchSize())
+	if batchSize <= 0 {
+		batchSize = runtime.NumCPU() * DefaultBatchSizeMultiplier
+		log.Infof("BatchSize not configured, using default value: %d (NumCPU=%d * %d)",
+			batchSize, runtime.NumCPU(), DefaultBatchSizeMultiplier)
+	} else {
+		batchSize = runtime.NumCPU() * batchSize
+		log.Infof("BatchSize configured from chain config: %d", batchSize)
+	}
+
 	scheduler := &WriaScheduler{
 		lock:        sync.Mutex{},
 		log:         log,
 		chainConf:   chainConf,
 		storeHelper: storeHelper,
 		txRWSetMap:  make(map[string]*commonPb.TxRWSet), // 初始化 txRWSetMap
+		batchSize:   batchSize,                          // 设置批处理大小
 		// snapshotCache sync.Map 不需要初始化
 	}
 
@@ -83,7 +93,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 	ws.lock.Lock()
 	defer ws.lock.Unlock()
 	defer ws.vmHelper.ReleaseContractCache()
-	ws.log.Infof("WRIA schedule start, block_number = %v, tx_count = %d, batchsize = %d", block.Header.BlockHeight, len(txBatch), BatchSize)
+	ws.log.Infof("WRIA schedule start, block_number = %v, tx_count = %d, batchsize = %d", block.Header.BlockHeight, len(txBatch), ws.batchSize)
 
 	ws.txRWSetMap = make(map[string]*commonPb.TxRWSet)
 	block.Txs = nil // ← 添加这行！清空 block.Txs
@@ -103,7 +113,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		}
 
 		//1. 选择阶段：依据BatchSize从当前txBatch中选取前BatchSize个序号最小交易进行调度，txBatch为剩余交易池
-		batchSize := BatchSize
+		batchSize := ws.batchSize
 		if batchSize > len(txBatch) {
 			batchSize = len(txBatch)
 		}

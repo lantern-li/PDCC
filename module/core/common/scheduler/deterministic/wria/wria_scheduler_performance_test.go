@@ -182,8 +182,11 @@ func TestWriaScheduler_Performance_ParallelismDegree(t *testing.T) {
 
 // TestWriaScheduler_Performance_BatchSizeImpact 测试批处理大小的影响
 func TestWriaScheduler_Performance_BatchSizeImpact(t *testing.T) {
+	// 计算默认的 BatchSize
+	defaultBatchSize := runtime.NumCPU() * DefaultBatchSizeMultiplier
+
 	fmt.Println("\n========== BatchSize 影响测试 ==========")
-	fmt.Printf("当前 BatchSize: %d\n", BatchSize)
+	fmt.Printf("当前 BatchSize: %d\n", defaultBatchSize)
 
 	txCount := 1000
 
@@ -195,7 +198,7 @@ func TestWriaScheduler_Performance_BatchSizeImpact(t *testing.T) {
 	}
 	scenarioNames := []string{"无冲突", "低冲突", "高冲突"}
 
-	fmt.Printf("\nBatchSize=%d 在不同场景下的表现：\n", BatchSize)
+	fmt.Printf("\nBatchSize=%d 在不同场景下的表现：\n", defaultBatchSize)
 	fmt.Printf("%-12s | 吞吐量 (txs/s) | 总耗时 (ms)\n", "场景")
 	fmt.Println("--------------------------------------------------")
 

@@ -74,7 +74,7 @@ func TestSchedulerComparison_ConflictRates(t *testing.T) {
 	fmt.Printf("测试配置：\n")
 	fmt.Printf("  交易数量: %d\n", txCount)
 	fmt.Printf("  CPU核数: %d\n", runtime.NumCPU())
-	fmt.Printf("  WRIA BatchSize: %d\n\n", wria.BatchSize)
+	fmt.Printf("  WRIA BatchSize: %d\n\n", runtime.NumCPU()*wria.DefaultBatchSizeMultiplier)
 
 	// 存储结果用于最终对比
 	wriaResults := make([]ComparisonMetrics, len(scenarios))
@@ -113,7 +113,7 @@ func TestSchedulerComparison_TxCounts(t *testing.T) {
 	fmt.Printf("测试配置：\n")
 	fmt.Printf("  冲突场景: 低冲突 (10%%)\n")
 	fmt.Printf("  CPU核数: %d\n", runtime.NumCPU())
-	fmt.Printf("  WRIA BatchSize: %d\n\n", wria.BatchSize)
+	fmt.Printf("  WRIA BatchSize: %d\n\n", runtime.NumCPU()*wria.DefaultBatchSizeMultiplier)
 
 	wriaResults := make([]ComparisonMetrics, len(txCounts))
 	ndResults := make([]ComparisonMetrics, len(txCounts))
