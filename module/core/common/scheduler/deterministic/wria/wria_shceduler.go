@@ -93,7 +93,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 	ws.lock.Lock()
 	defer ws.lock.Unlock()
 	defer ws.vmHelper.ReleaseContractCache()
-	ws.log.Infof("WRIA schedule start, block_number = %v, tx_count = %d, batchsize = %d", block.Header.BlockHeight, len(txBatch), ws.batchSize)
+	ws.log.Infof("WRIA schedule start, block_number = %v, tx_count = %d, batchsize = %d", block.Header.BlockHeight, len(txBatch), ws.batchSize) //动态调整后整理的ws.batchSize要改
 
 	ws.txRWSetMap = make(map[string]*commonPb.TxRWSet)
 	block.Txs = nil // ← 添加这行！清空 block.Txs
