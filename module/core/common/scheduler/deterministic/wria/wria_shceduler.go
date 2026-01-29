@@ -297,7 +297,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		// 7. 将 ws.snapshotCache 中的写集直接应用到 snapshot.writeTable 中，并清空 ws.snapshotCache
 		// 这样下一批交易执行时，可以直接从 snapshot.writeTable 中读取，而不用从 DB 中读取
 		applyWriteCacheToSnapshotStart := time.Now()
-		appliedCount := ws.applySnapshotCacheToSnapshot(snapshot) // todo：后续考虑性能优化，不对snapshot进行适配
+		appliedCount := ws.applySnapshotCacheToSnapshot(snapshot)
 		ws.log.DebugDynamic(func() string {
 			return fmt.Sprintf("[applyWriteCacheToSnapshotStage]: total cost=%v, applynum:%d", time.Since(applyWriteCacheToSnapshotStart), appliedCount)
 		}) // todo:先测试下这种对snapshot的适配会额外产生多少开销。 batch size 为40时候，120key，约为20～50us
@@ -337,7 +337,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 
 	totalTime := time.Since(startTime)
 	tps := float64(len(block.Txs)) / totalTime.Seconds()
-	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v, total txs=%d, TPS=%.2f, blockheight=%d",
+	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v, total txs=%d, TPS=%.2f, blockheight=%d", // todo:以区块为单位进行batchsize动态调整
 		roundNum, totalTime, len(block.Txs), tps, block.Header.BlockHeight)
 
 	return ws.txRWSetMap, nil, nil
