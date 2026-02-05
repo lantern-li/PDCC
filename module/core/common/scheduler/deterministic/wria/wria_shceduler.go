@@ -98,6 +98,8 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 	ws.txRWSetMap = make(map[string]*commonPb.TxRWSet)
 	block.Txs = nil // ← 添加这行！清空 block.Txs
 
+	//roundCommitRates := make([]float64, 0)
+
 	// 循环调度，直到 txBatch 为空或超时
 	startTime := time.Now()
 	timeoutDuration := time.Duration(ScheduleTimeout) * time.Second
@@ -326,6 +328,21 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			return fmt.Sprintf("Round %d completed: committed=%d, aborted=%d", roundNum, committedTxs, len(abortedTxs))
 		})
 
+		//// 计算提交率
+		//totalTxs := committedTxs + len(abortedTxs)
+		//commitRate := 0.0
+		//if totalTxs > 0 {
+		//	commitRate = float64(committedTxs) / float64(totalTxs)
+		//}
+		//ws.log.Infof(
+		//	"Round %d completed: committed=%d, aborted=%d, commitRate=%.2f%%",
+		//	roundNum,
+		//	committedTxs,
+		//	len(abortedTxs),
+		//	commitRate*100,
+		//)
+		//roundCommitRates = append(roundCommitRates, commitRate)
+
 		// 将被 abort 的交易放回 txBatch 头部（prepend）
 		if len(abortedTxs) > 0 {
 			txBatch = append(abortedTxs, txBatch...)
@@ -334,11 +351,18 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			})
 		}
 	}
+	// todo:以区块为单位进行batchsize动态调整
 
 	totalTime := time.Since(startTime)
 	tps := float64(len(block.Txs)) / totalTime.Seconds()
-	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v, total txs=%d, TPS=%.2f, blockheight=%d", // todo:以区块为单位进行batchsize动态调整
+	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v, total txs=%d, TPS=%.2f, blockheight=%d",
 		roundNum, totalTime, len(block.Txs), tps, block.Header.BlockHeight)
+
+	//ws.log.Infof("========== WRIA Round Commit Rates ==========")
+	//for i, cr := range roundCommitRates {
+	//	ws.log.Infof("Round %d: commitRate = %.2f%%", i+1, cr*100)
+	//}
+	//ws.log.Infof("============================================")
 
 	return ws.txRWSetMap, nil, nil
 }
