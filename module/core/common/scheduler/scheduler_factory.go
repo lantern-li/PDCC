@@ -76,6 +76,8 @@ func (sf TxSchedulerFactory) NewTxScheduler(vmMgr protocol.VmManager, chainConf 
 			return reorder.NewReorderTxScheduler(vmMgr, chainConf, storeHelper, ac)
 		} else if scheduler.AlgorithmType == config.AlgorithmType_WRIA {
 			return wria.NewWriaScheduler(vmMgr, chainConf, storeHelper, ac)
+		} else if scheduler.AlgorithmType == config.AlgorithmType_GRAPH {
+			//return wria.NewGraphScheduler(vmMgr, chainConf, storeHelper, ac)
 		}
 	}
 	panic(fmt.Sprintf("invaild scheduler config  %+v", scheduler))
