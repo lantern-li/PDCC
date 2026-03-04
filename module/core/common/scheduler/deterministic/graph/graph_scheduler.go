@@ -36,6 +36,12 @@ type txExecInfo struct {
 	originalIndex         int // 原始索引，用于确定性排序
 	rwSetCount            int // 读写集总数量，用于重排序
 }
+type MasterWriteSet map[string][]*commonPb.VersionedTxWrite // string：string(Write.Key)
+
+type Graph struct {
+	Nodes []int         // 所有交易节点
+	Edges map[int][]int // 边: from -> []to (A依赖B，则A->B)
+}
 
 // GraphScheduler A deterministic parallel scheduler
 type GraphScheduler struct {
@@ -123,7 +129,7 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 
 		execStageStart := time.Now() // 记录开始时间
 
-		for i, tx := range selectedTxs {
+		for i, tx := range selectedTxs { // i 从 0 开始
 			wg.Add(1)
 			// 每个 goroutine 只写 execInfos[idx] 这个唯一槽位，且 idx 不重复。
 			go func(idx int, transaction *commonPb.Transaction) {
@@ -163,9 +169,7 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 
 		// 3.写集合并阶段：将每笔交易的写集WS(TXi)进行合并，生成写集多版本总表MasterWS。
 		writeSetMergingStart := time.Now()
-		type MasterWriteSet map[string][]*commonPb.VersionedTxWrite // string：string(Write.Key)
 		masterWS := make(MasterWriteSet)
-
 		// 直接按序合并，一笔交易对同一个key只有一个写入，无需并发构建中间localMap
 		for _, execInfo := range execInfos { // comment：对于同一个key，masterWS中是升序的。
 			for _, vw := range execInfo.txWriteSetWithVersion {
@@ -176,6 +180,51 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 		Gs.log.DebugDynamic(func() string {
 			return fmt.Sprintf("[writeSetMergingStage]: total cost=%v", time.Since(writeSetMergingStart))
 		})
+
+		// 4.构图阶段：基于读写依赖关系构建有向图
+		graphBuildStart := time.Now()
+
+		// 初始化图结构
+		graph := &Graph{
+			Nodes: make([]int, len(execInfos)),
+			Edges: make(map[int][]int),
+		}
+
+		// 添加所有节点
+		for i := range execInfos { // todo 可优化，先这样
+			graph.Nodes[i] = i // 现在是一一对应关系
+		}
+
+		// 构建边：遍历每笔交易的读集，检查是否匹配其他交易的写 todo 后续考虑并行优化 似乎还是分组并行比较好
+		for readerIdx, execInfo := range execInfos {
+			for _, txRead := range execInfo.txReadSet {
+				readKey := string(txRead.Key)
+
+				// 在 masterWS 中查找该 key 的所有写入版本
+				if versionedWrites, exists := masterWS[readKey]; exists {
+					// 遍历所有写入该 key 的交易
+					for _, vw := range versionedWrites {
+						writerIdx := int(vw.Version)
+
+						// 避免自环：交易不能指向自己
+						if writerIdx != readerIdx {
+							// 建立有向边：readerIdx -> writerIdx (读交易依赖写交易)
+							graph.Edges[readerIdx] = append(graph.Edges[readerIdx], writerIdx)
+						}
+					}
+				}
+			}
+		}
+
+		Gs.log.DebugDynamic(func() string {
+			edgeCount := 0
+			for _, edges := range graph.Edges {
+				edgeCount += len(edges)
+			}
+			return fmt.Sprintf("[graphBuildStage]: built graph with %d nodes and %d edges, total cost=%v",
+				len(graph.Nodes), edgeCount, time.Since(graphBuildStart))
+		})
+
 	}
 
 	return Gs.txRWSetMap, nil, nil

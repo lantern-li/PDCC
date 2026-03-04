@@ -174,7 +174,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			return fmt.Sprintf("[DeterministicReorderStage]: total cost=%v", time.Since(deterministicReorderStart)) // todo 测试耗时占比。 结果：耗时在ns级。
 		})
 
-		// 4. 版本标记阶段：先并发地将每笔交易的写集进行版本标记。 comment：得重排序，所以只能在重排序之后对写集进行版本标记。
+		// 4. 版本标记阶段：先并发地将每笔交易的写集进行版本标记。 comment：因为得重排序，所以只能在重排序之后对写集进行版本标记。
 		writeSetMergingStart := time.Now() // todo：这里的优化，似乎没必要对每个交易都起一个协程，因为起协程也是需要成本的。可以对该批交易分组，每组并发处理，而组内串行的对每笔交易进行版本标记。
 		var versionWG sync.WaitGroup
 		for txIndex, execInfo := range execInfos {
