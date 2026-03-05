@@ -33,14 +33,61 @@ type txExecInfo struct {
 	txRWSet               *commonPb.TxRWSet
 	txReadSet             []*commonPb.TxRead
 	txWriteSetWithVersion []*commonPb.VersionedTxWrite
-	originalIndex         int // 原始索引，用于确定性排序
-	rwSetCount            int // 读写集总数量，用于重排序
+	originalIndex         int  // 原始索引，用于确定性排序
+	rwSetCount            int  // 读写集总数量，用于重排序
+	removed               bool // 是否因破环被移除
 }
 type MasterWriteSet map[string][]*commonPb.VersionedTxWrite // string：string(Write.Key)
 
 type Graph struct {
-	Nodes []int         // 所有交易节点
-	Edges map[int][]int // 边: from -> []to (A依赖B，则A->B)
+	Nodes        []int         // 所有交易节点
+	Edges        map[int][]int // 边: from -> []to (A依赖B，则A->B)
+	RemovedNodes []int         // 因破环被移除的节点列表
+}
+
+const (
+	colorWhite = 0 // 未访问
+	colorGray  = 1 // 正在访问（在当前DFS路径上）
+	colorBlack = 2 // 已完成访问
+)
+
+// DetectCycle 使用DFS三色标记法检测有向图中是否存在环。
+// 返回 (是否有环, 环上的节点列表)。
+func (g *Graph) DetectCycle() (bool, []int) {
+	color := make(map[int]int, len(g.Nodes)) // 默认 colorWhite
+
+	for _, node := range g.Nodes {
+		if color[node] == colorWhite {
+			if cycleNodes := g.dfsDetectCycle(node, color); len(cycleNodes) > 0 {
+				return true, cycleNodes
+			}
+		}
+	}
+	return false, nil
+}
+
+// dfsDetectCycle 对 node 执行DFS，发现环时返回环上的节点列表。
+func (g *Graph) dfsDetectCycle(node int, color map[int]int) []int {
+	color[node] = colorGray
+
+	for _, neighbor := range g.Edges[node] {
+		if color[neighbor] == colorGray {
+			// 发现环：neighbor 是当前DFS路径上的祖先节点
+			return []int{neighbor, node}
+		}
+		if color[neighbor] == colorWhite {
+			if cycleNodes := g.dfsDetectCycle(neighbor, color); len(cycleNodes) > 0 {
+				// 如果环还没闭合（首节点还没再次出现在尾部），把当前节点追加进去
+				if cycleNodes[0] != cycleNodes[len(cycleNodes)-1] {
+					cycleNodes = append(cycleNodes, node)
+				}
+				return cycleNodes
+			}
+		}
+	}
+
+	color[node] = colorBlack
+	return nil
 }
 
 // GraphScheduler A deterministic parallel scheduler
@@ -224,6 +271,23 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 			return fmt.Sprintf("[graphBuildStage]: built graph with %d nodes and %d edges, total cost=%v",
 				len(graph.Nodes), edgeCount, time.Since(graphBuildStart))
 		})
+
+		// 5.检测环阶段：使用DFS三色标记法检测有向图中的环
+		cycleDetectStart := time.Now()
+
+		hasCycle, cycleNodes := graph.DetectCycle()
+
+		Gs.log.DebugDynamic(func() string {
+			return fmt.Sprintf("[cycleDetectStage]: hasCycle=%v, total cost=%v", hasCycle, time.Since(cycleDetectStart))
+		})
+
+		// 6. 破环阶段
+		if hasCycle {
+			Gs.log.Infof("[cycleDetectStage]: cycle detected involving nodes %v, need to break cycle", cycleNodes)
+			// TODO: 破环逻辑
+		}
+
+		//
 
 	}
 
