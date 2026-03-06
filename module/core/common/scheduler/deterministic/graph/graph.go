@@ -24,6 +24,9 @@ func buildDependencyGraph(execInfos []txExecInfo, masterWS MasterWriteSet) *Grap
 		graph.Nodes[i] = i
 	}
 
+	// 使用 map 对边进行去重：当一笔交易读了另一笔交易写的多个 key 时，只记录一条边
+	edgeSet := make(map[int]map[int]struct{})
+
 	for readerIdx, execInfo := range execInfos {
 		for _, txRead := range execInfo.txReadSet {
 			readKey := string(txRead.Key)
@@ -32,12 +35,22 @@ func buildDependencyGraph(execInfos []txExecInfo, masterWS MasterWriteSet) *Grap
 					writerIdx := int(vw.Version)
 					// 避免自环：交易不能指向自己
 					if writerIdx != readerIdx {
-						graph.Edges[readerIdx] = append(graph.Edges[readerIdx], writerIdx)
+						if edgeSet[readerIdx] == nil {
+							edgeSet[readerIdx] = make(map[int]struct{})
+						}
+						edgeSet[readerIdx][writerIdx] = struct{}{}
 					}
 				}
 			}
 		}
 	}
+
+	for readerIdx, writerSet := range edgeSet {
+		for writerIdx := range writerSet {
+			graph.Edges[readerIdx] = append(graph.Edges[readerIdx], writerIdx)
+		}
+	}
+
 	return graph
 }
 
