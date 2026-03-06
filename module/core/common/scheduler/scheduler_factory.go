@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sync"
 
+	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/graph"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"chainmaker.org/chainmaker/common/v2/monitor"
@@ -77,7 +78,7 @@ func (sf TxSchedulerFactory) NewTxScheduler(vmMgr protocol.VmManager, chainConf 
 		} else if scheduler.AlgorithmType == config.AlgorithmType_WRIA {
 			return wria.NewWriaScheduler(vmMgr, chainConf, storeHelper, ac)
 		} else if scheduler.AlgorithmType == config.AlgorithmType_GRAPH {
-			//return wria.NewGraphScheduler(vmMgr, chainConf, storeHelper, ac)
+			return graph.NewGraphScheduler(vmMgr, chainConf, storeHelper, ac)
 		}
 	}
 	panic(fmt.Sprintf("invaild scheduler config  %+v", scheduler))

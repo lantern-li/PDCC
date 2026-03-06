@@ -37,58 +37,6 @@ type txExecInfo struct {
 	rwSetCount            int  // 读写集总数量，用于重排序
 	removed               bool // 是否因破环被移除
 }
-type MasterWriteSet map[string][]*commonPb.VersionedTxWrite // string：string(Write.Key)
-
-type Graph struct {
-	Nodes        []int         // 所有交易节点
-	Edges        map[int][]int // 边: from -> []to (A依赖B，则A->B)
-	RemovedNodes []int         // 因破环被移除的节点列表
-}
-
-const (
-	colorWhite = 0 // 未访问
-	colorGray  = 1 // 正在访问（在当前DFS路径上）
-	colorBlack = 2 // 已完成访问
-)
-
-// DetectCycle 使用DFS三色标记法检测有向图中是否存在环。
-// 返回 (是否有环, 环上的节点列表)。
-func (g *Graph) DetectCycle() (bool, []int) {
-	color := make(map[int]int, len(g.Nodes)) // 默认 colorWhite
-
-	for _, node := range g.Nodes {
-		if color[node] == colorWhite {
-			if cycleNodes := g.dfsDetectCycle(node, color); len(cycleNodes) > 0 {
-				return true, cycleNodes
-			}
-		}
-	}
-	return false, nil
-}
-
-// dfsDetectCycle 对 node 执行DFS，发现环时返回环上的节点列表。
-func (g *Graph) dfsDetectCycle(node int, color map[int]int) []int {
-	color[node] = colorGray
-
-	for _, neighbor := range g.Edges[node] {
-		if color[neighbor] == colorGray {
-			// 发现环：neighbor 是当前DFS路径上的祖先节点
-			return []int{neighbor, node}
-		}
-		if color[neighbor] == colorWhite {
-			if cycleNodes := g.dfsDetectCycle(neighbor, color); len(cycleNodes) > 0 {
-				// 如果环还没闭合（首节点还没再次出现在尾部），把当前节点追加进去
-				if cycleNodes[0] != cycleNodes[len(cycleNodes)-1] {
-					cycleNodes = append(cycleNodes, node)
-				}
-				return cycleNodes
-			}
-		}
-	}
-
-	color[node] = colorBlack
-	return nil
-}
 
 // GraphScheduler A deterministic parallel scheduler
 type GraphScheduler struct {
@@ -216,53 +164,14 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 
 		// 3.写集合并阶段：将每笔交易的写集WS(TXi)进行合并，生成写集多版本总表MasterWS。
 		writeSetMergingStart := time.Now()
-		masterWS := make(MasterWriteSet)
-		// 直接按序合并，一笔交易对同一个key只有一个写入，无需并发构建中间localMap
-		for _, execInfo := range execInfos { // comment：对于同一个key，masterWS中是升序的。
-			for _, vw := range execInfo.txWriteSetWithVersion {
-				key := string(vw.Write.Key)
-				masterWS[key] = append(masterWS[key], vw)
-			}
-		}
+		masterWS := buildMasterWriteSet(execInfos)
 		Gs.log.DebugDynamic(func() string {
 			return fmt.Sprintf("[writeSetMergingStage]: total cost=%v", time.Since(writeSetMergingStart))
 		})
 
 		// 4.构图阶段：基于读写依赖关系构建有向图
 		graphBuildStart := time.Now()
-
-		// 初始化图结构
-		graph := &Graph{
-			Nodes: make([]int, len(execInfos)),
-			Edges: make(map[int][]int),
-		}
-
-		// 添加所有节点
-		for i := range execInfos { // todo 可优化，先这样
-			graph.Nodes[i] = i // 现在是一一对应关系
-		}
-
-		// 构建边：遍历每笔交易的读集，检查是否匹配其他交易的写 todo 后续考虑并行优化 似乎还是分组并行比较好
-		for readerIdx, execInfo := range execInfos {
-			for _, txRead := range execInfo.txReadSet {
-				readKey := string(txRead.Key)
-
-				// 在 masterWS 中查找该 key 的所有写入版本
-				if versionedWrites, exists := masterWS[readKey]; exists {
-					// 遍历所有写入该 key 的交易
-					for _, vw := range versionedWrites {
-						writerIdx := int(vw.Version)
-
-						// 避免自环：交易不能指向自己
-						if writerIdx != readerIdx {
-							// 建立有向边：readerIdx -> writerIdx (读交易依赖写交易)
-							graph.Edges[readerIdx] = append(graph.Edges[readerIdx], writerIdx)
-						}
-					}
-				}
-			}
-		}
-
+		graph := buildDependencyGraph(execInfos, masterWS)
 		Gs.log.DebugDynamic(func() string {
 			edgeCount := 0
 			for _, edges := range graph.Edges {
@@ -276,18 +185,45 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 		cycleDetectStart := time.Now()
 
 		hasCycle, cycleNodes := graph.DetectCycle()
+		// comment：当hasCycle为true时，cycleNodes表示的是检测到的一条环路径上的节点集合。
+		// 注意：cycleNodes返回的是 “一条发现的环路径（cycle path）”，而不是图中所有环。 算法可以是确定性的。先不纠结这一个环破环的优化。只用来确定是否有环。todo：后续考虑优化
 
 		Gs.log.DebugDynamic(func() string {
-			return fmt.Sprintf("[cycleDetectStage]: hasCycle=%v, total cost=%v", hasCycle, time.Since(cycleDetectStart))
+			return fmt.Sprintf("[cycleDetectStage]: hasCycle=%v, cycleNodes=%v, total cost=%v", hasCycle, cycleNodes, time.Since(cycleDetectStart))
 		})
 
 		// 6. 破环阶段
 		if hasCycle {
-			Gs.log.Infof("[cycleDetectStage]: cycle detected involving nodes %v, need to break cycle", cycleNodes)
-			// TODO: 破环逻辑
-		}
+			cycleBreakStage := time.Now()
+			// 拷贝一份图，用于后续破环操作，不影响原图
+			graphCopy := graph.Copy()
 
-		//
+			// 循环删除graphCopy中所有入度为0/出度为0的顶点，剩余节点必定在环上
+			graphCopy.RemoveLeafNodes()
+
+			/* comment：这时有如下3个结论必定成立：
+			1、图中的每个强连通分量至少包含一个环。
+			2、每个环必定被包含在某个强连通分量中。
+			3、图中的每个强连通分量必定的大小必定大于等于2。（因为图中不允许自环的出现）
+			*/
+
+			// 使用 Tarjan 算法找出所有强连通分量
+			sccs := graphCopy.FindSCCs()
+
+			// 对每个 SCC 执行破环：循环选点删除 → RemoveLeafNodes，直到瓦解
+			removedNodes := graphCopy.BreakCycles(sccs)
+
+			// 标记被删除的交易
+			for _, nodeIdx := range removedNodes {
+				execInfos[nodeIdx].removed = true
+			}
+
+			Gs.log.DebugDynamic(func() string {
+				return fmt.Sprintf("[cycleBreakStage]: removedNodes=%v, total cost=%v",
+					removedNodes, time.Since(cycleBreakStage))
+			})
+
+		}
 
 	}
 
