@@ -312,7 +312,7 @@ func (g *Graph) BreakCycles(sccs [][]int) []int {
 	var removedNodes []int
 
 	for _, scc := range sccs { // todo：先串行吧，后面并行。
-		if len(scc) < 2 { // todo：实际上不会有这种情况，但代码还是保留着吧。
+		if len(scc) < 2 {
 			continue
 		}
 
@@ -459,7 +459,7 @@ func (g *Graph) MarkCommittable() (committable, uncommittable []int) {
 
 	mark := make(map[int]int, len(g.Nodes)) // 标记
 
-	// 构建反向邻接表：reverseEdges[to] = []from，即"谁依赖了 to"
+	// 构建反向邻接表：reverseEdges[to] = []from，即"谁依赖了 to" // comment：这里的[]from顺序是不确定的
 	reverseEdges := make(map[int][]int, len(g.Nodes))
 	for from, neighbors := range g.Edges {
 		for _, to := range neighbors {
@@ -480,45 +480,50 @@ func (g *Graph) MarkCommittable() (committable, uncommittable []int) {
 	isRedLayer := true
 	for markCount < len(g.Nodes) { // 只要还有节点没被标记，就一直循环。todo：在确定能反向传播完整个图的前提上。
 
-		//nextLayerMap := make(map[int]bool) // 受影响的未标记节点 todo:注意这里是map，不会重复
-		nextLayer := make([]int, 0)
+		// 先收集本轮受影响的未标记节点，再统一判定并落标，避免同层内顺序影响结果。
+		candidatesMap := make(map[int]struct{})
+		for _, node := range layer {
+			for _, from := range reverseEdges[node] {
+				if mark[from] == unmarked {
+					candidatesMap[from] = struct{}{}
+				}
+			}
+		}
+
+		candidates := make([]int, 0, len(candidatesMap))
+		for node := range candidatesMap {
+			candidates = append(candidates, node)
+		}
+		sort.Ints(candidates)
+
+		nextLayer := make([]int, 0, len(candidates))
 
 		if isRedLayer {
 			// 处理红色层反向传播，只要依赖红色顶点就直接标记为灰色
-			for _, node := range layer {
-				for _, from := range reverseEdges[node] {
-					if mark[from] == unmarked { // 这里有unmarked标记，所以不会重复
-						mark[from] = gray
-						nextLayer = append(nextLayer, from)
-					}
-				}
+			for _, from := range candidates {
+				mark[from] = gray
+				nextLayer = append(nextLayer, from)
 			}
 		} else {
 			// 处理灰色层反向传播, 如果有未标记的节点仅依赖灰色节点，就标记为红色
-			for _, node := range layer {
-				for _, from := range reverseEdges[node] {
-					if mark[from] == unmarked {
-
-						// todo：注意收集结论。未标记节点的所有依赖 ∈ {gray, unmarked}。否则它早就在上一轮 被标灰了
-						// 判定from顶点是否仅仅指向灰色节点 todo
-						onlygray := true
-						for _, to := range g.Edges[from] {
-							if mark[to] == unmarked {
-								// from 这个节点先不处理
-								onlygray = false
-								break
-							}
-						}
-
-						// from节点仅仅指向灰色节点，标记为红色
-						// todo：这里不是BUG。没有 unmarked 等价于 所有依赖都是 gray。所以这里 不是 bug
-						if onlygray {
-							mark[from] = red
-							nextLayer = append(nextLayer, from)
-						}
-
+			redDecisions := make([]int, 0, len(candidates))
+			for _, from := range candidates {
+				// 判定 from 的所有依赖是否都已标记（在本轮开始时）。
+				allMarked := true
+				for _, to := range g.Edges[from] {
+					if mark[to] == unmarked {
+						allMarked = false
+						break
 					}
 				}
+				if allMarked {
+					redDecisions = append(redDecisions, from)
+				}
+			}
+			// 统一落标，避免本层内先后顺序影响判定。
+			for _, from := range redDecisions {
+				mark[from] = red
+				nextLayer = append(nextLayer, from)
 			}
 		}
 
@@ -536,6 +541,8 @@ func (g *Graph) MarkCommittable() (committable, uncommittable []int) {
 			uncommittable = append(uncommittable, node)
 		}
 	}
+	//sort.Ints(committable) g.Nodes本身就是升序的
+	//sort.Ints(uncommittable)
 
 	return
 }

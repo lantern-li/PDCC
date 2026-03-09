@@ -191,3 +191,51 @@ writerIdx)
 
 如果需要在重建图后也保证完全确定性，只需在 buildDependencyGraph
 第 49-53 行对 map 遍历结果排序即可。
+
+# Test deterministic buildDependencyGraph
+```go
+// Test deterministic buildDependencyGraph
+		Gs.log.Infof("Test deterministic buildDependencyGraph: %+v\n", graph)
+		grap1 := buildDependencyGraph(execInfos, masterWS)
+		Gs.log.Infof("Test deterministic buildDependencyGraph: %+v\n", grap1)
+```
+![img.png](img.png)
+![img_1.png](img_1.png)
+
+# Test deterministic FindSCCs
+```go
+// Test deterministic FindSCCs
+			Gs.log.Infof("Test deterministic FindSCCs: %+v\n", sccs)
+			sccs1 := graphCopy.FindSCCs()
+			Gs.log.Infof("Test deterministic FindSCCs: %+v\n", sccs1)
+```
+![img_2.png](img_2.png)
+
+
+# Test deterministic BreakCycles
+```go
+// Test deterministic BreakCycles
+			Gs.log.Infof("is scc 升序: %+v\n", sccs)
+			Gs.log.Infof("Test deterministic BreakCycles: %+v\n", removedNodes)
+			removedNodes1 := graphCopy.BreakCycles(sccs)
+			Gs.log.Infof("Test deterministic BreakCycles: %+v\n", removedNodes1)
+```
+![img_3.png](img_3.png)
+
+# Test determinitic MarkCommittable
+```go
+// Test determinitic MarkCommittable
+		Gs.log.Infof("Test determinitic MarkCommittable: %+v\n, %+v\n", committable, uncommittable)
+		committable1, uncommittable1 := graph.MarkCommittable()
+		Gs.log.Infof("Test determinitic MarkCommittable: %+v\n, %+v\n", committable1, uncommittable1)
+```
+![img_4.png](img_4.png)
+
+```go
+// Test determinitic MarkCommittable
+		committable1, uncommittable1 := graph.MarkCommittable()
+		if !reflect.DeepEqual(committable, committable1) ||
+			!reflect.DeepEqual(uncommittable, uncommittable1) {
+			Gs.log.Fatalf("MarkCommittable is NOT deterministic")
+		}
+```

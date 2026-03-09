@@ -8,6 +8,7 @@ package graph
 
 import (
 	"fmt"
+	"reflect"
 	"runtime"
 	"sync"
 	"time"
@@ -168,6 +169,7 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 		// 4.构图阶段：基于读写依赖关系构建有向图
 		graphBuildStart := time.Now()
 		graph := buildDependencyGraph(execInfos, masterWS) // todo：测试确认下是否是确定性构图
+
 		Gs.log.DebugDynamic(func() string {
 			edgeCount := 0
 			for _, edges := range graph.Edges {
@@ -200,7 +202,10 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 			/* comment：这时有如下3个结论必定成立：
 			1、图中的每个强连通分量至少包含一个环。
 			2、每个环必定被包含在某个强连通分量中。
-			3、图中的每个强连通分量必定的大小必定大于等于2。（因为图中不允许自环的出现）
+			3、图中的每个强连通分量必定的大小必定大于等于2。（因为图中不允许自环的出现） refactor：不一定成立。
+			  -	1 <-> 2（一个环）
+			  - 4 <-> 5（另一个环）
+			  - 2 -> 3 -> 4
 			*/
 
 			// 使用 Tarjan 算法找出所有强连通分量
@@ -228,6 +233,13 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 		// 7. 标记阶段：基于Sink Nodes（出度为0的点）到Source Nodes的反向传播标记
 		commitStart := time.Now()
 		committable, uncommittable := graph.MarkCommittable() // comment：committable, uncommittable按照升序排列
+
+		// Test determinitic MarkCommittable
+		committable1, uncommittable1 := graph.MarkCommittable()
+		if !reflect.DeepEqual(committable, committable1) ||
+			!reflect.DeepEqual(uncommittable, uncommittable1) {
+			Gs.log.Fatalf("MarkCommittable is NOT deterministic")
+		}
 
 		Gs.log.DebugDynamic(func() string {
 			return fmt.Sprintf("[markStage]: committable=%v, uncommittable=%v, total cost=%v",
