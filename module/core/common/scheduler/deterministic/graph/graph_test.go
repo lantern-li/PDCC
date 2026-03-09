@@ -1011,14 +1011,17 @@ func TestSelectNodeToRemove_ByTotalDegree(t *testing.T) {
 
 // TestSelectNodeToRemove_TieBreakByInDegree 总度数相同时，入度更大的优先
 func TestSelectNodeToRemove_TieBreakByInDegree(t *testing.T) {
-	// 0: 入度=2, 出度=1, 总度=3
-	// 1: 入度=1, 出度=2, 总度=3
-	// 总度相同，0 入度更大 → 选 0
+	// 图结构: 0→1, 1→0, 1→2, 2→0
+	// 0: 入度=2(来自1,2), 出度=1(到1), 总度=3
+	// 1: 入度=1(来自0),   出度=2(到0,2), 总度=3
+	// 2: 入度=1(来自1),   出度=1(到0), 总度=2
+	// 节点0和1总度相同=3，节点0入度更大(2>1) → 选 0
 	g := &Graph{
-		Nodes: []int{0, 1},
+		Nodes: []int{0, 1, 2},
 		Edges: map[int][]int{
 			0: {1},
-			1: {0, 0}, // 节点1出度=2，节点0入度=2
+			1: {0, 2},
+			2: {0},
 		},
 	}
 
@@ -1179,4 +1182,522 @@ func TestCopy_RemoveLeafNodes_FindSCCs(t *testing.T) {
 	// 原图不受影响
 	assert.Equal(t, 4, len(original.Nodes))
 	assert.Equal(t, []int{1, 3}, original.Edges[0])
+}
+
+// ==================== RemoveNode 测试 ====================
+
+// TestRemoveNode_Basic 基础测试：删除中间节点，出边和入边都应被清除
+func TestRemoveNode_Basic(t *testing.T) {
+	// 0→1→2
+	g := &Graph{
+		Nodes: []int{0, 1, 2},
+		Edges: map[int][]int{
+			0: {1},
+			1: {2},
+		},
+	}
+
+	g.RemoveNode(1)
+	fmt.Print(g)
+
+	assert.Equal(t, []int{0, 2}, g.Nodes)
+	// 节点1的出边 1→2 应被删除
+	_, has1 := g.Edges[1]
+	assert.False(t, has1, "节点1的出边应被删除")
+	// 节点0的出边 0→1 中指向1的边应被移除
+	assert.Equal(t, []int{}, g.Edges[0], "节点0到节点1的边应被移除")
+}
+
+// TestRemoveNode_HubNode 删除一个拥有多条出边和入边的hub节点
+func TestRemoveNode_HubNode(t *testing.T) {
+	// 0→2, 1→2, 2→3, 2→4（节点2是hub）
+	g := &Graph{
+		Nodes: []int{0, 1, 2, 3, 4},
+		Edges: map[int][]int{
+			0: {2},
+			1: {2},
+			2: {3, 4},
+		},
+	}
+
+	g.RemoveNode(2)
+	fmt.Print(g)
+
+	assert.Equal(t, []int{0, 1, 3, 4}, g.Nodes)
+	// 节点2的出边应被删除
+	_, has2 := g.Edges[2]
+	assert.False(t, has2, "节点2的出边应被删除")
+	// 0→2, 1→2 中指向2的边应被移除
+	assert.Equal(t, []int{}, g.Edges[0])
+	assert.Equal(t, []int{}, g.Edges[1])
+}
+
+// TestRemoveNode_FromCycle 从环中删除节点
+func TestRemoveNode_FromCycle(t *testing.T) {
+	// 0→1→2→0（三元环），删除节点1
+	g := &Graph{
+		Nodes: []int{0, 1, 2},
+		Edges: map[int][]int{
+			0: {1},
+			1: {2},
+			2: {0},
+		},
+	}
+
+	g.RemoveNode(1)
+
+	assert.Equal(t, []int{0, 2}, g.Nodes)
+	assert.Equal(t, []int{}, g.Edges[0], "0→1 应被移除")
+	assert.Equal(t, []int{0}, g.Edges[2], "2→0 应保留")
+	_, has1 := g.Edges[1]
+	assert.False(t, has1)
+}
+
+// TestRemoveNode_TwoNodeCycle 两节点互指，删除其中一个
+func TestRemoveNode_TwoNodeCycle(t *testing.T) {
+	// 0↔1
+	g := &Graph{
+		Nodes: []int{0, 1},
+		Edges: map[int][]int{
+			0: {1},
+			1: {0},
+		},
+	}
+
+	g.RemoveNode(0)
+
+	assert.Equal(t, []int{1}, g.Nodes)
+	_, has0 := g.Edges[0]
+	assert.False(t, has0)
+	assert.Equal(t, []int{}, g.Edges[1], "1→0 应被移除")
+}
+
+// TestRemoveNode_IsolatedNode 删除一个没有任何边的孤立节点
+func TestRemoveNode_IsolatedNode(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0, 1, 2},
+		Edges: map[int][]int{
+			0: {2},
+		},
+	}
+
+	g.RemoveNode(1)
+
+	assert.Equal(t, []int{0, 2}, g.Nodes)
+	assert.Equal(t, []int{2}, g.Edges[0], "0→2 应保留")
+}
+
+// TestRemoveNode_SourceNode 删除只有出边没有入边的源节点
+func TestRemoveNode_SourceNode(t *testing.T) {
+	// 0→1, 0→2（节点0只有出边）
+	g := &Graph{
+		Nodes: []int{0, 1, 2},
+		Edges: map[int][]int{
+			0: {1, 2},
+		},
+	}
+
+	g.RemoveNode(0)
+
+	assert.Equal(t, []int{1, 2}, g.Nodes)
+	_, has0 := g.Edges[0]
+	assert.False(t, has0, "节点0的出边应被删除")
+}
+
+// TestRemoveNode_SinkNode 删除只有入边没有出边的汇节点
+func TestRemoveNode_SinkNode(t *testing.T) {
+	// 0→2, 1→2（节点2只有入边）
+	g := &Graph{
+		Nodes: []int{0, 1, 2},
+		Edges: map[int][]int{
+			0: {2},
+			1: {2},
+		},
+	}
+
+	g.RemoveNode(2)
+
+	assert.Equal(t, []int{0, 1}, g.Nodes)
+	assert.Equal(t, []int{}, g.Edges[0])
+	assert.Equal(t, []int{}, g.Edges[1])
+}
+
+// TestRemoveNode_SingleNode 图中只有一个节点时删除它
+func TestRemoveNode_SingleNode(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0},
+		Edges: map[int][]int{},
+	}
+
+	g.RemoveNode(0)
+
+	assert.Empty(t, g.Nodes)
+	assert.Empty(t, g.Edges)
+}
+
+// TestRemoveNode_PreservesRemainingEdges 删除节点后，剩余节点之间的边应完整保留
+func TestRemoveNode_PreservesRemainingEdges(t *testing.T) {
+	// 0→1, 0→2, 1→2, 2→3, 3→1，删除节点0
+	g := &Graph{
+		Nodes: []int{0, 1, 2, 3},
+		Edges: map[int][]int{
+			0: {1, 2},
+			1: {2},
+			2: {3},
+			3: {1},
+		},
+	}
+
+	g.RemoveNode(0)
+
+	assert.Equal(t, []int{1, 2, 3}, g.Nodes)
+	assert.Equal(t, []int{2}, g.Edges[1], "1→2 应保留")
+	assert.Equal(t, []int{3}, g.Edges[2], "2→3 应保留")
+	assert.Equal(t, []int{1}, g.Edges[3], "3→1 应保留")
+}
+
+// TestRemoveNode_MultipleIncomingEdges 被删节点有多条入边，全部应被清除
+func TestRemoveNode_MultipleIncomingEdges(t *testing.T) {
+	// 0→3, 1→3, 2→3, 0→1
+	g := &Graph{
+		Nodes: []int{0, 1, 2, 3},
+		Edges: map[int][]int{
+			0: {3, 1},
+			1: {3},
+			2: {3},
+		},
+	}
+
+	g.RemoveNode(3)
+
+	assert.Equal(t, []int{0, 1, 2}, g.Nodes)
+	assert.Equal(t, []int{1}, g.Edges[0], "0→1 应保留，0→3 应移除")
+	assert.Equal(t, []int{}, g.Edges[1], "1→3 应移除")
+	assert.Equal(t, []int{}, g.Edges[2], "2→3 应移除")
+}
+
+// TestRemoveNode_NonContiguousNodes 非连续节点编号
+func TestRemoveNode_NonContiguousNodes(t *testing.T) {
+	// 节点编号不连续: 5→10→20→5
+	g := &Graph{
+		Nodes: []int{5, 10, 20},
+		Edges: map[int][]int{
+			5:  {10},
+			10: {20},
+			20: {5},
+		},
+	}
+
+	g.RemoveNode(10)
+
+	assert.Equal(t, []int{5, 20}, g.Nodes)
+	assert.Equal(t, []int{}, g.Edges[5], "5→10 应被移除")
+	assert.Equal(t, []int{5}, g.Edges[20], "20→5 应保留")
+	_, has10 := g.Edges[10]
+	assert.False(t, has10)
+}
+
+// TestRemoveNode_PreservesNodeOrder 删除节点后应保持剩余节点的原始顺序
+func TestRemoveNode_PreservesNodeOrder(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{3, 1, 4, 1, 5},
+		Edges: map[int][]int{},
+	}
+
+	g.RemoveNode(4)
+
+	assert.Equal(t, []int{3, 1, 1, 5}, g.Nodes, "应保持原始顺序") // todo 这里不管了
+}
+
+// ==================== MarkCommittable 测试 ====================
+
+// TestMarkCommittable_AllSinkNodes 所有节点都无出边，全部标红
+func TestMarkCommittable_AllSinkNodes(t *testing.T) {
+	// 三个孤立节点，没有任何边
+	g := &Graph{
+		Nodes: []int{0, 1, 2},
+		Edges: map[int][]int{},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	assert.Equal(t, []int{0, 1, 2}, committable)
+	assert.Empty(t, uncommittable)
+}
+
+// TestMarkCommittable_SingleChain 单链 0→1→2→3
+// 出度为0的是节点3（红色-0），节点2依赖红色→灰色，节点1仅依赖灰色→红色，节点0依赖红色→灰色
+func TestMarkCommittable_SingleChain(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0, 1, 2, 3},
+		Edges: map[int][]int{
+			0: {1},
+			1: {2},
+			2: {3},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{1, 3}, committable, "节点3红色-0，节点1红色-1")
+	assert.Equal(t, []int{0, 2}, uncommittable, "节点2灰色-0，节点0灰色-1")
+}
+
+// TestMarkCommittable_FanIn 多个节点依赖同一个Sink
+// 0→2, 1→2  节点2出度为0→红色，节点0和1依赖红色→灰色
+func TestMarkCommittable_FanIn(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0, 1, 2},
+		Edges: map[int][]int{
+			0: {2},
+			1: {2},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{2}, committable)
+	assert.Equal(t, []int{0, 1}, uncommittable)
+}
+
+// TestMarkCommittable_FanOut 一个节点依赖多个Sink
+// 0→1, 0→2  节点1和2出度为0→红色，节点0依赖红色→灰色
+func TestMarkCommittable_FanOut(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0, 1, 2},
+		Edges: map[int][]int{
+			0: {1, 2},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{1, 2}, committable)
+	assert.Equal(t, []int{0}, uncommittable)
+}
+
+// TestMarkCommittable_Diamond 菱形依赖 0→1, 0→2, 1→3, 2→3
+// 3: 出度0→红色-0
+// 1,2: 依赖红色3→灰色
+// 0: 依赖灰色1和灰色2（仅依赖灰色）→红色-1
+func TestMarkCommittable_Diamond(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0, 1, 2, 3},
+		Edges: map[int][]int{
+			0: {1, 2},
+			1: {3},
+			2: {3},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{0, 3}, committable, "节点3红色-0，节点0红色-1")
+	assert.Equal(t, []int{1, 2}, uncommittable, "节点1和2灰色")
+}
+
+// TestMarkCommittable_MixedDependency 节点同时依赖红色和灰色→灰色
+// 0→1, 0→2, 2→3
+// 3: 出度0→红色-0, 1: 出度0→红色-0
+// 2: 依赖红色3→灰色
+// 0: 依赖红色1和灰色2→有红色依赖→灰色
+func TestMarkCommittable_MixedDependency(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0, 1, 2, 3},
+		Edges: map[int][]int{
+			0: {1, 2},
+			2: {3},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{1, 3}, committable, "节点1和3出度0→红色")
+	assert.Equal(t, []int{0, 2}, uncommittable, "节点2依赖红色→灰色，节点0依赖红色1和灰色2→灰色")
+}
+
+// TestMarkCommittable_TwoIndependentChains 两条独立的链
+// 0→1, 2→3
+// 1: 红色-0, 3: 红色-0
+// 0: 灰色, 2: 灰色
+func TestMarkCommittable_TwoIndependentChains(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0, 1, 2, 3},
+		Edges: map[int][]int{
+			0: {1},
+			2: {3},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{1, 3}, committable)
+	assert.Equal(t, []int{0, 2}, uncommittable)
+}
+
+// TestMarkCommittable_LongChain 长链 0→1→2→3→4→5
+// 红色: 5(层0), 3(层2), 1(层4)
+// 灰色: 4(层1), 2(层3), 0(层5)
+func TestMarkCommittable_LongChain(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0, 1, 2, 3, 4, 5},
+		Edges: map[int][]int{
+			0: {1},
+			1: {2},
+			2: {3},
+			3: {4},
+			4: {5},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{1, 3, 5}, committable)
+	assert.Equal(t, []int{0, 2, 4}, uncommittable)
+}
+
+// TestMarkCommittable_SingleNode 只有一个节点，出度为0→红色
+func TestMarkCommittable_SingleNode(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0},
+		Edges: map[int][]int{},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	assert.Equal(t, []int{0}, committable)
+	assert.Empty(t, uncommittable)
+}
+
+// TestMarkCommittable_ComplexDAG 复杂DAG
+//
+//	0→2, 1→2, 2→4, 3→4, 5→3
+//
+// 第一轮: 4出度0→红色-0
+// 第二轮: 2依赖红色4→灰色, 3依赖红色4→灰色
+// 第三轮: 0仅依赖灰色2→红色-1, 1仅依赖灰色2→红色-1, 5仅依赖灰色3→红色-1
+func TestMarkCommittable_ComplexDAG(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0, 1, 2, 3, 4, 5},
+		Edges: map[int][]int{
+			0: {2},
+			1: {2},
+			2: {4},
+			3: {4},
+			5: {3},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{0, 1, 4, 5}, committable, "4红色-0; 0,1,5红色-1")
+	assert.Equal(t, []int{2, 3}, uncommittable, "2,3灰色")
+}
+
+// TestMarkCommittable_NonContiguousNodes 非连续节点编号
+func TestMarkCommittable_NonContiguousNodes(t *testing.T) {
+	// 10→20→30
+	g := &Graph{
+		Nodes: []int{10, 20, 30},
+		Edges: map[int][]int{
+			10: {20},
+			20: {30},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{10, 30}, committable, "30红色-0, 10红色-1")
+	assert.Equal(t, []int{20}, uncommittable, "20灰色")
+}
+
+// TestMarkCommittable_WideTree 宽树形DAG: 多个Source指向多个中间节点再指向同一个Sink
+// 0→3, 1→3, 2→4, 3→5, 4→5
+// 5: 红色-0
+// 3,4: 灰色
+// 0,1: 仅依赖灰色3→红色-1; 2: 仅依赖灰色4→红色-1
+func TestMarkCommittable_WideTree(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0, 1, 2, 3, 4, 5},
+		Edges: map[int][]int{
+			0: {3},
+			1: {3},
+			2: {4},
+			3: {5},
+			4: {5},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{0, 1, 2, 5}, committable)
+	assert.Equal(t, []int{3, 4}, uncommittable)
+}
+
+// TestMarkCommittable_MultipleSinks 多个独立Sink
+// 0→1, 0→2, 3→4  （1,2,4都是Sink）
+// 红色-0: 1, 2, 4
+// 灰色: 0(依赖红色1和红色2), 3(依赖红色4)
+func TestMarkCommittable_MultipleSinks(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{0, 1, 2, 3, 4},
+		Edges: map[int][]int{
+			0: {1, 2},
+			3: {4},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{1, 2, 4}, committable)
+	assert.Equal(t, []int{0, 3}, uncommittable)
+}
+
+func TestMarkCommittable_EG(t *testing.T) {
+	g := &Graph{
+		Nodes: []int{1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17},
+		Edges: map[int][]int{
+			2:  {11},
+			3:  {2},
+			5:  {2, 3},
+			6:  {1},
+			9:  {3},
+			10: {7, 12},
+			13: {7, 10},
+			14: {8},
+			17: {10},
+		},
+	}
+
+	committable, uncommittable := g.MarkCommittable()
+	fmt.Println(committable)
+	fmt.Println(uncommittable)
+
+	sort.Ints(committable)
+	sort.Ints(uncommittable)
+	assert.Equal(t, []int{1, 3, 7, 8, 11, 12, 16, 17}, committable)
+	assert.Equal(t, []int{2, 5, 6, 9, 10, 13, 14}, uncommittable)
 }

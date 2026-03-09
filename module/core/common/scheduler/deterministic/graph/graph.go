@@ -16,15 +16,16 @@ type Graph struct {
 // 节点为 execInfos 的索引，边 readerIdx -> writerIdx 表示读交易依赖写交易。
 func buildDependencyGraph(execInfos []txExecInfo, masterWS MasterWriteSet) *Graph {
 	graph := &Graph{
-		Nodes: make([]int, len(execInfos)),
-		Edges: make(map[int][]int),
+		Nodes:        make([]int, len(execInfos)),
+		Edges:        make(map[int][]int),
+		RemovedNodes: make([]int, 0),
 	}
 
 	for i := range execInfos {
 		graph.Nodes[i] = i
 	}
 
-	// 使用 map 对边进行去重：当一笔交易读了另一笔交易写的多个 key 时，只记录一条边
+	// 使用 map 对边进行去重：当一笔交易读了另一笔交易写的多个 key 时，只记录一条边 refactor
 	edgeSet := make(map[int]map[int]struct{})
 
 	for readerIdx, execInfo := range execInfos {
@@ -305,7 +306,7 @@ func (g *Graph) selectNodeToRemove() int {
 func (g *Graph) BreakCycles(sccs [][]int) []int {
 	var removedNodes []int
 
-	for _, scc := range sccs {
+	for _, scc := range sccs { // todo：先串行吧，后面并行。
 		if len(scc) < 2 { // todo：实际上不会有这种情况，但代码还是保留着吧。
 			continue
 		}
@@ -324,6 +325,212 @@ func (g *Graph) BreakCycles(sccs [][]int) []int {
 		}
 	}
 	return removedNodes
+}
+
+// MarkCommittable 基于 Sink Nodes 的反向传播标记，将所有节点标记为可提交（红色）或不可提交（灰色）。
+//
+// 算法（在破环后的 DAG 上执行）：
+//
+//	a. 所有出度为0的节点（Sink Nodes）可以提交 → 标记为红色-0
+//	b. 直接依赖红色节点的未标记节点 → 标记为灰色
+//	c. 仅依赖灰色节点的未标记节点 → 标记为红色
+//	d. 重复 b、c 直到所有节点都被标记
+//
+// 边方向：from → to 表示 from 依赖 to（from 读了 to 的写集）。
+// "直接依赖X"指的是节点有一条出边指向X颜色的节点。
+//
+// 返回值：committable 为可提交的节点列表（红色），uncommittable 为不可提交的节点列表（灰色）。
+// todo：这里两点是很重要的，一点是确定性，还有一点是活性（即能反向传播整个图）
+// todo：代码最后写完让AI评估下是否能反向传播完整个图
+func (g *Graph) MarkCommittable_Old() (committable, uncommittable []int) {
+	const (
+		unmarked = 0
+		red      = 1 // 可提交
+		gray     = 2 // 不可提交
+	)
+
+	mark := make(map[int]int, len(g.Nodes)) // 标记
+
+	// 构建反向邻接表：reverseEdges[to] = []from，即"谁依赖了 to"
+	reverseEdges := make(map[int][]int, len(g.Nodes))
+	for from, neighbors := range g.Edges {
+		for _, to := range neighbors {
+			reverseEdges[to] = append(reverseEdges[to], from)
+		}
+	}
+
+	// 第一轮：所有出度为0的节点标记为红色，加入队列
+	queue := make([]int, 0)
+	for _, node := range g.Nodes {
+		if len(g.Edges[node]) == 0 {
+			mark[node] = red
+			queue = append(queue, node)
+		}
+	}
+
+	// BFS 反向传播
+	for len(queue) > 0 {
+		// 取出当前批次
+		current := queue
+		queue = nil
+
+		// 收集所有被当前批次影响到的、还未标记的邻居（即"谁依赖了 current 中的节点"）
+		// 这些邻居根据 current 的颜色决定自己的颜色：
+		//   - current 是红色 → 邻居标灰
+		//   - current 是灰色 → 邻居如果所有依赖都已标记且没有红色依赖，则标红
+		affected := make(map[int]bool) // 受影响的未标记节点
+		for _, node := range current {
+			for _, from := range reverseEdges[node] {
+				if mark[from] == unmarked {
+					affected[from] = true // 该节点还未标记，确实是受影响了
+				}
+			}
+		}
+
+		// 对受影响的节点做出裁决
+		for node := range affected {
+			// 检查该节点的所有依赖（出边指向的节点）是否都已标记
+			allMarked := true
+			hasRedDep := false
+			for _, to := range g.Edges[node] {
+
+				if mark[to] == unmarked {
+					allMarked = false // 这个似乎要分灰层影响和红色影响不同进行分类讨论 todo：分类讨论重构代码吧。对于红色层：是只有有依赖就灰；对于灰色层，是仅依赖，才红。 然后让AI确认是是否能反向传播完整个图。
+					break             // 红色层反向传播不需要这样
+				}
+				if mark[to] == red {
+					hasRedDep = true
+				}
+			}
+			if !allMarked {
+				continue // 还有依赖未标记，等后续轮次处理
+			}
+
+			// 所有依赖都已标记：有红色依赖 → 灰色，仅灰色依赖 → 红色
+			if hasRedDep {
+				mark[node] = gray
+			} else {
+				mark[node] = red
+			}
+			queue = append(queue, node)
+		}
+	}
+
+	// 收集结果
+	for _, node := range g.Nodes {
+		if mark[node] == red {
+			committable = append(committable, node)
+		} else {
+			uncommittable = append(uncommittable, node)
+		}
+	}
+	return
+}
+
+// MarkCommittable 基于 Sink Nodes 到 Source Nodes 的反向传播标记，将所有节点标记为可提交（红色）或不可提交（灰色）。
+//
+// 算法（在破环后的 DAG 上执行）：
+//
+//	a. 所有出度为0的节点（Sink Nodes）可以提交 → 标记为红色-0
+//	b. 只要依赖红色节点的未标记节点 → 标记为灰色
+//	c. 仅依赖灰色节点的未标记节点 → 标记为红色
+//	d. 重复 b、c 直到所有节点都被标记
+//
+// 边方向：from → to 表示 from 依赖 to（from 读了 to 的写集）。
+// "直接依赖X"指的是节点有一条出边指向X颜色的节点。
+//
+// 返回值：committable 为可提交的节点列表（红色），uncommittable 为不可提交的节点列表（灰色）。
+// todo：这里两点是很重要的，一点是确定性，还有一点是活性（即能反向传播整个图）
+// todo：代码最后写完让AI评估下是否能反向传播完整个图（只要是DAG就能保证） 待仔细证明
+func (g *Graph) MarkCommittable() (committable, uncommittable []int) {
+	const (
+		unmarked = 0
+		red      = 1 // 可提交
+		gray     = 2 // 不可提交
+	)
+	markCount := 0 // 总共标记的节点数
+
+	mark := make(map[int]int, len(g.Nodes)) // 标记
+
+	// 构建反向邻接表：reverseEdges[to] = []from，即"谁依赖了 to"
+	reverseEdges := make(map[int][]int, len(g.Nodes))
+	for from, neighbors := range g.Edges {
+		for _, to := range neighbors {
+			reverseEdges[to] = append(reverseEdges[to], from)
+		}
+	}
+
+	// 第一轮：所有出度为0的节点标记为红色，加入layer
+	layer := make([]int, 0)
+	for _, node := range g.Nodes {
+		if len(g.Edges[node]) == 0 {
+			mark[node] = red
+			layer = append(layer, node)
+		}
+	}
+	markCount = markCount + len(layer)
+
+	isRedLayer := true
+	for markCount < len(g.Nodes) { // 只要还有节点没被标记，就一直循环。todo：在确定能反向传播完整个图的前提上。
+
+		//nextLayerMap := make(map[int]bool) // 受影响的未标记节点 todo:注意这里是map，不会重复
+		nextLayer := make([]int, 0)
+
+		if isRedLayer {
+			// 处理红色层反向传播，只要依赖红色顶点就直接标记为灰色
+			for _, node := range layer {
+				for _, from := range reverseEdges[node] {
+					if mark[from] == unmarked { // 这里有unmarked标记，所以不会重复
+						mark[from] = gray
+						nextLayer = append(nextLayer, from)
+					}
+				}
+			}
+		} else {
+			// 处理灰色层反向传播, 如果有未标记的节点仅依赖灰色节点，就标记为红色
+			for _, node := range layer {
+				for _, from := range reverseEdges[node] {
+					if mark[from] == unmarked {
+
+						// todo：注意收集结论。未标记节点的所有依赖 ∈ {gray, unmarked}。否则它早就在上一轮 被标灰了
+						// 判定from顶点是否仅仅指向灰色节点 todo
+						onlygray := true
+						for _, to := range g.Edges[from] {
+							if mark[to] == unmarked {
+								// from 这个节点先不处理
+								onlygray = false
+								break
+							}
+						}
+
+						// from节点仅仅指向灰色节点，标记为红色
+						// todo：这里不是BUG。没有 unmarked 等价于 所有依赖都是 gray。所以这里 不是 bug
+						if onlygray {
+							mark[from] = red
+							nextLayer = append(nextLayer, from)
+						}
+
+					}
+				}
+			}
+		}
+
+		markCount = markCount + len(nextLayer) //总共被标记的节点
+		layer = nextLayer
+
+		isRedLayer = !isRedLayer // 状态翻转
+	}
+
+	// 收集结果
+	for _, node := range g.Nodes {
+		if mark[node] == red {
+			committable = append(committable, node)
+		} else {
+			uncommittable = append(uncommittable, node)
+		}
+	}
+
+	return
 }
 
 // DetectCycle 使用DFS三色标记法检测有向图中是否存在环。

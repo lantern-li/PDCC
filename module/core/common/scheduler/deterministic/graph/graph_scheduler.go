@@ -33,9 +33,9 @@ type txExecInfo struct {
 	txRWSet               *commonPb.TxRWSet
 	txReadSet             []*commonPb.TxRead
 	txWriteSetWithVersion []*commonPb.VersionedTxWrite
-	originalIndex         int  // 原始索引，用于确定性排序
-	rwSetCount            int  // 读写集总数量，用于重排序
-	removed               bool // 是否因破环被移除
+	originalIndex         int // 原始索引，用于确定性排序
+	rwSetCount            int // 读写集总数量，用于重排序
+	//removed               bool // 是否因破环被移除
 }
 
 // GraphScheduler A deterministic parallel scheduler
@@ -112,7 +112,7 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 		if batchSize > len(txBatch) {
 			batchSize = len(txBatch)
 		}
-		selectedTxs := txBatch[:batchSize:batchSize] // 容量也限制为 batchSize，不共享后面的容量空间。
+		selectedTxs := txBatch[:batchSize:batchSize] // 容量也限制为 batchSize，不共享后面的容量空间。 todo，后期还是拷贝隔离了吧，这样还是安全些
 		txBatch = txBatch[batchSize:]
 		Gs.log.DebugDynamic(func() string {
 			return fmt.Sprintf("Round %d: selected %d transactions for scheduling, remainTxs=%d", roundNum, batchSize, len(txBatch))
@@ -179,7 +179,7 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 			}
 			return fmt.Sprintf("[graphBuildStage]: built graph with %d nodes and %d edges, total cost=%v",
 				len(graph.Nodes), edgeCount, time.Since(graphBuildStart))
-		})
+		}) // todo：实际测试可以把图打印出来看看，构的有没有问题。
 
 		// 5.检测环阶段：使用DFS三色标记法检测有向图中的环
 		cycleDetectStart := time.Now()
@@ -213,18 +213,76 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 			// 对每个 SCC 执行破环：循环选点删除 → RemoveLeafNodes，直到瓦解
 			removedNodes := graphCopy.BreakCycles(sccs)
 
-			// 标记被删除的交易
-			for _, nodeIdx := range removedNodes {
-				execInfos[nodeIdx].removed = true
+			// 标记被删除的交易，并从原图中删除这些节点
+			graph.RemovedNodes = removedNodes
+			for _, node := range removedNodes { // todo：后期考虑一批批删除
+				graph.RemoveNode(node)
 			}
 
 			Gs.log.DebugDynamic(func() string {
 				return fmt.Sprintf("[cycleBreakStage]: removedNodes=%v, total cost=%v",
 					removedNodes, time.Since(cycleBreakStage))
 			})
-
 		}
 
+		// 7. 标记阶段：基于Sink Nodes（出度为0的点）到Source Nodes的反向传播标记
+		commitStart := time.Now()
+		committable, uncommittable := graph.MarkCommittable()
+
+		Gs.log.DebugDynamic(func() string {
+			return fmt.Sprintf("[markStage]: committable=%v, uncommittable=%v, total cost=%v",
+				committable, uncommittable, time.Since(commitStart))
+		})
+
+		// 8. 提交阶段：对于所有committable交易，先将所有交易的写集写到一个数据结构中，所有交易都写完后。对于同一个key的写，保留交易序号最大的写。似乎类似map reduce
+		commitStageStart := time.Now()
+
+		// 8.1 Map 阶段：收集所有 committable 交易的写集，对同一个 key 只保留交易序号（idx）最大的写
+		mergedWrites := make(map[string]*commonPb.TxWrite, len(committable)) // key -> 最终要应用的 TxWrite
+		mergedVersion := make(map[string]int, len(committable))              // key -> 对应的最大交易序号
+
+		for _, idx := range committable {
+			for _, w := range execInfos[idx].txRWSet.TxWrites {
+				key := string(w.Key)
+				if existingIdx, exists := mergedVersion[key]; !exists || idx > existingIdx {
+					mergedWrites[key] = w
+					mergedVersion[key] = idx
+				}
+			}
+		}
+
+		// 8.2 Reduce 阶段：将合并后的写集应用到 snapshot，以便下一轮交易执行时能读到最新值
+		if len(mergedWrites) > 0 {
+			writes := make([]*commonPb.TxWrite, 0, len(mergedWrites))
+			// 拿到该批次并发安全的写集
+			for _, w := range mergedWrites {
+				writes = append(writes, w)
+			}
+			snapshot.ApplyWritesToWriteTable(writes)
+		}
+
+		// 8.3 记录到 txRWSetMap，设置 tx.Result，追加到 block.Txs
+		for _, idx := range committable {
+			info := execInfos[idx]
+			Gs.txRWSetMap[info.tx.Payload.TxId] = info.txRWSet
+			info.tx.Result = info.txSimContext.GetTxResult()
+			block.Txs = append(block.Txs, info.tx)
+		}
+
+		Gs.log.DebugDynamic(func() string {
+			return fmt.Sprintf("[commitStage]: committed %d txs, merged %d unique keys, total cost=%v",
+				len(committable), len(mergedWrites), time.Since(commitStageStart))
+		})
+
+		// 9. 下一轮批处理： 不可提交的交易 + 破环被移除的交易：放回 txBatch 头部，等待下一轮重新执行
+		var retryTxs []*commonPb.Transaction
+		for _, idx := range uncommittable {
+			retryTxs = append(retryTxs, execInfos[idx].tx)
+		}
+		for _, idx := range graph.RemovedNodes {
+			retryTxs = append(retryTxs, execInfos[idx].tx)
+		}
+		txBatch = append(retryTxs, txBatch...)
 	}
 
 	return Gs.txRWSetMap, nil, nil
