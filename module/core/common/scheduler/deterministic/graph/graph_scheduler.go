@@ -285,6 +285,11 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 		txBatch = append(retryTxs, txBatch...)
 	}
 
+	totalTime := time.Since(startTime)
+	tps := float64(len(block.Txs)) / totalTime.Seconds()
+	Gs.log.Infof("Graph schedule completed after %d rounds, total time=%v, total txs=%d, TPS=%.2f, blockheight=%d",
+		roundNum, totalTime, len(block.Txs), tps, block.Header.BlockHeight)
+
 	return Gs.txRWSetMap, nil, nil
 }
 
