@@ -120,7 +120,8 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		if batchSize > len(txBatch) {
 			batchSize = len(txBatch)
 		}
-		selectedTxs := txBatch[:batchSize:batchSize]
+		selectedTxs := make([]*commonPb.Transaction, batchSize)
+		copy(selectedTxs, txBatch[:batchSize]) // copy后，selectedTxs是新的底层数组
 		txBatch = txBatch[batchSize:]
 		ws.log.DebugDynamic(func() string {
 			return fmt.Sprintf("Round %d: selected %d transactions for scheduling, remainTxs=%d", roundNum, batchSize, len(txBatch))

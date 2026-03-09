@@ -1,5 +1,7 @@
 package graph
 
+import "sort"
+
 const (
 	colorWhite = 0 // 未访问
 	colorGray  = 1 // 正在访问（在当前DFS路径上）
@@ -12,7 +14,7 @@ type Graph struct {
 	RemovedNodes []int         // 因破环被移除的节点列表
 }
 
-// buildDependencyGraph 基于交易执行信息和写集总表构建读写依赖有向图。
+// buildDependencyGraph 基于交易执行信息和写集总表构建读写依赖有向图（确定性构图）。
 // 节点为 execInfos 的索引，边 readerIdx -> writerIdx 表示读交易依赖写交易。
 func buildDependencyGraph(execInfos []txExecInfo, masterWS MasterWriteSet) *Graph {
 	graph := &Graph{
@@ -47,9 +49,12 @@ func buildDependencyGraph(execInfos []txExecInfo, masterWS MasterWriteSet) *Grap
 	}
 
 	for readerIdx, writerSet := range edgeSet {
+		writers := make([]int, 0, len(writerSet))
 		for writerIdx := range writerSet {
-			graph.Edges[readerIdx] = append(graph.Edges[readerIdx], writerIdx)
+			writers = append(writers, writerIdx)
 		}
+		sort.Ints(writers) // 升序排序
+		graph.Edges[readerIdx] = writers
 	}
 
 	return graph
@@ -324,6 +329,8 @@ func (g *Graph) BreakCycles(sccs [][]int) []int {
 			sub.RemoveLeafNodes()
 		}
 	}
+
+	sort.Ints(removedNodes) // 升序排序
 	return removedNodes
 }
 

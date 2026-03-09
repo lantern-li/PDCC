@@ -700,18 +700,6 @@ func TestCopy_ThenRemoveLeafNodes(t *testing.T) {
 }
 
 // ==================== FindSCCs 测试 ====================
-
-// normalizeSCCs 将 SCC 结果标准化：先对每个 SCC 内部排序，再按最小节点对所有 SCC 排序，方便断言比较。
-func normalizeSCCs(sccs [][]int) [][]int {
-	for _, scc := range sccs {
-		sort.Ints(scc)
-	}
-	sort.Slice(sccs, func(i, j int) bool {
-		return sccs[i][0] < sccs[j][0]
-	})
-	return sccs
-}
-
 // TestFindSCCs_EmptyGraph 空图，无 SCC
 func TestFindSCCs_EmptyGraph(t *testing.T) {
 	g := &Graph{

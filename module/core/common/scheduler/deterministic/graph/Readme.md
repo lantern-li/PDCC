@@ -115,3 +115,79 @@ tx2 → tx3
 算法：没有依赖的交易可提交（红），依赖了可提交交易的不可提交（
 灰），所有依赖都不可提交的反而可以提交（红），如此交替传播直到
 所有节点都被标记。本质上是在 DAG 上按拓扑层次做冲突隔离。
+
+# FindSCC 的确定性问题
+module/core/common/scheduler/deterministic/graph/graph.go中的
+FindSCCs是确定性的吗，即对于同样的图，多次运行得到的SCC都是那  
+几个，内容都一样，只是顺序可能不同（即每个scc的内部和sccs之间  
+进行的顺序）
+
+⏺ Searched for 2 patterns, read 1 file (ctrl+o to expand)
+
+⏺ Bash(ls /home/user/ 2>/dev/null || echo "no /home/user"; pwd;  
+ls)                                                        
+⎿  no /home/user                                               
+/Users/denglongli/workspace/chainmaker-go                   
+CLAUDE.md                                                 
+… +20 lines (ctrl+o to expand)
+
+⏺ Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ 分析：FindSCCs 的确定性
+
+结论：SCC 的内容（作为集合）是确定的，但顺序可能不同
+
+分两种情况讨论：
+                                                                 
+---             
+情况 1：对同一个 Graph 结构体多次调用 FindSCCs
+
+完全确定，每次结果完全一致（包括顺序）。
+
+FindSCCs 内部只遍历 slice，不遍历 map 的 key：
+- 第 151 行遍历 g.Nodes — slice，顺序固定
+- 第 183 行遍历 g.Edges[v] — 按 key 取出 slice 值，顺序固定
+- t.visited[node] — 按 key 查 map 值，确定性操作
+
+因此对同一个 Graph 实例，FindSCCs 是纯确定性的。
+
+  ---
+情况 2：图由 buildDependencyGraph 重新构建（相同输入）
+
+SCC 的成员集合相同，但内部节点顺序和 SCC 之间的顺序可能不同。
+
+原因在 buildDependencyGraph 的第 49-53 行：
+
+        for readerIdx, writerSet := range edgeSet {
+                for writerIdx := range writerSet {
+                        graph.Edges[readerIdx] = append(graph.Edg
+writerIdx)
+}
+}
+
+这里 edgeSet 是 map[int]map[int]struct{}，Go 的 map
+迭代顺序是不确定的。这导致 graph.Edges[readerIdx] 这个 slice
+中邻居的排列顺序在不同运行中可能不同。
+
+邻居顺序不同 → Tarjan DFS 遍历顺序不同 → SCC 内节点弹栈顺序不同
++ SCC 发现顺序不同。
+
+但 SCC 的划分是图的拓扑属性（最大强连通子图），与遍历顺序无关，
+所以作为集合是完全相同的。
+
+  ---
+总结
+
+┌──────────────────────┬──────────────┬──────────┬──────────┐
+│         场景         │     SCC      │   SCC    │   SCC    │
+│                      │ 内容（集合） │ 内部顺序 │ 之间顺序 │
+├──────────────────────┼──────────────┼──────────┼──────────┤
+│ 同一 Graph           │   ✅ 相同    │ ✅ 相同  │ ✅ 相同  │
+│ 实例多次调用         │              │          │          │
+├──────────────────────┼──────────────┼──────────┼──────────┤
+│ 相同输入重建图后调用 │   ✅ 相同    │   ❌     │   ❌     │
+│                      │              │ 可能不同 │ 可能不同 │
+└──────────────────────┴──────────────┴──────────┴──────────┘
+
+如果需要在重建图后也保证完全确定性，只需在 buildDependencyGraph
+第 49-53 行对 map 遍历结果排序即可。

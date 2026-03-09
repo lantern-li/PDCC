@@ -1,6 +1,10 @@
 package graph
 
-import commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
+import (
+	"sort"
+
+	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
+)
 
 type MasterWriteSet map[string][]*commonPb.VersionedTxWrite // string：string(Write.Key)
 
@@ -16,4 +20,15 @@ func buildMasterWriteSet(execInfos []txExecInfo) MasterWriteSet {
 		}
 	}
 	return masterWS
+}
+
+// normalizeSCCs 将 SCC 结果标准化：先对每个 SCC 内部排序，再按最小节点对所有 SCC 排序，方便断言比较。
+func normalizeSCCs(sccs [][]int) [][]int {
+	for _, scc := range sccs {
+		sort.Ints(scc)
+	}
+	sort.Slice(sccs, func(i, j int) bool {
+		return sccs[i][0] < sccs[j][0]
+	})
+	return sccs
 }

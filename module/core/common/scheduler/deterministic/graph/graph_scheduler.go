@@ -33,9 +33,6 @@ type txExecInfo struct {
 	txRWSet               *commonPb.TxRWSet
 	txReadSet             []*commonPb.TxRead
 	txWriteSetWithVersion []*commonPb.VersionedTxWrite
-	originalIndex         int // 原始索引，用于确定性排序
-	rwSetCount            int // 读写集总数量，用于重排序
-	//removed               bool // 是否因破环被移除
 }
 
 // GraphScheduler A deterministic parallel scheduler
@@ -112,8 +109,9 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 		if batchSize > len(txBatch) {
 			batchSize = len(txBatch)
 		}
-		selectedTxs := txBatch[:batchSize:batchSize] // 容量也限制为 batchSize，不共享后面的容量空间。 todo，后期还是拷贝隔离了吧，这样还是安全些
-		txBatch = txBatch[batchSize:]
+		selectedTxs := make([]*commonPb.Transaction, batchSize)
+		copy(selectedTxs, txBatch[:batchSize]) // copy后，selectedTxs是新的底层数组
+		txBatch = txBatch[batchSize:]          // 这里还是引用原有的底层数组，只不过指针变了
 		Gs.log.DebugDynamic(func() string {
 			return fmt.Sprintf("Round %d: selected %d transactions for scheduling, remainTxs=%d", roundNum, batchSize, len(txBatch))
 		})
@@ -139,8 +137,6 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 					txSimContext: txSimContext,
 					txRWSet:      txRWSet,
 					txReadSet:    txRWSet.TxReads,
-					//originalIndex: idx, Graph算法不需要这个。
-					//rwSetCount:    len(txRWSet.TxReads) + len(txRWSet.TxWrites), Graph算法不需要这个。
 				}
 
 				// 对写集合进行版本标记。 comment：Graph没有重排序，所以这时就可以对写集进行版本的处理
@@ -171,7 +167,7 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 
 		// 4.构图阶段：基于读写依赖关系构建有向图
 		graphBuildStart := time.Now()
-		graph := buildDependencyGraph(execInfos, masterWS)
+		graph := buildDependencyGraph(execInfos, masterWS) // todo：测试确认下是否是确定性构图
 		Gs.log.DebugDynamic(func() string {
 			edgeCount := 0
 			for _, edges := range graph.Edges {
@@ -210,12 +206,15 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 			// 使用 Tarjan 算法找出所有强连通分量
 			sccs := graphCopy.FindSCCs()
 
+			// 对每个scc的内部和sccs之间进行排序（确定性保证）
+			sccs = normalizeSCCs(sccs) // todo：对同一个 Graph 实例，FindSCCs 是纯确定性的，实际上不需要这个也行。但是要保证构图阶段是纯确定性的才行。 测试是否需要这个
+
 			// 对每个 SCC 执行破环：循环选点删除 → RemoveLeafNodes，直到瓦解
 			removedNodes := graphCopy.BreakCycles(sccs)
 
 			// 标记被删除的交易，并从原图中删除这些节点
 			graph.RemovedNodes = removedNodes
-			for _, node := range removedNodes { // todo：后期考虑一批批删除
+			for _, node := range removedNodes { // todo：后期考虑一批删除，而非单个点删除
 				graph.RemoveNode(node)
 			}
 
@@ -225,16 +224,17 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 			})
 		}
 
+		// 以下必定是DAG。
 		// 7. 标记阶段：基于Sink Nodes（出度为0的点）到Source Nodes的反向传播标记
 		commitStart := time.Now()
-		committable, uncommittable := graph.MarkCommittable()
+		committable, uncommittable := graph.MarkCommittable() // comment：committable, uncommittable按照升序排列
 
 		Gs.log.DebugDynamic(func() string {
 			return fmt.Sprintf("[markStage]: committable=%v, uncommittable=%v, total cost=%v",
 				committable, uncommittable, time.Since(commitStart))
 		})
 
-		// 8. 提交阶段：对于所有committable交易，先将所有交易的写集写到一个数据结构中，所有交易都写完后。对于同一个key的写，保留交易序号最大的写。似乎类似map reduce
+		// 8. 提交阶段：对于所有committable交易，先将所有交易的写集写到一个数据结构中，所有交易都写完后。对于同一个key的写，保留交易序号最大的写。
 		commitStageStart := time.Now()
 
 		// 8.1 Map 阶段：收集所有 committable 交易的写集，对同一个 key 只保留交易序号（idx）最大的写
@@ -247,7 +247,7 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 			}
 		}
 
-		// 8.2 Reduce 阶段：将合并后的写集应用到 snapshot，以便下一轮交易执行时能读到最新值
+		// 8.2 应用snapshot：将合并后的写集应用到 snapshot，以便下一轮交易执行时能读到最新值
 		if len(mergedWrites) > 0 {
 			writes := make([]*commonPb.TxWrite, 0, len(mergedWrites))
 			// 拿到该批次并发安全的写集
@@ -272,10 +272,10 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 
 		// 9. 下一轮批处理： 不可提交的交易 + 破环被移除的交易：放回 txBatch 头部，等待下一轮重新执行
 		var retryTxs []*commonPb.Transaction
-		for _, idx := range uncommittable {
+		for _, idx := range graph.RemovedNodes { // RemovedNodes也是升序
 			retryTxs = append(retryTxs, execInfos[idx].tx)
 		}
-		for _, idx := range graph.RemovedNodes {
+		for _, idx := range uncommittable {
 			retryTxs = append(retryTxs, execInfos[idx].tx)
 		}
 		txBatch = append(retryTxs, txBatch...)
