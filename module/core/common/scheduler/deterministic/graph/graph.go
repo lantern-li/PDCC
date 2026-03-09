@@ -342,90 +342,90 @@ func (g *Graph) BreakCycles(sccs [][]int) []int {
 // 返回值：committable 为可提交的节点列表（红色），uncommittable 为不可提交的节点列表（灰色）。
 // todo：这里两点是很重要的，一点是确定性，还有一点是活性（即能反向传播整个图）
 // todo：代码最后写完让AI评估下是否能反向传播完整个图
-func (g *Graph) MarkCommittable_Old() (committable, uncommittable []int) {
-	const (
-		unmarked = 0
-		red      = 1 // 可提交
-		gray     = 2 // 不可提交
-	)
-
-	mark := make(map[int]int, len(g.Nodes)) // 标记
-
-	// 构建反向邻接表：reverseEdges[to] = []from，即"谁依赖了 to"
-	reverseEdges := make(map[int][]int, len(g.Nodes))
-	for from, neighbors := range g.Edges {
-		for _, to := range neighbors {
-			reverseEdges[to] = append(reverseEdges[to], from)
-		}
-	}
-
-	// 第一轮：所有出度为0的节点标记为红色，加入队列
-	queue := make([]int, 0)
-	for _, node := range g.Nodes {
-		if len(g.Edges[node]) == 0 {
-			mark[node] = red
-			queue = append(queue, node)
-		}
-	}
-
-	// BFS 反向传播
-	for len(queue) > 0 {
-		// 取出当前批次
-		current := queue
-		queue = nil
-
-		// 收集所有被当前批次影响到的、还未标记的邻居（即"谁依赖了 current 中的节点"）
-		// 这些邻居根据 current 的颜色决定自己的颜色：
-		//   - current 是红色 → 邻居标灰
-		//   - current 是灰色 → 邻居如果所有依赖都已标记且没有红色依赖，则标红
-		affected := make(map[int]bool) // 受影响的未标记节点
-		for _, node := range current {
-			for _, from := range reverseEdges[node] {
-				if mark[from] == unmarked {
-					affected[from] = true // 该节点还未标记，确实是受影响了
-				}
-			}
-		}
-
-		// 对受影响的节点做出裁决
-		for node := range affected {
-			// 检查该节点的所有依赖（出边指向的节点）是否都已标记
-			allMarked := true
-			hasRedDep := false
-			for _, to := range g.Edges[node] {
-
-				if mark[to] == unmarked {
-					allMarked = false // 这个似乎要分灰层影响和红色影响不同进行分类讨论 todo：分类讨论重构代码吧。对于红色层：是只有有依赖就灰；对于灰色层，是仅依赖，才红。 然后让AI确认是是否能反向传播完整个图。
-					break             // 红色层反向传播不需要这样
-				}
-				if mark[to] == red {
-					hasRedDep = true
-				}
-			}
-			if !allMarked {
-				continue // 还有依赖未标记，等后续轮次处理
-			}
-
-			// 所有依赖都已标记：有红色依赖 → 灰色，仅灰色依赖 → 红色
-			if hasRedDep {
-				mark[node] = gray
-			} else {
-				mark[node] = red
-			}
-			queue = append(queue, node)
-		}
-	}
-
-	// 收集结果
-	for _, node := range g.Nodes {
-		if mark[node] == red {
-			committable = append(committable, node)
-		} else {
-			uncommittable = append(uncommittable, node)
-		}
-	}
-	return
-}
+//func (g *Graph) MarkCommittable_Old() (committable, uncommittable []int) {
+//	const (
+//		unmarked = 0
+//		red      = 1 // 可提交
+//		gray     = 2 // 不可提交
+//	)
+//
+//	mark := make(map[int]int, len(g.Nodes)) // 标记
+//
+//	// 构建反向邻接表：reverseEdges[to] = []from，即"谁依赖了 to"
+//	reverseEdges := make(map[int][]int, len(g.Nodes))
+//	for from, neighbors := range g.Edges {
+//		for _, to := range neighbors {
+//			reverseEdges[to] = append(reverseEdges[to], from)
+//		}
+//	}
+//
+//	// 第一轮：所有出度为0的节点标记为红色，加入队列
+//	queue := make([]int, 0)
+//	for _, node := range g.Nodes {
+//		if len(g.Edges[node]) == 0 {
+//			mark[node] = red
+//			queue = append(queue, node)
+//		}
+//	}
+//
+//	// BFS 反向传播
+//	for len(queue) > 0 {
+//		// 取出当前批次
+//		current := queue
+//		queue = nil
+//
+//		// 收集所有被当前批次影响到的、还未标记的邻居（即"谁依赖了 current 中的节点"）
+//		// 这些邻居根据 current 的颜色决定自己的颜色：
+//		//   - current 是红色 → 邻居标灰
+//		//   - current 是灰色 → 邻居如果所有依赖都已标记且没有红色依赖，则标红
+//		affected := make(map[int]bool) // 受影响的未标记节点
+//		for _, node := range current {
+//			for _, from := range reverseEdges[node] {
+//				if mark[from] == unmarked {
+//					affected[from] = true // 该节点还未标记，确实是受影响了
+//				}
+//			}
+//		}
+//
+//		// 对受影响的节点做出裁决
+//		for node := range affected {
+//			// 检查该节点的所有依赖（出边指向的节点）是否都已标记
+//			allMarked := true
+//			hasRedDep := false
+//			for _, to := range g.Edges[node] {
+//
+//				if mark[to] == unmarked {
+//					allMarked = false // 这个似乎要分灰层影响和红色影响不同进行分类讨论 todo：分类讨论重构代码吧。对于红色层：是只有有依赖就灰；对于灰色层，是仅依赖，才红。 然后让AI确认是是否能反向传播完整个图。
+//					break             // 红色层反向传播不需要这样
+//				}
+//				if mark[to] == red {
+//					hasRedDep = true
+//				}
+//			}
+//			if !allMarked {
+//				continue // 还有依赖未标记，等后续轮次处理
+//			}
+//
+//			// 所有依赖都已标记：有红色依赖 → 灰色，仅灰色依赖 → 红色
+//			if hasRedDep {
+//				mark[node] = gray
+//			} else {
+//				mark[node] = red
+//			}
+//			queue = append(queue, node)
+//		}
+//	}
+//
+//	// 收集结果
+//	for _, node := range g.Nodes {
+//		if mark[node] == red {
+//			committable = append(committable, node)
+//		} else {
+//			uncommittable = append(uncommittable, node)
+//		}
+//	}
+//	return
+//}
 
 // MarkCommittable 基于 Sink Nodes 到 Source Nodes 的反向传播标记，将所有节点标记为可提交（红色）或不可提交（灰色）。
 //
@@ -521,7 +521,7 @@ func (g *Graph) MarkCommittable() (committable, uncommittable []int) {
 		isRedLayer = !isRedLayer // 状态翻转
 	}
 
-	// 收集结果
+	// 收集结果 给出的是升序排列的结果
 	for _, node := range g.Nodes {
 		if mark[node] == red {
 			committable = append(committable, node)

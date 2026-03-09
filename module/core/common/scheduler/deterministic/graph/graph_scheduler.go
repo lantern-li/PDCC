@@ -238,16 +238,12 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 		commitStageStart := time.Now()
 
 		// 8.1 Map 阶段：收集所有 committable 交易的写集，对同一个 key 只保留交易序号（idx）最大的写
-		mergedWrites := make(map[string]*commonPb.TxWrite, len(committable)) // key -> 最终要应用的 TxWrite
-		mergedVersion := make(map[string]int, len(committable))              // key -> 对应的最大交易序号
+		// committable 已按 idx 升序排列，后遍历到的 idx 必然更大，直接覆盖即可
+		mergedWrites := make(map[string]*commonPb.TxWrite) // key -> 最终要应用的 TxWrite
 
 		for _, idx := range committable {
 			for _, w := range execInfos[idx].txRWSet.TxWrites {
-				key := string(w.Key)
-				if existingIdx, exists := mergedVersion[key]; !exists || idx > existingIdx {
-					mergedWrites[key] = w
-					mergedVersion[key] = idx
-				}
+				mergedWrites[string(w.Key)] = w
 			}
 		}
 
