@@ -238,4 +238,4 @@ writerIdx)
 			!reflect.DeepEqual(uncommittable, uncommittable1) {
 			Gs.log.Fatalf("MarkCommittable is NOT deterministic")
 		}
-```
+``` 测试OK。

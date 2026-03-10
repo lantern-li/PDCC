@@ -8,7 +8,6 @@ package graph
 
 import (
 	"fmt"
-	"reflect"
 	"runtime"
 	"sync"
 	"time"
@@ -24,7 +23,7 @@ const (
 	ScheduleTimeout        = 10
 	ScheduleWithDagTimeout = 20
 	// DefaultBatchSizeMultiplier 默认批处理大小倍数（相对于CPU核心数）
-	DefaultBatchSizeMultiplier = 10
+	DefaultBatchSizeMultiplier = 5
 )
 
 // txExecInfo 存储交易执行的相关信息
@@ -81,7 +80,7 @@ func NewGraphScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, s
 
 // 说明：v2.3.5之后，交易执行时，如果从自己的写集中读取，那么这个读集不会被记录到最终txSimContext中的读集中
 
-// Schedule schedules the transactions using WRIA algorithm.
+// Schedule schedules the transactions using Graph algorithm.
 func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Transaction, snapshot protocol.Snapshot) (map[string]*commonPb.TxRWSet, map[string][]*commonPb.ContractEvent, error) {
 	Gs.lock.Lock()
 	defer Gs.lock.Unlock()
@@ -166,9 +165,9 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 			return fmt.Sprintf("[writeSetMergingStage]: total cost=%v", time.Since(writeSetMergingStart))
 		})
 
-		// 4.构图阶段：基于读写依赖关系构建有向图
+		// 4.构图阶段：基于读写依赖关系构建有向图（确定性构图）
 		graphBuildStart := time.Now()
-		graph := buildDependencyGraph(execInfos, masterWS) // todo：测试确认下是否是确定性构图
+		graph := buildDependencyGraph(execInfos, masterWS)
 
 		Gs.log.DebugDynamic(func() string {
 			edgeCount := 0
@@ -234,13 +233,6 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 		commitStart := time.Now()
 		committable, uncommittable := graph.MarkCommittable() // comment：committable, uncommittable按照升序排列
 
-		// Test determinitic MarkCommittable
-		committable1, uncommittable1 := graph.MarkCommittable()
-		if !reflect.DeepEqual(committable, committable1) ||
-			!reflect.DeepEqual(uncommittable, uncommittable1) {
-			Gs.log.Fatalf("MarkCommittable is NOT deterministic")
-		}
-
 		Gs.log.DebugDynamic(func() string {
 			return fmt.Sprintf("[markStage]: committable=%v, uncommittable=%v, total cost=%v",
 				committable, uncommittable, time.Since(commitStart))
@@ -282,6 +274,7 @@ func (Gs *GraphScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 				len(committable), len(mergedWrites), time.Since(commitStageStart))
 		})
 
+		// todo：批大小动态处理阶段
 		// 9. 下一轮批处理： 不可提交的交易 + 破环被移除的交易：放回 txBatch 头部，等待下一轮重新执行
 		var retryTxs []*commonPb.Transaction
 		for _, idx := range graph.RemovedNodes { // RemovedNodes也是升序

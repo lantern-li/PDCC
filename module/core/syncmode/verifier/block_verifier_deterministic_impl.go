@@ -7,9 +7,11 @@ SPDX-License-Identifier: Apache-2.0
 package verifier
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
 
 	commonErrors "chainmaker.org/chainmaker/common/v2/errors"
@@ -26,6 +28,7 @@ import (
 	"chainmaker.org/chainmaker-go/module/core/common"
 	"chainmaker.org/chainmaker-go/module/core/common/coinbasemgr"
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler"
+	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/serial"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 )
 
@@ -44,6 +47,7 @@ type DeterministicBlockVerifierImpl struct {
 	proposalCache  protocol.ProposalCache         // proposal cache
 	chainConf      protocol.ChainConf             // chain config
 	ac             protocol.AccessControlProvider // access control manager
+	vmMgr          protocol.VmManager             // vm manager, for serializability verification
 	log            protocol.Logger                // logger
 	txPool         protocol.TxPool                // tx pool to check if tx is duplicate
 	txFilter       protocol.TxFilter              // tx pool to check if tx is duplicate
@@ -69,6 +73,7 @@ func NewDeterministicBlockVerifier(config BlockVerifierConfig, log protocol.Logg
 		proposalCache:         config.ProposedCache,
 		chainConf:             config.ChainConf,
 		ac:                    config.AC,
+		vmMgr:                 config.VmMgr,
 		log:                   log,
 		txPool:                config.TxPool,
 		storeHelper:           config.StoreHelper,
@@ -377,37 +382,42 @@ func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutDag(block *commonpb.B
 	snapshot := v.snapshotManager.NewSnapshot(lastBlock, newBlock)
 	startVMTick := utils.CurrentTimeMillisSeconds()
 
-	//// Determinism verification: clone inputs and run scheduler twice
-	//blockClone := proto.Clone(newBlock).(*commonpb.Block)
-	//validatedTxsClone := make([]*commonpb.Transaction, len(newBlock.Txs))
-	//copy(validatedTxsClone, newBlock.Txs)
-	//snapshotClone := v.snapshotManager.NewSnapshot(lastBlock, blockClone)
+	// Determinism verification: clone inputs and run scheduler twice
+	blockClone := proto.Clone(newBlock).(*commonpb.Block)
+	validatedTxsClone := make([]*commonpb.Transaction, len(newBlock.Txs))
+	copy(validatedTxsClone, newBlock.Txs)
+	snapshotClone := v.snapshotManager.NewSnapshot(lastBlock, blockClone)
 
 	// 主节点和从节点都在这里执行
 	txRWSetMap, _, err := v.txScheduler.Schedule(newBlock, newBlock.Txs, snapshot)
 
-	//// 算法的确定性验证：
-	//_, _, err2 := v.txScheduler.Schedule(blockClone, validatedTxsClone, snapshotClone)
-	//if err2 == nil && err == nil {
-	//	// Compare newBlock.Txs with blockClone.Txs
-	//	if len(newBlock.Txs) != len(blockClone.Txs) {
-	//		v.log.Errorf("Scheduler determinism check FAILED: tx count mismatch, first=%d, second=%d",
-	//			len(newBlock.Txs), len(blockClone.Txs))
-	//	} else {
-	//		allMatch := true
-	//		for i := range newBlock.Txs {
-	//			if newBlock.Txs[i].Payload.TxId != blockClone.Txs[i].Payload.TxId {
-	//				allMatch = false
-	//				v.log.Errorf("Scheduler determinism check FAILED: tx order mismatch at index %d, first=%s, second=%s",
-	//					i, newBlock.Txs[i].Payload.TxId, blockClone.Txs[i].Payload.TxId)
-	//				break
-	//			}
-	//		}
-	//		if allMatch {
-	//			v.log.Infof("Scheduler determinism check PASSED: both runs produced identical tx list with %d txs", len(newBlock.Txs))
-	//		}
-	//	}
-	//}
+	// 算法的确定性验证：
+	_, _, err2 := v.txScheduler.Schedule(blockClone, validatedTxsClone, snapshotClone)
+	if err2 == nil && err == nil {
+		// Compare newBlock.Txs with blockClone.Txs
+		if len(newBlock.Txs) != len(blockClone.Txs) {
+			v.log.Errorf("Scheduler determinism check FAILED: tx count mismatch, first=%d, second=%d",
+				len(newBlock.Txs), len(blockClone.Txs))
+		} else {
+			allMatch := true
+			for i := range newBlock.Txs {
+				if newBlock.Txs[i].Payload.TxId != blockClone.Txs[i].Payload.TxId {
+					allMatch = false
+					v.log.Errorf("Scheduler determinism check FAILED: tx order mismatch at index %d, first=%s, second=%s",
+						i, newBlock.Txs[i].Payload.TxId, blockClone.Txs[i].Payload.TxId)
+					break
+				}
+			}
+			if allMatch {
+				v.log.Infof("Scheduler determinism check PASSED: both runs produced identical tx list with %d txs", len(newBlock.Txs))
+			}
+		}
+	}
+
+	// 可串行化验证：按调度输出的交易顺序，用串行调度器重新执行一遍，比较最终世界状态是否一致
+	if err == nil && len(newBlock.Txs) > 0 {
+		v.verifySerializability(newBlock, txRWSetMap, lastBlock)
+	}
 
 	vmUsed := utils.CurrentTimeMillisSeconds() - startVMTick
 
@@ -830,4 +840,98 @@ func (v *DeterministicBlockVerifierImpl) verifyRepeat(block *commonpb.Block,
 		return true
 	}
 	return false
+}
+
+// verifySerializability 可串行化验证：按调度器输出的交易顺序，用串行调度器重新执行一遍，
+// 比较每笔交易的写集值是否与并行调度的结果一致。若一致，说明并行调度的结果等价于该串行顺序。
+func (v *DeterministicBlockVerifierImpl) verifySerializability(
+	block *commonpb.Block,
+	txRWSetMap map[string]*commonpb.TxRWSet,
+	lastBlock *commonpb.Block,
+) {
+	// 1. 克隆 block，将 Txs 设为调度器输出的顺序（即 block.Txs）
+	serialBlock := proto.Clone(block).(*commonpb.Block)
+
+	// 2. 深拷贝交易列表（串行调度器会修改 tx.Result）
+	serialTxs := make([]*commonpb.Transaction, len(block.Txs))
+	for i, tx := range block.Txs {
+		serialTxs[i] = proto.Clone(tx).(*commonpb.Transaction)
+	}
+
+	// 3. 创建新 snapshot
+	serialSnapshot := v.snapshotManager.NewSnapshot(lastBlock, serialBlock)
+
+	// 4. 创建串行调度器并执行
+	serialScheduler := serial.NewSerialScheduler(v.vmMgr, v.chainConf, v.ac, nil)
+	serialTxRWSetMap, _, serialErr := serialScheduler.Schedule(serialBlock, serialTxs, serialSnapshot)
+	if serialErr != nil {
+		v.log.Errorf("Serializability check FAILED: serial scheduler error: %v", serialErr)
+		return
+	}
+
+	// 5. 比较交易数量
+	if len(serialBlock.Txs) != len(block.Txs) {
+		v.log.Errorf("Serializability check FAILED: tx count mismatch, parallel=%d, serial=%d",
+			len(block.Txs), len(serialBlock.Txs))
+		return
+	}
+
+	// 6. 逐笔比较写集
+	allMatch := true
+	for _, tx := range block.Txs {
+		txId := tx.Payload.TxId
+		parallelRWSet := txRWSetMap[txId]
+		serialRWSet := serialTxRWSetMap[txId]
+
+		if parallelRWSet == nil || serialRWSet == nil {
+			v.log.Errorf("Serializability check FAILED: missing rwset for tx %s (parallel=%v, serial=%v)",
+				txId, parallelRWSet != nil, serialRWSet != nil)
+			allMatch = false
+			break
+		}
+
+		// 比较写集：构建 key->value map 后逐 key 比较
+		parallelWrites := make(map[string][]byte, len(parallelRWSet.TxWrites))
+		for _, w := range parallelRWSet.TxWrites {
+			parallelWrites[string(w.Key)] = w.Value
+		}
+
+		serialWrites := make(map[string][]byte, len(serialRWSet.TxWrites))
+		for _, w := range serialRWSet.TxWrites {
+			serialWrites[string(w.Key)] = w.Value
+		}
+
+		// 检查写集 key 数量
+		if len(parallelWrites) != len(serialWrites) {
+			v.log.Errorf("Serializability check FAILED: write count mismatch for tx %s, parallel=%d, serial=%d",
+				txId, len(parallelWrites), len(serialWrites))
+			allMatch = false
+			break
+		}
+
+		// 逐 key 比较值
+		for key, pVal := range parallelWrites {
+			sVal, exists := serialWrites[key]
+			if !exists {
+				v.log.Errorf("Serializability check FAILED: tx %s, key %x exists in parallel but not in serial",
+					txId, key)
+				allMatch = false
+				break
+			}
+			if !bytes.Equal(pVal, sVal) {
+				v.log.Errorf("Serializability check FAILED: tx %s, key %x value mismatch",
+					txId, key)
+				allMatch = false
+				break
+			}
+		}
+
+		if !allMatch {
+			break
+		}
+	}
+
+	if allMatch {
+		v.log.Infof("Serializability check PASSED: serial execution of %d txs produced identical write sets", len(block.Txs))
+	}
 }
