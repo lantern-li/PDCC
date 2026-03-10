@@ -14,6 +14,10 @@ import (
 	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
+/*
+使用方式：
+go run tools/analyze_tps.go -type graph
+*/
 // TPSData 存储解析出的TPS数据
 type TPSData struct {
 	BlockHeight int
@@ -121,6 +125,45 @@ func parseOcc2LogFile(logPath string) ([]TPSData, error) {
 			blockHeight, _ := strconv.Atoi(matches[1])
 			totalTxs, _ := strconv.Atoi(matches[2])
 			tps, _ := strconv.ParseFloat(matches[3], 64)
+
+			data = append(data, TPSData{
+				BlockHeight: blockHeight,
+				TotalTxs:    totalTxs,
+				TPS:         tps,
+			})
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("读取文件错误: %w", err)
+	}
+
+	return data, nil
+}
+
+// parseGraphLogFile 从日志文件中解析TPS数据（Graph调度器）
+// 日志格式: Graph schedule completed after X rounds, total time=XXms, total txs=XXX, TPS=XXX.XX, blockheight=XXX
+func parseGraphLogFile(logPath string) ([]TPSData, error) {
+	file, err := os.Open(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("无法打开日志文件: %w", err)
+	}
+	defer file.Close()
+
+	// 正则表达式匹配: total time=XXms, total txs=XXX, TPS=XXX.XX, blockheight=XXX
+	pattern := regexp.MustCompile(`Graph schedule completed after \d+ rounds, total time=[\d.]+(?:ms|µs|s), total txs=(\d+), TPS=([\d.]+), blockheight=(\d+)`)
+
+	var data []TPSData
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		matches := pattern.FindStringSubmatch(line)
+
+		if len(matches) == 4 {
+			totalTxs, _ := strconv.Atoi(matches[1])
+			tps, _ := strconv.ParseFloat(matches[2], 64)
+			blockHeight, _ := strconv.Atoi(matches[3])
 
 			data = append(data, TPSData{
 				BlockHeight: blockHeight,
@@ -301,7 +344,7 @@ func createBarChart(data []TPSData, schedulerName string) *charts.Bar {
 
 func main() {
 	// 命令行参数
-	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2 或 reorder")
+	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2, reorder 或 graph")
 	flag.Parse()
 
 	// 日志文件路径
@@ -325,6 +368,10 @@ func main() {
 		schedulerName = "Reorder"
 		fmt.Printf("正在解析日志文件 (Reorder): %s\n", logPath)
 		data, err = parseReorderLogFile(logPath)
+	case "graph":
+		schedulerName = "Graph"
+		fmt.Printf("正在解析日志文件 (Graph): %s\n", logPath)
+		data, err = parseGraphLogFile(logPath)
 	default:
 		schedulerName = "WRIA"
 		fmt.Printf("正在解析日志文件 (WRIA): %s\n", logPath)
