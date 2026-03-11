@@ -42,7 +42,6 @@ type GraphScheduler struct {
 	chainConf      protocol.ChainConf
 	storeHelper    conf.StoreHelper
 	vmHelper       *deterministic.CommonVMHelper // Shared VM execution helper
-	snapshotCache  sync.Map                      // key: string(Write.Key), value: *commonPb.VersionedTxWrite
 	txRWSetMap     map[string]*commonPb.TxRWSet  // key: string(txId), value: *commonPb.TxRWSet  todo chainmaker用这个落库。
 	txRWSetMapLock sync.Mutex                    // lock for txRWSetMap concurrent access todo 这个似乎没用上
 	batchSize      int                           // 批处理大小，从配置文件读取或使用默认值
@@ -70,7 +69,6 @@ func NewGraphScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, s
 		storeHelper: storeHelper,
 		txRWSetMap:  make(map[string]*commonPb.TxRWSet), // 初始化 txRWSetMap
 		batchSize:   batchSize,                          // 设置批处理大小
-		// snapshotCache sync.Map 不需要初始化
 	}
 
 	scheduler.vmHelper = deterministic.NewCommonVMHelper(log, chainConf, vmMgr, ac)

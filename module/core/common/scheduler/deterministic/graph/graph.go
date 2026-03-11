@@ -311,7 +311,7 @@ func (g *Graph) selectNodeToRemove() int {
 func (g *Graph) BreakCycles(sccs [][]int) []int {
 	var removedNodes []int
 
-	for _, scc := range sccs { // todo：先串行吧，后面并行。
+	for _, scc := range sccs { // todo：先串行吧，后面并行。 refactor：并行也不一定更快，还是串行吧。
 		if len(scc) < 2 {
 			continue
 		}
