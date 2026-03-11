@@ -3,7 +3,7 @@ Copyright (C) BABEC. All rights reserved.
 
 SPDX-License-Identifier: Apache-2.0
 */
-
+// todo:读写冲突判断似乎是用return contractName + string(key)
 package graph
 
 import (

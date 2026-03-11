@@ -477,7 +477,7 @@ func (s *SnapshotImpl) applyNormalTxSimContext(tx *commonPb.Transaction,
 	for _, txRead := range txRWSet.TxReads {
 		finalKey := constructKey(txRead.ContractName, txRead.Key)
 		// 乐观检查，便于提前发现冲突
-		if sv, ok := s.writeTable.getByLock(finalKey); ok {
+		if sv, ok := s.writeTable.getByLock(finalKey); ok { // todo：注意原始OCC是用finalKey来进行冲突判断的
 			if sv.seq >= txExecSeq {
 				s.log.Debugf("Key Conflicted %+v-%+v, tx id:%s", sv.seq, txExecSeq, tx.Payload.TxId)
 				return false, s.GetSnapshotSize() + len(s.specialTxTable)

@@ -3,7 +3,7 @@ Copyright (C) BABEC. All rights reserved.
 
 SPDX-License-Identifier: Apache-2.0
 */
-
+// todo:读写冲突判断似乎是用return contractName + string(key) 之前之所以没错是因为压测是同一个合约，没体现出问题
 package wria
 
 import (

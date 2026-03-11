@@ -25,11 +25,12 @@ const (
 
 // txExecInfo 存储交易执行的相关信息
 type txExecInfo struct {
-	tx                    *commonPb.Transaction
-	txSimContext          protocol.TxSimContext
-	txRWSet               *commonPb.TxRWSet
-	txReadSet             []*commonPb.TxRead
-	txWriteSetWithVersion []*commonPb.VersionedTxWrite
+	tx           *commonPb.Transaction
+	index        int
+	txSimContext protocol.TxSimContext
+	txRWSet      *commonPb.TxRWSet
+	txReadSet    []*commonPb.TxRead
+	txWriteSet   []*commonPb.TxWrite
 }
 
 // AriaScheduler A deterministic parallel scheduler
@@ -71,7 +72,7 @@ func (As *AriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 	As.lock.Lock()
 	defer As.lock.Unlock()
 	defer As.vmHelper.ReleaseContractCache()
-	As.log.Infof("Graph schedule start, block_number = %v, tx_count = %d, batchsize = %d", block.Header.BlockHeight, len(txBatch), As.batchSize) //动态调整后整理的ws.batchSize要改
+	As.log.Infof("Aria schedule start, block_number = %v, tx_count = %d, batchsize = %d", block.Header.BlockHeight, len(txBatch), As.batchSize) //动态调整后整理的ws.batchSize要改
 
 	As.txRWSetMap = make(map[string]*commonPb.TxRWSet)
 	block.Txs = nil // ← 添加这行！清空 block.Txs
@@ -120,22 +121,12 @@ func (As *AriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 
 				execInfos[idx] = txExecInfo{
 					tx:           transaction,
+					index:        idx,
 					txSimContext: txSimContext,
 					txRWSet:      txRWSet,
 					txReadSet:    txRWSet.TxReads,
+					txWriteSet:   txRWSet.TxWrites,
 				}
-
-				// 对写集合进行版本标记。 comment：Graph没有重排序，所以这时就可以对写集进行版本的处理
-				versionedWrites := make([]*commonPb.VersionedTxWrite, 0, len(txRWSet.TxWrites))
-
-				for _, w := range txRWSet.TxWrites {
-					versionedWrites = append(versionedWrites, &commonPb.VersionedTxWrite{
-						Write:   w,
-						Version: uint64(idx),
-					})
-				}
-
-				execInfos[idx].txWriteSetWithVersion = versionedWrites
 			}(i, tx)
 		}
 		wg.Wait()
@@ -144,6 +135,69 @@ func (As *AriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			return fmt.Sprintf("[ExecutionStage] execute %d txs finished, total cost=%v", len(selectedTxs), time.Since(execStageStart))
 		})
 
+		// 3. 写预留阶段 ReserveWrite
+		reserveTable, aborted := reserveWrite(execInfos)
+
+		// 统计 abort 的交易数
+		abortCount := 0
+		for i := range aborted {
+			if aborted[i].Load() {
+				abortCount++
+			}
+		}
+		As.log.DebugDynamic(func() string {
+			return fmt.Sprintf("[ReserveWriteStage] round %d: %d txs aborted out of %d",
+				roundNum, abortCount, len(execInfos))
+		})
+
+		// 4. 冲突检查阶段：基于预留表检查 WAW 和 RAW 依赖
+		// 已在写预留阶段被 abort 的交易会自动跳过（性能优化）
+		checkConflictStart := time.Now()
+		checkConflicts(execInfos, reserveTable, aborted)
+
+		As.log.DebugDynamic(func() string {
+			// 重新统计（checkConflicts 可能新增了 abort）
+			finalAbortCount := 0
+			for i := range aborted {
+				if aborted[i].Load() {
+					finalAbortCount++
+				}
+			}
+			return fmt.Sprintf("[CheckConflictStage] round %d: %d txs aborted out of %d (reserve=%d, conflict=%d), cost=%v",
+				roundNum, finalAbortCount, len(execInfos), abortCount, finalAbortCount-abortCount, time.Since(checkConflictStart))
+		})
+
+		// 5. 提交/回退阶段：按序分离已提交和需重试的交易
+		abortedTxs := make([]*commonPb.Transaction, 0)
+		committedWrites := make([]*commonPb.TxWrite, 0) // comment：Aria这里，每笔可提交交易的写必定是不同的key，就是并发安全的。
+		committedCount := 0
+		for i := range execInfos {
+			if aborted[i].Load() {
+				abortedTxs = append(abortedTxs, execInfos[i].tx)
+			} else {
+				// 提交：记录结果，加入 block.Txs，存储读写集
+				execInfos[i].tx.Result = execInfos[i].txSimContext.GetTxResult()
+				block.Txs = append(block.Txs, execInfos[i].tx)
+				As.txRWSetMap[execInfos[i].tx.Payload.TxId] = execInfos[i].txRWSet
+				committedWrites = append(committedWrites, execInfos[i].txRWSet.TxWrites...)
+				committedCount++
+			}
+		}
+
+		// 将该批次已提交交易的写集应用到 snapshot，以便下一轮交易执行时能读到最新值
+		if len(committedWrites) > 0 {
+			snapshot.ApplyWritesToWriteTable(committedWrites)
+		}
+
+		// 将被 abort 的交易放回 txBatch 头部，下一轮重新执行
+		if len(abortedTxs) > 0 {
+			txBatch = append(abortedTxs, txBatch...)
+		}
+
+		As.log.DebugDynamic(func() string {
+			return fmt.Sprintf("[CommitStage] round %d: committed=%d, aborted=%d",
+				roundNum, committedCount, len(abortedTxs))
+		})
 	}
 
 	totalTime := time.Since(startTime)
