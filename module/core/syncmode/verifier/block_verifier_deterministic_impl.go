@@ -382,51 +382,51 @@ func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutDag(block *commonpb.B
 	snapshot := v.snapshotManager.NewSnapshot(lastBlock, newBlock)
 	startVMTick := utils.CurrentTimeMillisSeconds()
 
-	// Determinism verification: clone inputs and run scheduler twice
-	blockClone := proto.Clone(newBlock).(*commonpb.Block)
-	validatedTxsClone := make([]*commonpb.Transaction, len(newBlock.Txs))
-	copy(validatedTxsClone, newBlock.Txs)
-	snapshotClone := v.snapshotManager.NewSnapshot(lastBlock, blockClone)
+	//// Determinism verification: clone inputs and run scheduler twice
+	//blockClone := proto.Clone(newBlock).(*commonpb.Block)
+	//validatedTxsClone := make([]*commonpb.Transaction, len(newBlock.Txs))
+	//copy(validatedTxsClone, newBlock.Txs)
+	//snapshotClone := v.snapshotManager.NewSnapshot(lastBlock, blockClone)
 
 	// 主节点和从节点都在这里执行
 	txRWSetMap, _, err := v.txScheduler.Schedule(newBlock, newBlock.Txs, snapshot)
 
-	// 算法的确定性验证：
-	txRWSetMap1, _, err2 := v.txScheduler.Schedule(blockClone, validatedTxsClone, snapshotClone)
-	if err2 == nil && err == nil {
-		// 1. 交易顺序一致性验证
-		if len(newBlock.Txs) != len(blockClone.Txs) {
-			v.log.Errorf("Scheduler determinism check FAILED: tx count mismatch, first=%d, second=%d",
-				len(newBlock.Txs), len(blockClone.Txs))
-		} else {
-			allMatch := true
-			for i := range newBlock.Txs {
-				if newBlock.Txs[i].Payload.TxId != blockClone.Txs[i].Payload.TxId {
-					allMatch = false
-					v.log.Errorf("Scheduler determinism check FAILED: tx order mismatch at index %d, first=%s, second=%s",
-						i, newBlock.Txs[i].Payload.TxId, blockClone.Txs[i].Payload.TxId)
-					break
-				}
-			}
-			if allMatch {
-				v.log.Infof("Scheduler determinism check PASSED (tx order): both runs produced identical tx list with %d txs", len(newBlock.Txs))
-			}
-		}
+	//// 算法的确定性验证：
+	//txRWSetMap1, _, err2 := v.txScheduler.Schedule(blockClone, validatedTxsClone, snapshotClone)
+	//if err2 == nil && err == nil {
+	//	// 1. 交易顺序一致性验证
+	//	if len(newBlock.Txs) != len(blockClone.Txs) {
+	//		v.log.Errorf("Scheduler determinism check FAILED: tx count mismatch, first=%d, second=%d",
+	//			len(newBlock.Txs), len(blockClone.Txs))
+	//	} else {
+	//		allMatch := true
+	//		for i := range newBlock.Txs {
+	//			if newBlock.Txs[i].Payload.TxId != blockClone.Txs[i].Payload.TxId {
+	//				allMatch = false
+	//				v.log.Errorf("Scheduler determinism check FAILED: tx order mismatch at index %d, first=%s, second=%s",
+	//					i, newBlock.Txs[i].Payload.TxId, blockClone.Txs[i].Payload.TxId)
+	//				break
+	//			}
+	//		}
+	//		if allMatch {
+	//			v.log.Infof("Scheduler determinism check PASSED (tx order): both runs produced identical tx list with %d txs", len(newBlock.Txs))
+	//		}
+	//	}
+	//
+	//	// 2. 对比每笔交易的读写集
+	//	v.verifyPerTxRWSetConsistency(txRWSetMap, txRWSetMap1, "Determinism check (rwset)")
+	//}
 
-		// 2. 对比每笔交易的读写集
-		v.verifyPerTxRWSetConsistency(txRWSetMap, txRWSetMap1, "Determinism check (rwset)")
-	}
+	//// 可串行化验证：按调度输出的交易顺序，用串行调度器重新执行一遍，比较最终世界状态是否一致
+	//if err == nil && len(newBlock.Txs) > 0 {
+	//	v.verifySerializability(newBlock, lastBlock, txRWSetMap)
+	//}
 
-	// 可串行化验证：按调度输出的交易顺序，用串行调度器重新执行一遍，比较最终世界状态是否一致
-	if err == nil && len(newBlock.Txs) > 0 {
-		v.verifySerializability(newBlock, lastBlock, txRWSetMap)
-	}
-
-	//// 顺序敏感性验证：用不同的交易顺序（反序）串行执行，验证执行与正序不同，
-	// 证明交易之间存在依赖关系，调度顺序确实影响最终结果。
-	if err == nil && len(newBlock.Txs) > 1 {
-		v.verifyOrderSensitivity(newBlock, lastBlock)
-	} // refactor:实验结果是不同的输入顺序，执行的状况不同。
+	////// 顺序敏感性验证：用不同的交易顺序（反序）串行执行，验证执行与正序不同，
+	//// 证明交易之间存在依赖关系，调度顺序确实影响最终结果。
+	//if err == nil && len(newBlock.Txs) > 1 {
+	//	v.verifyOrderSensitivity(newBlock, lastBlock)
+	//} // refactor:实验结果是不同的输入顺序，执行的状况不同。极少数情况是会相等。
 
 	vmUsed := utils.CurrentTimeMillisSeconds() - startVMTick
 
