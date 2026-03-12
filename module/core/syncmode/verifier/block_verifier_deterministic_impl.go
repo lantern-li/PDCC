@@ -937,7 +937,7 @@ func (v *DeterministicBlockVerifierImpl) verifyPerTxRWSetConsistency(
 		if !exists {
 			allMatch = false
 			mismatchCount++
-			v.log.Warnf("[%s] tx %s exists in first run but not in second run", checkLabel, txId)
+			//v.log.Warnf("[%s] tx %s exists in first run but not in second run", checkLabel, txId)
 			continue
 		}
 
@@ -945,16 +945,16 @@ func (v *DeterministicBlockVerifierImpl) verifyPerTxRWSetConsistency(
 		if !txReadSetsEqual(rwSet1.TxReads, rwSet2.TxReads) {
 			allMatch = false
 			mismatchCount++
-			v.log.Warnf("[%s] tx %s read set MISMATCH: first has %d reads, second has %d reads",
-				checkLabel, txId, len(rwSet1.TxReads), len(rwSet2.TxReads))
+			//v.log.Warnf("[%s] tx %s read set MISMATCH: first has %d reads, second has %d reads",
+			//	checkLabel, txId, len(rwSet1.TxReads), len(rwSet2.TxReads))
 		}
 
 		// 对比写集
 		if !txWriteSetsEqual(rwSet1.TxWrites, rwSet2.TxWrites) {
 			allMatch = false
 			mismatchCount++
-			v.log.Warnf("[%s] tx %s write set MISMATCH: first has %d writes, second has %d writes",
-				checkLabel, txId, len(rwSet1.TxWrites), len(rwSet2.TxWrites))
+			//v.log.Warnf("[%s] tx %s write set MISMATCH: first has %d writes, second has %d writes",
+			//	checkLabel, txId, len(rwSet1.TxWrites), len(rwSet2.TxWrites))
 		}
 	}
 
@@ -963,7 +963,7 @@ func (v *DeterministicBlockVerifierImpl) verifyPerTxRWSetConsistency(
 		if _, exists := txRWSetMap1[txId]; !exists {
 			allMatch = false
 			mismatchCount++
-			v.log.Warnf("[%s] tx %s exists in second run but not in first run", checkLabel, txId)
+			//v.log.Warnf("[%s] tx %s exists in second run but not in first run", checkLabel, txId)
 		}
 	}
 
