@@ -139,7 +139,6 @@ func (As *AriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		reserveTable, aborted := reserveWrite(execInfos)
 		// 3.2 生成读预留表 ReserveRead
 		readReserveTable := reserveRead(execInfos)
-		_ = readReserveTable // TODO: 用于后续 WAR 冲突检测
 
 		// 统计 abort 的交易数
 		abortCount := 0
@@ -156,7 +155,7 @@ func (As *AriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		// 4. 冲突检查阶段：基于预留表检查 WAW 和 RAW 依赖
 		// 已在写预留阶段被 abort 的交易会自动跳过（性能优化）
 		checkConflictStart := time.Now()
-		checkConflicts(execInfos, reserveTable, aborted)
+		checkConflicts(execInfos, reserveTable, readReserveTable, aborted, snapshot)
 
 		As.log.DebugDynamic(func() string {
 			// 重新统计（checkConflicts 可能新增了 abort）
@@ -172,24 +171,17 @@ func (As *AriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 
 		// 5. 提交/回退阶段：按序分离已提交和需重试的交易
 		abortedTxs := make([]*commonPb.Transaction, 0)
-		committedWrites := make([]*commonPb.TxWrite, 0) // comment：Aria这里，每笔可提交交易的写必定是不同的key，就是并发安全的。
 		committedCount := 0
 		for i := range execInfos {
 			if aborted[i].Load() {
-				abortedTxs = append(abortedTxs, execInfos[i].tx)
+				abortedTxs = append(abortedTxs, execInfos[i].tx) // comment：abort交易从小到大收集，并放入下一批的头部
 			} else {
 				// 提交：记录结果，加入 block.Txs，存储读写集
 				execInfos[i].tx.Result = execInfos[i].txSimContext.GetTxResult()
-				block.Txs = append(block.Txs, execInfos[i].tx)
+				block.Txs = append(block.Txs, execInfos[i].tx) // refactor：这里注意block.Txs给出的不是该调度的可串行化顺序！
 				As.txRWSetMap[execInfos[i].tx.Payload.TxId] = execInfos[i].txRWSet
-				committedWrites = append(committedWrites, execInfos[i].txRWSet.TxWrites...)
 				committedCount++
 			}
-		}
-
-		// 将该批次已提交交易的写集应用到 snapshot，以便下一轮交易执行时能读到最新值
-		if len(committedWrites) > 0 {
-			snapshot.ApplyWritesToWriteTable(committedWrites)
 		}
 
 		// 将被 abort 的交易放回 txBatch 头部，下一轮重新执行

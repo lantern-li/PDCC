@@ -3,6 +3,8 @@ package aria
 import (
 	"sync"
 	"sync/atomic"
+
+	"chainmaker.org/chainmaker/protocol/v2"
 )
 
 // reservation 表示一个 key 的写预留条目
@@ -55,20 +57,43 @@ func hasRAWConflict(info *txExecInfo, idx int, reserveTable *sync.Map) bool {
 	return false
 }
 
-// checkConflicts 冲突检查阶段：基于预留表检查 WAW 和 RAW 依赖，决定交易能否提交。
+// hasWARConflict 检查交易 idx 是否存在 WAR（Write-After-Read）依赖。
+// 遍历写集，若某个更早的交易持有该 key 的读预留，则存在 WAR 依赖。
+func hasWARConflict(info *txExecInfo, idx int, readReserveTable *sync.Map) bool {
+	for _, txWrite := range info.txWriteSet {
+		key := constructKey(txWrite.ContractName, txWrite.Key)
+		val, ok := readReserveTable.Load(key)
+		if !ok {
+			continue
+		}
+		res := val.(*reservation)
+		if res.txIndex < idx {
+			return true
+		}
+	}
+	return false
+}
+
+// checkConflicts 冲突检查阶段：基于预留表检查 WAW、WAR 和 RAW 依赖，决定交易能否提交。
 //
-// 根据 Aria 论文 Rule 1：一个交易可以提交，当且仅当它对所有更早的交易（∀j<i）
-// 没有 WAW 依赖和 RAW 依赖。
+// 根据 Aria 论文 Rule 2：一个交易可以提交，当且仅当：
 //
-// 检查方式（通过探查写预留表，而非遍历所有更早交易）：
-//   - WAW 检查：对 Ti 写集中的每个 key，查预留表。若持有者不是 Ti 自己，
+//	(1) 它对所有更早的交易没有 WAW 依赖，且
+//	(2) 它不同时拥有 WAR 依赖和 RAW 依赖。
+//
+// 检查方式（通过探查预留表，而非遍历所有更早交易）：
+//   - WAW 检查：对 Ti 写集中的每个 key，查写预留表。若持有者不是 Ti 自己，
 //     说明某个更早的 Tj 也写了该 key → Ti 有 WAW 依赖 → abort。
-//   - RAW 检查：对 Ti 读集中的每个 key，查预留表。若某个 Tj (j<i) 持有预留，
-//     说明 Ti 应该看到 Tj 的写入但实际没有（都在相同 snapshot 上执行） → Ti 有 RAW 依赖 → abort。
+//   - WAR + RAW 联合检查：
+//     WAR 检查：对 Ti 写集中的每个 key，查读预留表。若某个 Tj (j<i) 持有预留，
+//     说明 Ti 写了 Tj 读过的 key → Ti 有 WAR 依赖。
+//     RAW 检查：对 Ti 读集中的每个 key，查写预留表。若某个 Tj (j<i) 持有预留，
+//     说明 Ti 应该看到 Tj 的写入但实际没有 → Ti 有 RAW 依赖。
+//     若同时存在 WAR 和 RAW 依赖 → abort。
 //
 // 已在写预留阶段被 abort 的交易可跳过此阶段（性能优化）。
 // 此阶段可并行执行，顺序无关。
-func checkConflicts(execInfos []txExecInfo, reserveTable *sync.Map, aborted []atomic.Bool) {
+func checkConflicts(execInfos []txExecInfo, reserveTable *sync.Map, readReserveTable *sync.Map, aborted []atomic.Bool, snapshot protocol.Snapshot) {
 	var wg sync.WaitGroup
 	for i := range execInfos {
 		wg.Add(1)
@@ -82,17 +107,20 @@ func checkConflicts(execInfos []txExecInfo, reserveTable *sync.Map, aborted []at
 
 			info := &execInfos[idx]
 
-			// WAW 检查
+			// WAW 检查：存在即 abort
 			if hasWAWConflict(info, idx, reserveTable) {
 				aborted[idx].Store(true)
 				return
 			}
 
-			// RAW 检查
-			if hasRAWConflict(info, idx, reserveTable) {
+			// WAR + RAW 联合检查：同时存在才 abort
+			war := hasWARConflict(info, idx, readReserveTable)
+			raw := hasRAWConflict(info, idx, reserveTable)
+			if war && raw {
 				aborted[idx].Store(true)
 				return
 			}
+			snapshot.ApplyWritesToWriteTable(info.txWriteSet) // comment:在这里落库，尊重Aria的原文。 这轮中，每个可提交交易的写集中肯定没有对同一个key的重复写
 		}(i)
 	}
 	wg.Wait()
@@ -122,7 +150,7 @@ func reserveRead(execInfos []txExecInfo) *sync.Map {
 
 				res.mu.Lock()
 				if res.txIndex == idx {
-					// 我们刚刚创建的预留成功
+					// 刚刚创建的预留成功
 				} else if idx < res.txIndex {
 					// 当前 TID 更小，覆盖已有预留
 					res.txIndex = idx
