@@ -135,8 +135,11 @@ func (As *AriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			return fmt.Sprintf("[ExecutionStage] execute %d txs finished, total cost=%v", len(selectedTxs), time.Since(execStageStart))
 		})
 
-		// 3. 写预留阶段 ReserveWrite
+		// 3.1 生成写预留表 ReserveWrite
 		reserveTable, aborted := reserveWrite(execInfos)
+		// 3.2 生成读预留表 ReserveRead
+		readReserveTable := reserveRead(execInfos)
+		_ = readReserveTable // TODO: 用于后续 WAR 冲突检测
 
 		// 统计 abort 的交易数
 		abortCount := 0

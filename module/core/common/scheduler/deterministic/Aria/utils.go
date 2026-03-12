@@ -98,6 +98,45 @@ func checkConflicts(execInfos []txExecInfo, reserveTable *sync.Map, aborted []at
 	wg.Wait()
 }
 
+// reserveRead 读预留阶段：每个交易遍历自己的读集，对每个 key 进行预留。
+// 规则：
+//   - 只有 TID 更小的交易才能覆盖已有预留
+//   - 与写预留不同，这里不标记任何交易为 abort，仅记录最小 TID
+//   - 用于后续 WAR（Write-After-Read）冲突检测
+func reserveRead(execInfos []txExecInfo) *sync.Map {
+	readReserveTable := &sync.Map{} // key: string(contractName + key) → *reservation
+
+	var wg sync.WaitGroup
+	for i := range execInfos {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			info := &execInfos[idx]
+
+			for _, txRead := range info.txReadSet {
+				reserveKey := constructKey(txRead.ContractName, txRead.Key)
+
+				// 获取或创建该 key 的预留条目
+				val, _ := readReserveTable.LoadOrStore(reserveKey, &reservation{txIndex: idx})
+				res := val.(*reservation)
+
+				res.mu.Lock()
+				if res.txIndex == idx {
+					// 我们刚刚创建的预留成功
+				} else if idx < res.txIndex {
+					// 当前 TID 更小，覆盖已有预留
+					res.txIndex = idx
+				}
+				// 不需要标记 abort，仅保留最小 TID
+				res.mu.Unlock()
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	return readReserveTable
+}
+
 // reserveWrite 写预留阶段：每个交易遍历自己的写集，对每个 key 进行预留。
 // 规则：
 //   - 只有 TID 更小的交易才能覆盖已有预留
