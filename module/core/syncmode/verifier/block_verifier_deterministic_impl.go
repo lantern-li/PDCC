@@ -392,9 +392,9 @@ func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutDag(block *commonpb.B
 	txRWSetMap, _, err := v.txScheduler.Schedule(newBlock, newBlock.Txs, snapshot)
 
 	// 算法的确定性验证：
-	_, _, err2 := v.txScheduler.Schedule(blockClone, validatedTxsClone, snapshotClone)
+	txRWSetMap1, _, err2 := v.txScheduler.Schedule(blockClone, validatedTxsClone, snapshotClone)
 	if err2 == nil && err == nil {
-		// Compare newBlock.Txs with blockClone.Txs
+		// 1. 交易顺序一致性验证
 		if len(newBlock.Txs) != len(blockClone.Txs) {
 			v.log.Errorf("Scheduler determinism check FAILED: tx count mismatch, first=%d, second=%d",
 				len(newBlock.Txs), len(blockClone.Txs))
@@ -409,15 +409,24 @@ func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutDag(block *commonpb.B
 				}
 			}
 			if allMatch {
-				v.log.Infof("Scheduler determinism check PASSED: both runs produced identical tx list with %d txs", len(newBlock.Txs))
+				v.log.Infof("Scheduler determinism check PASSED (tx order): both runs produced identical tx list with %d txs", len(newBlock.Txs))
 			}
 		}
+
+		// 2. 对比每笔交易的读写集
+		v.verifyPerTxRWSetConsistency(txRWSetMap, txRWSetMap1, "Determinism check (rwset)")
 	}
 
 	// 可串行化验证：按调度输出的交易顺序，用串行调度器重新执行一遍，比较最终世界状态是否一致
 	if err == nil && len(newBlock.Txs) > 0 {
-		v.verifySerializability(newBlock, txRWSetMap, lastBlock)
+		v.verifySerializability(newBlock, lastBlock, txRWSetMap)
 	}
+
+	//// 顺序敏感性验证：用不同的交易顺序（反序）串行执行，验证执行与正序不同，
+	// 证明交易之间存在依赖关系，调度顺序确实影响最终结果。
+	if err == nil && len(newBlock.Txs) > 1 {
+		v.verifyOrderSensitivity(newBlock, lastBlock)
+	} // refactor:实验结果是不同的输入顺序，执行的状况不同。
 
 	vmUsed := utils.CurrentTimeMillisSeconds() - startVMTick
 
@@ -843,11 +852,12 @@ func (v *DeterministicBlockVerifierImpl) verifyRepeat(block *commonpb.Block,
 }
 
 // verifySerializability 可串行化验证：按调度器输出的交易顺序，用串行调度器重新执行一遍，
-// 比较每笔交易的写集值是否与并行调度的结果一致。若一致，说明并行调度的结果等价于该串行顺序。
+// 对比并行调度和串行调度的 snapshot writeTable（最终世界状态）是否一致。
+// 若一致，说明并行调度的结果等价于该串行顺序的执行结果。
 func (v *DeterministicBlockVerifierImpl) verifySerializability(
 	block *commonpb.Block,
-	txRWSetMap map[string]*commonpb.TxRWSet,
 	lastBlock *commonpb.Block,
+	parallelTxRWSetMap map[string]*commonpb.TxRWSet,
 ) {
 	// 1. 克隆 block，将 Txs 设为调度器输出的顺序（即 block.Txs）
 	serialBlock := proto.Clone(block).(*commonpb.Block)
@@ -869,69 +879,135 @@ func (v *DeterministicBlockVerifierImpl) verifySerializability(
 		return
 	}
 
-	// 5. 比较交易数量
-	if len(serialBlock.Txs) != len(block.Txs) {
-		v.log.Errorf("Serializability check FAILED: tx count mismatch, parallel=%d, serial=%d",
-			len(block.Txs), len(serialBlock.Txs))
+	// 对比并行调度和串行调度每笔交易的读写集
+	v.verifyPerTxRWSetConsistency(parallelTxRWSetMap, serialTxRWSetMap, "Serializability check (rwset)")
+}
+
+// verifyOrderSensitivity 顺序敏感性验证：将交易反序后串行执行，对比每笔交易的读写集。
+// 即使最终世界状态相同（如 SmallBank 的加减法操作天然可交换），
+// 只要交易之间存在读写依赖，同一笔交易在不同执行位置读到的值就会不同。
+func (v *DeterministicBlockVerifierImpl) verifyOrderSensitivity(
+	block *commonpb.Block,
+	lastBlock *commonpb.Block,
+) {
+	// 1. 正序串行执行
+	forwardBlock := proto.Clone(block).(*commonpb.Block)
+	forwardTxs := make([]*commonpb.Transaction, len(block.Txs))
+	for i, tx := range block.Txs {
+		forwardTxs[i] = proto.Clone(tx).(*commonpb.Transaction)
+	}
+	forwardSnapshot := v.snapshotManager.NewSnapshot(lastBlock, forwardBlock)
+	forwardScheduler := serial.NewSerialScheduler(v.vmMgr, v.chainConf, v.ac, nil)
+	forwardTxRWSetMap, _, forwardErr := forwardScheduler.Schedule(forwardBlock, forwardTxs, forwardSnapshot)
+	if forwardErr != nil {
+		v.log.Errorf("Order sensitivity check FAILED: forward serial scheduler error: %v", forwardErr)
 		return
 	}
 
-	// 6. 逐笔比较写集
+	// 2. 反序串行执行
+	reverseBlock := proto.Clone(block).(*commonpb.Block)
+	reverseTxs := make([]*commonpb.Transaction, len(block.Txs))
+	for i, tx := range block.Txs {
+		reverseTxs[len(block.Txs)-1-i] = proto.Clone(tx).(*commonpb.Transaction)
+	}
+	reverseSnapshot := v.snapshotManager.NewSnapshot(lastBlock, reverseBlock)
+	reverseScheduler := serial.NewSerialScheduler(v.vmMgr, v.chainConf, v.ac, nil)
+	reverseTxRWSetMap, _, reverseErr := reverseScheduler.Schedule(reverseBlock, reverseTxs, reverseSnapshot)
+	if reverseErr != nil {
+		v.log.Errorf("Order sensitivity check FAILED: reverse serial scheduler error: %v", reverseErr)
+		return
+	}
+
+	// 对比正序和反序执行每笔交易的读写集
+	v.verifyPerTxRWSetConsistency(forwardTxRWSetMap, reverseTxRWSetMap, "Order sensitivity check (rwset)")
+}
+
+// verifyPerTxRWSetConsistency 对比两次执行中每笔交易的读写集是否一致
+func (v *DeterministicBlockVerifierImpl) verifyPerTxRWSetConsistency(
+	txRWSetMap1 map[string]*commonpb.TxRWSet,
+	txRWSetMap2 map[string]*commonpb.TxRWSet,
+	checkLabel string,
+) {
 	allMatch := true
-	for _, tx := range block.Txs {
-		txId := tx.Payload.TxId
-		parallelRWSet := txRWSetMap[txId]
-		serialRWSet := serialTxRWSetMap[txId]
+	mismatchCount := 0
 
-		if parallelRWSet == nil || serialRWSet == nil {
-			v.log.Errorf("Serializability check FAILED: missing rwset for tx %s (parallel=%v, serial=%v)",
-				txId, parallelRWSet != nil, serialRWSet != nil)
+	// 遍历第一组读写集，逐笔对比
+	for txId, rwSet1 := range txRWSetMap1 {
+		rwSet2, exists := txRWSetMap2[txId]
+		if !exists {
 			allMatch = false
-			break
+			mismatchCount++
+			v.log.Warnf("[%s] tx %s exists in first run but not in second run", checkLabel, txId)
+			continue
 		}
 
-		// 比较写集：构建 key->value map 后逐 key 比较
-		parallelWrites := make(map[string][]byte, len(parallelRWSet.TxWrites))
-		for _, w := range parallelRWSet.TxWrites {
-			parallelWrites[string(w.Key)] = w.Value
-		}
-
-		serialWrites := make(map[string][]byte, len(serialRWSet.TxWrites))
-		for _, w := range serialRWSet.TxWrites {
-			serialWrites[string(w.Key)] = w.Value
-		}
-
-		// 检查写集 key 数量
-		if len(parallelWrites) != len(serialWrites) {
-			v.log.Errorf("Serializability check FAILED: write count mismatch for tx %s, parallel=%d, serial=%d",
-				txId, len(parallelWrites), len(serialWrites))
+		// 对比读集
+		if !txReadSetsEqual(rwSet1.TxReads, rwSet2.TxReads) {
 			allMatch = false
-			break
+			mismatchCount++
+			v.log.Warnf("[%s] tx %s read set MISMATCH: first has %d reads, second has %d reads",
+				checkLabel, txId, len(rwSet1.TxReads), len(rwSet2.TxReads))
 		}
 
-		// 逐 key 比较值
-		for key, pVal := range parallelWrites {
-			sVal, exists := serialWrites[key]
-			if !exists {
-				v.log.Errorf("Serializability check FAILED: tx %s, key %x exists in parallel but not in serial",
-					txId, key)
-				allMatch = false
-				break
-			}
-			if !bytes.Equal(pVal, sVal) {
-				v.log.Errorf("Serializability check FAILED: tx %s, key %x value mismatch",
-					txId, key)
-				allMatch = false
-				break
-			}
+		// 对比写集
+		if !txWriteSetsEqual(rwSet1.TxWrites, rwSet2.TxWrites) {
+			allMatch = false
+			mismatchCount++
+			v.log.Warnf("[%s] tx %s write set MISMATCH: first has %d writes, second has %d writes",
+				checkLabel, txId, len(rwSet1.TxWrites), len(rwSet2.TxWrites))
 		}
+	}
 
-		if !allMatch {
-			break
+	// 检查第二组中是否有第一组没有的交易
+	for txId := range txRWSetMap2 {
+		if _, exists := txRWSetMap1[txId]; !exists {
+			allMatch = false
+			mismatchCount++
+			v.log.Warnf("[%s] tx %s exists in second run but not in first run", checkLabel, txId)
 		}
 	}
 
 	if allMatch {
-		v.log.Infof("Serializability check PASSED: serial execution of %d txs produced identical write sets", len(block.Txs))
+		v.log.Infof("[%s] PASSED: all %d txs have identical read-write sets", checkLabel, len(txRWSetMap1))
+	} else {
+		v.log.Errorf("[%s] FAILED: %d mismatches found out of %d txs", checkLabel, mismatchCount, len(txRWSetMap1))
 	}
+}
+
+// txReadSetsEqual 对比两个读集是否完全相同（忽略顺序）
+func txReadSetsEqual(reads1, reads2 []*commonpb.TxRead) bool {
+	if len(reads1) != len(reads2) {
+		return false
+	}
+	m := make(map[string][]byte, len(reads1))
+	for _, r := range reads1 {
+		m[r.ContractName+string(r.Key)] = r.Value
+	}
+	for _, r := range reads2 {
+		key := r.ContractName + string(r.Key)
+		v1, exists := m[key]
+		if !exists || !bytes.Equal(v1, r.Value) {
+			return false
+		}
+	}
+	return true
+}
+
+// txWriteSetsEqual 对比两个写集是否完全相同（忽略顺序）
+func txWriteSetsEqual(writes1, writes2 []*commonpb.TxWrite) bool {
+	if len(writes1) != len(writes2) {
+		return false
+	}
+	m := make(map[string][]byte, len(writes1))
+	for _, w := range writes1 {
+		m[w.ContractName+string(w.Key)] = w.Value
+	}
+	for _, w := range writes2 {
+		key := w.ContractName + string(w.Key)
+		v1, exists := m[key]
+		if !exists || !bytes.Equal(v1, w.Value) {
+			return false
+		}
+	}
+	return true
 }

@@ -178,7 +178,8 @@ func (As *AriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			} else {
 				// 提交：记录结果，加入 block.Txs，存储读写集
 				execInfos[i].tx.Result = execInfos[i].txSimContext.GetTxResult()
-				block.Txs = append(block.Txs, execInfos[i].tx) // refactor：这里注意block.Txs给出的不是该调度的可串行化顺序！
+				block.Txs = append(block.Txs, execInfos[i].tx) // refactor：这里注意block.Txs给出的不是该调度的可串行化顺序！（todo待研究或者也是一种可串行化顺序）但是因为按照同样的从小到大的顺序放置，原来的确定性验证也能通过。同时因为这一批的可提交交易的写都是独立的，所以可串行化验证也能通过。
+				// todo：要再加个确定性验证，验证两次执行后的世界状态相同。 （已通过）
 				As.txRWSetMap[execInfos[i].tx.Payload.TxId] = execInfos[i].txRWSet
 				committedCount++
 			}

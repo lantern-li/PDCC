@@ -77,6 +77,19 @@ func (s *Shard) put(k string, sv *sv) {
 	s.m[k] = sv
 }
 
+// ToMap 将 ShardSet 中所有分片的数据聚合为一个 map[string][]byte 返回
+func (s *ShardSet) ToMap() map[string][]byte {
+	result := make(map[string][]byte)
+	for _, shard := range s.shards {
+		shard.RLock()
+		for k, v := range shard.m {
+			result[k] = v.value
+		}
+		shard.RUnlock()
+	}
+	return result
+}
+
 func shardNum(key string, shardedNum int) int {
 	return int(fnv32(key) % uint32(shardedNum))
 }
