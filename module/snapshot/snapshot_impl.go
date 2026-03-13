@@ -163,10 +163,10 @@ func (s *SnapshotImpl) GetTxResultMap() map[string]*commonPb.Result {
 	return s.txResultMap
 }
 
-// GetWriteTable 返回 writeTable 中聚合的最终世界状态 map[string][]byte
-func (s *SnapshotImpl) GetWriteTable() map[string][]byte {
-	return s.writeTable.ToMap()
-}
+//// GetWriteTable 返回 writeTable 中聚合的最终世界状态 map[string][]byte
+//func (s *SnapshotImpl) GetWriteTable() map[string][]byte {
+//	return s.writeTable.ToMap()
+//} todo：暂时先不要这个
 
 // GetTxRWSetTable return the snapshot's txRWSetTable
 func (s *SnapshotImpl) GetTxRWSetTable() []*commonPb.TxRWSet {
