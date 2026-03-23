@@ -294,13 +294,14 @@ func (s *SnapshotImpl) GetKey(txExecSeq int, contractName string, key []byte) ([
 	//if txExecSeq > snapshotSize || txExecSeq < 0 {
 	//	txExecSeq = snapshotSize //nolint: ineffassign, staticcheck
 	//}
-	finalKey := constructKey(contractName, key)
-	if sv, ok := s.writeTable.getByLock(finalKey); ok {
-		return sv.value, nil
-	}
-	if sv, ok := s.readTable.getByLock(finalKey); ok {
-		return sv.value, nil
-	}
+	//finalKey := constructKey(contractName, key)
+	//if sv, ok := s.writeTable.getByLock(finalKey); ok {
+	//	return sv.value, nil
+	//}
+	//if sv, ok := s.readTable.getByLock(finalKey); ok {
+	//	return sv.value, nil
+	//}
+	// refactor：直接从db中读
 
 	iter := s.preSnapshot
 	for iter != nil {

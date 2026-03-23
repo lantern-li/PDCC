@@ -4,6 +4,7 @@ import (
 	"context"
 	"runtime"
 	"sync"
+	"time"
 
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
@@ -23,16 +24,6 @@ const (
 	ScheduleWithDagTimeout = 20
 )
 
-// txExecInfo 存储交易执行的相关信息
-type txExecInfo struct {
-	tx           *commonPb.Transaction
-	index        int
-	txSimContext protocol.TxSimContext
-	txRWSet      *commonPb.TxRWSet
-	txReadSet    []*commonPb.TxRead
-	txWriteSet   []*commonPb.TxWrite
-}
-
 // BlockScheduler A deterministic parallel scheduler
 type BlockScheduler struct {
 	lock           sync.Mutex
@@ -43,7 +34,7 @@ type BlockScheduler struct {
 	txRWSetMap     map[string]*commonPb.TxRWSet  // key: string(txId), value: *commonPb.TxRWSet  todo chainmaker用这个落库。
 	txRWSetMapLock sync.Mutex                    // lock for txRWSetMap concurrent access todo 这个似乎没用上
 
-	executors int // 线程数量 comment：每个 executors 可以执行 execute 任务，也可以执行 validate 任务
+	threadsNum int // 线程数量 comment：每个 thread 可以执行 execute 任务，也可以执行 validate 任务
 }
 
 // NewBlockStmScheduler creates a new BlockStm transaction scheduler
@@ -57,7 +48,7 @@ func NewBlockStmScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf
 		storeHelper: storeHelper,
 		txRWSetMap:  make(map[string]*commonPb.TxRWSet), // 初始化 txRWSetMap
 
-		executors: runtime.NumCPU(), // todo:确认是否为论文建议的配置数
+		threadsNum: runtime.NumCPU(), // todo:确认是否为论文建议的配置数
 	}
 
 	scheduler.vmHelper = deterministic.NewCommonVMHelper(log, chainConf, vmMgr, ac)
@@ -79,19 +70,34 @@ func (Bs *BlockScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 
 	// 创建调度器
 	scheduler := NewScheduler(len(txBatch))
-	// todo 多版本内存
+	mvMemory := NewMVMemory(len(txBatch))
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), ScheduleTimeout*time.Second)
+	defer cancel()
+
 	var wg sync.WaitGroup
-	wg.Add(Bs.executors)
-	for i := 0; i < Bs.executors; i++ {
-		e := NewExecutor(ctx, scheduler, i) // 创建每个执行器
+	wg.Add(Bs.threadsNum)
+	for i := 0; i < Bs.threadsNum; i++ {
+		t := NewThread(ctx, scheduler, mvMemory, txBatch, Bs.vmHelper, snapshot, block, i) // 创建每个线程器 comment：这里传入了全局txbatch，全局snapshot，全局scheduler， 全局mvMemory
 		go func() {
 			defer wg.Done()
-			e.Run() // 让每个执行器跑起来
+			t.Run() // 让每个线程器跑起来
 		}()
 	}
 	wg.Wait()
+
+	// 从每笔交易最后一次incarnation的txSimContext中收集txRWSet。todo：tx填充
+	for i, tx := range txBatch {
+		ptr := mvMemory.lastTxSimContext[i].Load()
+		if ptr == nil {
+			continue
+		}
+		txSimCtx := *ptr
+		txRWSet := txSimCtx.GetTxRWSet(true)
+		if txRWSet != nil {
+			Bs.txRWSetMap[tx.Payload.TxId] = txRWSet
+		}
+	}
 
 	return Bs.txRWSetMap, nil, nil
 }

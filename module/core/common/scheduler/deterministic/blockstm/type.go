@@ -81,12 +81,6 @@ type write_set struct {
 
 type ReadStatus int
 
-const (
-	ReadStatusOK       ReadStatus = iota
-	ReadStatusNotFound            // S = {}，location 在 MVdata 中无任何 idx < txn_idx 的条目
-	ReadStatusError               // entry = ESTIMATE，需等待 blocking_txn_idx 完成
-)
-
 type ReadResult struct {
 	Status         ReadStatus
 	Version        TxnVersion // ReadStatusOK 时有效

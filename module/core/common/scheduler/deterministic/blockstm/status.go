@@ -9,15 +9,16 @@ const (
 	StatusExecuting
 	StatusExecuted
 	StatusAborting
-	StatusSuspended
 )
+
+// todo：incarnation在哪儿自增的
 
 // StatusEntry 每笔交易的执行状态
 type StatusEntry struct {
 	sync.Mutex
 
-	incarnation Incarnation
-	status      Status
+	incarnation Incarnation // 最新的化身
+	status      Status      // 最新化身的状态
 
 	//cond *Condvar todo：遇到未完成写入时等待”的优化路径 暂时先不优化这个
 }

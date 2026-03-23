@@ -31,9 +31,6 @@ type Scheduler struct {
 	txn_dependency []TxDependency // 这里是阻塞者 导致——> 被阻塞者
 	// txn_idx to a mutex-protected pair (incarnation_number, status), where status ∈ {READY_TO_EXECUTE, EXECUTING, EXECUTED, ABORTING}.
 	txn_status []StatusEntry
-
-	executedTxns  atomic.Int64 //记录执行任务（TaskKindExecution）被跑了多少次
-	validatedTxns atomic.Int64 //记录验证任务（TaskKindValidation）被跑了多少次
 }
 
 func NewScheduler(block_size int) *Scheduler {

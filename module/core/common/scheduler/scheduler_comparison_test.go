@@ -24,7 +24,7 @@ import (
 	"chainmaker.org/chainmaker/protocol/v2"
 	"chainmaker.org/chainmaker/protocol/v2/mock"
 
-	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/wria"
+	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/pdcc"
 	crypto2 "chainmaker.org/chainmaker/common/v2/crypto"
 	"chainmaker.org/chainmaker/localconf/v2"
 	"chainmaker.org/chainmaker/pb-go/v2/consensus"

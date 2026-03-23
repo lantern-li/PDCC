@@ -21,9 +21,9 @@ import (
 	"chainmaker.org/chainmaker/pb-go/v2/config"
 	"chainmaker.org/chainmaker/protocol/v2"
 
+	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/pdcc"
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/reorder"
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/serial"
-	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/wria"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 )
 

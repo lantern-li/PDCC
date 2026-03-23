@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/gogo/protobuf/proto"
@@ -39,6 +40,47 @@ var (
 	// sf is a singleflight group to prevent cache stampede when fetching contracts
 	sf singleflight.Group
 )
+
+type blockSTMReadBlockedError struct {
+	blockingTxnIdx int
+}
+
+func (e *blockSTMReadBlockedError) Error() string {
+	return fmt.Sprintf("blockstm read blocked by txn %d", e.blockingTxnIdx)
+}
+
+func (e *blockSTMReadBlockedError) BlockingTxnIndex() int {
+	return e.blockingTxnIdx
+}
+
+func parseBlockSTMReadBlocked(err error) (int, bool) {
+	if err == nil {
+		return 0, false
+	}
+	const prefix = "BLOCKSTM_READ_BLOCKED:"
+	msg := err.Error()
+	idx := strings.Index(msg, prefix)
+	if idx < 0 {
+		return 0, false
+	}
+	start := idx + len(prefix)
+	end := start
+	for end < len(msg) {
+		ch := msg[end]
+		if ch < '0' || ch > '9' {
+			break
+		}
+		end++
+	}
+	if end == start {
+		return 0, false
+	}
+	n, convErr := strconv.Atoi(msg[start:end])
+	if convErr != nil {
+		return 0, false
+	}
+	return n, true
+}
 
 // CommonVMHelper contains shared VM execution logic
 type CommonVMHelper struct {
@@ -928,4 +970,72 @@ func (h *CommonVMHelper) ExecuteTx(tx *commonPb.Transaction, snapshot protocol.S
 	txSimContext.SetTxResult(txResult)
 	return txSimContext, specialTxType, runVmSuccess
 
+}
+
+// todo：先假设read ERROR 的逻辑能走的通，后续再测试验证是否真的能走通
+
+// ExecuteTxForBlockSTM is like ExecuteTx, but it returns the underlying VM error instead of swallowing it.
+// This is used by Block-STM to distinguish dependency (READ_ERROR) from genuine execution failures.
+func (h *CommonVMHelper) ExecuteTxForBlockSTM(tx *commonPb.Transaction, snapshot protocol.Snapshot, block *commonPb.Block) (protocol.TxSimContext,
+	protocol.ExecOrderTxType, bool, error) { // 注意这里多了个error
+
+	blockVersion := block.GetHeader().BlockVersion
+
+	// STEP1: init sim-context
+	txSimContext := vm.NewTxSimContext(h.vmManager, snapshot, tx, blockVersion, h.log)
+
+	// STEP2: tx check, including gas
+	enableGas := h.CheckGasEnable()
+	enableOptimizeChargeGas := coinbasemgr.IsOptimizeChargeGasEnabled(h.chainConf)
+	if blockVersion >= blockVersion2300 {
+		if !h.GuardForExecuteTx2300(tx, txSimContext, enableGas, enableOptimizeChargeGas, snapshot) {
+			return txSimContext, protocol.ExecOrderTxTypeNormal, false, nil
+		}
+	} else if blockVersion >= 2220 {
+		if !h.GuardForExecuteTx2220(tx, txSimContext, enableGas, enableOptimizeChargeGas) {
+			return txSimContext, protocol.ExecOrderTxTypeNormal, false, nil
+		}
+	}
+
+	// STEP3: run tx based on different block version
+	ctx := &RunVMContext{
+		Tx:                      tx,
+		TxSimContext:            txSimContext,
+		EnableOptimizeChargeGas: enableOptimizeChargeGas,
+		Snapshot:                snapshot,
+		AC:                      h.ac,
+		ContractCache:           h.contractCache,
+	}
+
+	runVmSuccess := true
+	var txResult *commonPb.Result
+	var err error
+	var specialTxType protocol.ExecOrderTxType
+
+	if blockVersion >= 2300 {
+		txResult, specialTxType, err = h.RunVM2300(ctx)
+	} else if blockVersion >= 2220 {
+		txResult, specialTxType, err = h.RunVM2220(ctx)
+	} else {
+		txResult, specialTxType, err = h.RunVM2210(ctx)
+	}
+
+	if err != nil {
+		runVmSuccess = false
+	}
+
+	// refactor开始
+	// Do not set tx result on dependency/read-block error; the scheduler will re-execute later.
+	var blocked interface{ BlockingTxnIndex() int }
+	if errors.As(err, &blocked) {
+		return txSimContext, specialTxType, runVmSuccess, err
+	}
+	if blockingIdx, ok := parseBlockSTMReadBlocked(err); ok {
+		return txSimContext, specialTxType, runVmSuccess, &blockSTMReadBlockedError{blockingTxnIdx: blockingIdx}
+	}
+	// refactor结束
+
+	// Set tx result for non-blocking outcomes (including ordinary execution failures).
+	txSimContext.SetTxResult(txResult)
+	return txSimContext, specialTxType, runVmSuccess, err
 }
