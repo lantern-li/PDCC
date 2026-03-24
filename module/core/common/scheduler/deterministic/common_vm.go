@@ -53,33 +53,41 @@ func (e *blockSTMReadBlockedError) BlockingTxnIndex() int {
 	return e.blockingTxnIdx
 }
 
-func parseBlockSTMReadBlocked(err error) (int, bool) {
-	if err == nil {
+func parseBlockSTMReadBlocked(msg string) (int, bool) {
+	if msg == "" {
 		return 0, false
 	}
-	const prefix = "BLOCKSTM_READ_BLOCKED:"
-	msg := err.Error()
-	idx := strings.Index(msg, prefix)
-	if idx < 0 {
-		return 0, false
+
+	// Prefer the explicit wire prefix used by Block-STM snapshots, but keep backward compatibility
+	// with messages rewritten in VM layers.
+	prefixes := []string{
+		"BLOCKSTM_READ_BLOCKED:",
 	}
-	start := idx + len(prefix)
-	end := start
-	for end < len(msg) {
-		ch := msg[end]
-		if ch < '0' || ch > '9' {
-			break
+
+	for _, prefix := range prefixes {
+		idx := strings.Index(msg, prefix)
+		if idx < 0 {
+			continue
 		}
-		end++
+		start := idx + len(prefix)
+		end := start
+		for end < len(msg) {
+			ch := msg[end]
+			if ch < '0' || ch > '9' {
+				break
+			}
+			end++
+		}
+		if end == start {
+			continue
+		}
+		n, convErr := strconv.Atoi(msg[start:end])
+		if convErr != nil {
+			continue
+		}
+		return n, true
 	}
-	if end == start {
-		return 0, false
-	}
-	n, convErr := strconv.Atoi(msg[start:end])
-	if convErr != nil {
-		return 0, false
-	}
-	return n, true
+	return 0, false
 }
 
 // CommonVMHelper contains shared VM execution logic
@@ -972,8 +980,6 @@ func (h *CommonVMHelper) ExecuteTx(tx *commonPb.Transaction, snapshot protocol.S
 
 }
 
-// todo：先假设read ERROR 的逻辑能走的通，后续再测试验证是否真的能走通
-
 // ExecuteTxForBlockSTM is like ExecuteTx, but it returns the underlying VM error instead of swallowing it.
 // This is used by Block-STM to distinguish dependency (READ_ERROR) from genuine execution failures.
 func (h *CommonVMHelper) ExecuteTxForBlockSTM(tx *commonPb.Transaction, snapshot protocol.Snapshot, block *commonPb.Block) (protocol.TxSimContext,
@@ -1020,22 +1026,23 @@ func (h *CommonVMHelper) ExecuteTxForBlockSTM(tx *commonPb.Transaction, snapshot
 		txResult, specialTxType, err = h.RunVM2210(ctx)
 	}
 
-	if err != nil {
+	if err != nil { // 这里认为有错误就是readerror
 		runVmSuccess = false
-	}
+		// 这时候的txResult.ContractResult.Message是 error message: [get state] fail. key=key_2, field=data, error:BLOCKSTM_READ_BLOCKED:2 (mv memory read blocked)
+		// 需要从txResult.ContractResult.Message中提取出BLOCKSTM_READ_BLOCKED:2中的2
 
-	// refactor开始
-	// Do not set tx result on dependency/read-block error; the scheduler will re-execute later.
-	var blocked interface{ BlockingTxnIndex() int }
-	if errors.As(err, &blocked) {
-		return txSimContext, specialTxType, runVmSuccess, err
-	}
-	if blockingIdx, ok := parseBlockSTMReadBlocked(err); ok {
+		// Do not set tx result on dependency/read-block error; the scheduler will re-execute later.
+		if txResult == nil || txResult.ContractResult == nil {
+			panic(fmt.Sprintf("txResult or ContractResult is nil on vm error: %v", err))
+		}
+		blockingIdx, ok := parseBlockSTMReadBlocked(txResult.ContractResult.Message)
+		if !ok {
+			panic(fmt.Sprintf("failed to parse BLOCKSTM_READ_BLOCKED from message: %s", txResult.ContractResult.Message))
+		}
 		return txSimContext, specialTxType, runVmSuccess, &blockSTMReadBlockedError{blockingTxnIdx: blockingIdx}
 	}
-	// refactor结束
 
 	// Set tx result for non-blocking outcomes (including ordinary execution failures).
 	txSimContext.SetTxResult(txResult)
-	return txSimContext, specialTxType, runVmSuccess, err
+	return txSimContext, specialTxType, runVmSuccess, nil
 }

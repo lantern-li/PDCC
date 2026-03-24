@@ -13,8 +13,16 @@ type MVReadBlockedError struct {
 	BlockingTxnIdx TxnIndex
 }
 
+// blockSTMReadBlockedWirePrefix is a machine-parseable marker used to bubble up Block-STM dependency
+// through VM layers that may stringify errors (e.g. wasm runtimes).
+//
+// NOTE: deterministic.CommonVMHelper.parseBlockSTMReadBlocked relies on this exact prefix.
+const BLOCKSTM_READ_BLOCKED = "BLOCKSTM_READ_BLOCKED:"
+
 func (e *MVReadBlockedError) Error() string {
-	return fmt.Sprintf("mv memory read blocked by txn %d", e.BlockingTxnIdx)
+	// Keep the leading "BLOCKSTM_READ_BLOCKED:<idx>" so upper layers can recover BlockingTxnIdx
+	// even if the error type information is lost and only the message survives.
+	return fmt.Sprintf("%s%d", BLOCKSTM_READ_BLOCKED, e.BlockingTxnIdx)
 }
 
 func (e *MVReadBlockedError) BlockingTxnIndex() int {
@@ -83,7 +91,7 @@ func (s *mvSnapshot) GetKey(txExecSeq int, contractName string, key []byte) ([]b
 		s.recordRead(loc, rr.Version)
 		return rr.Value, nil
 	case ReadStatusError:
-		return nil, &MVReadBlockedError{BlockingTxnIdx: rr.BlockingTxnIdx} // todo：读到ERROR
+		return nil, &MVReadBlockedError{BlockingTxnIdx: rr.BlockingTxnIdx} // BLOCKSTM_READ_BLOCKED:<idx> (mv memory read blocked)
 	default:
 		return nil, fmt.Errorf("unknown mv read status: %v", rr.Status)
 	}

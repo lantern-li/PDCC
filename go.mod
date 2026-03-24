@@ -34,6 +34,8 @@ require (
 	google.golang.org/grpc v1.56.2
 )
 
+require github.com/emirpasic/gods v1.18.1
+
 require (
 	chainmaker.org/chainmaker/libp2p-pubsub v1.1.5 // indirect
 	chainmaker.org/chainmaker/lws v1.2.1 // indirect
@@ -68,7 +70,6 @@ require (
 	github.com/eapache/go-resiliency v1.2.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
-	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/flynn/noise v0.0.0-20180327030543-2492fe189ae6 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
@@ -282,12 +283,12 @@ require (
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/tidwall/btree v1.7.0
 	golang.org/x/sync v0.2.0
 	google.golang.org/protobuf v1.31.0
 )
 
 replace (
+	chainmaker.org/chainmaker/vm-wasmer/v2 => ../vm-wasmer
 	github.com/RedisBloom/redisbloom-go => chainmaker.org/third_party/redisbloom-go v1.0.0
 	github.com/bits-and-blooms/bitset => chainmaker.org/third_party/bitset v0.0.0-20250827033140-c958f2649ebe
 	github.com/bits-and-blooms/bloom/v3 => chainmaker.org/third_party/bloom/v3 v3.0.0-20250827033434-e72bb2fe7ae6
@@ -306,5 +307,4 @@ replace (
 	github.com/syndtr/goleveldb => chainmaker.org/third_party/goleveldb v1.1.0
 	github.com/tidwall/btree => github.com/crypto-org-chain/btree v0.0.0-20240406140148-2687063b042c
 	github.com/tikv/client-go => chainmaker.org/third_party/tikv-client-go v1.0.0
-	chainmaker.org/chainmaker/vm-wasmer/v2 => ../vm-wasmer
 )

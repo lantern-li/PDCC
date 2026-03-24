@@ -14,6 +14,7 @@ type Thread struct {
 	ctx       context.Context
 	scheduler *Scheduler
 	mvMemory  *MVMemory
+	log       protocol.Logger
 
 	// 执行一笔交易所需
 	txBatch  []*commonPb.Transaction // 把交易的执行放到线程器中，不包装多余的东西
@@ -33,6 +34,7 @@ func NewThread(
 	snapshot protocol.Snapshot,
 	block *commonPb.Block,
 	i int,
+	log protocol.Logger,
 ) *Thread {
 	return &Thread{
 		ctx:       ctx,
@@ -43,6 +45,7 @@ func NewThread(
 		snapshot:  snapshot,
 		block:     block,
 		i:         i,
+		log:       log,
 	}
 }
 
@@ -143,7 +146,13 @@ func (t *Thread) Execute(version TxnVersion) (readSet ReadSet, writeSet []write_
 	if err != nil {
 		var blocked interface{ BlockingTxnIndex() int }
 		if errors.As(err, &blocked) {
-			return ReadSet{}, nil, nil, TxnIndex(blocked.BlockingTxnIndex()), true
+			idx := blocked.BlockingTxnIndex()
+			// Defensive bounds check: the "read blocked" marker may come from a stringified VM error.
+			// Ensure it cannot crash the scheduler by indexing outside the current block range.
+			if idx >= 0 && idx < int(version.Index) && idx < len(t.txBatch) {
+				t.log.Warnf("[BlockSTM] tx[%d] read blocked by tx[%d]", version.Index, idx)
+				return ReadSet{}, nil, nil, TxnIndex(idx), true
+			}
 		}
 	}
 

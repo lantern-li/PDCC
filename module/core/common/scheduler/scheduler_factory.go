@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	aria "chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/Aria"
+	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/blockstm"
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/graph"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -82,6 +83,8 @@ func (sf TxSchedulerFactory) NewTxScheduler(vmMgr protocol.VmManager, chainConf 
 			return graph.NewGraphScheduler(vmMgr, chainConf, storeHelper, ac)
 		} else if scheduler.AlgorithmType == config.AlgorithmType_ARIA {
 			return aria.NewAriaScheduler(vmMgr, chainConf, storeHelper, ac)
+		} else if scheduler.AlgorithmType == config.AlgorithmType_BLOCKSTM {
+			return blockstm.NewBlockStmScheduler(vmMgr, chainConf, storeHelper, ac)
 		}
 	}
 	panic(fmt.Sprintf("invaild scheduler config  %+v", scheduler))

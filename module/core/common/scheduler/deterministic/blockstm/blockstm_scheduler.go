@@ -2,6 +2,7 @@ package blockstm
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -65,6 +66,7 @@ func (Bs *BlockScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 	defer Bs.vmHelper.ReleaseContractCache()
 
 	Bs.log.Infof("BlockSTM schedule started, block_number = %v, tx_count = %d", block.Header.BlockHeight, len(txBatch))
+	startTime := time.Now()
 	Bs.txRWSetMap = make(map[string]*commonPb.TxRWSet)
 	block.Txs = nil // ← 添加这行！清空 block.Txs
 
@@ -78,7 +80,7 @@ func (Bs *BlockScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 	var wg sync.WaitGroup
 	wg.Add(Bs.threadsNum)
 	for i := 0; i < Bs.threadsNum; i++ {
-		t := NewThread(ctx, scheduler, mvMemory, txBatch, Bs.vmHelper, snapshot, block, i) // 创建每个线程器 comment：这里传入了全局txbatch，全局snapshot，全局scheduler， 全局mvMemory
+		t := NewThread(ctx, scheduler, mvMemory, txBatch, Bs.vmHelper, snapshot, block, i, Bs.log) // 创建每个线程器 comment：这里传入了全局txbatch，全局snapshot，全局scheduler， 全局mvMemory
 		go func() {
 			defer wg.Done()
 			t.Run() // 让每个线程器跑起来
@@ -86,18 +88,25 @@ func (Bs *BlockScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tr
 	}
 	wg.Wait()
 
-	// 从每笔交易最后一次incarnation的txSimContext中收集txRWSet。todo：tx填充
+	// 从每笔交易最后一次incarnation的txSimContext中收集txRWSet，填充tx.Result和block.Txs
 	for i, tx := range txBatch {
 		ptr := mvMemory.lastTxSimContext[i].Load()
 		if ptr == nil {
-			continue
+			panic(fmt.Sprintf("blockstm: txSimContext missing for tx[%d] %s", i, tx.Payload.TxId))
 		}
 		txSimCtx := *ptr
-		txRWSet := txSimCtx.GetTxRWSet(true)
+		txRWSet := txSimCtx.GetTxRWSet(true) // comment：runVmSuccess设为true
 		if txRWSet != nil {
 			Bs.txRWSetMap[tx.Payload.TxId] = txRWSet
 		}
+		tx.Result = txSimCtx.GetTxResult()
+		block.Txs = append(block.Txs, tx)
 	}
+
+	totalTime := time.Since(startTime)
+	tps := float64(len(block.Txs)) / totalTime.Seconds()
+	Bs.log.Infof("BlockSTM schedule completed, total time=%v, total txs=%d, TPS=%.2f, blockheight=%d",
+		totalTime, len(block.Txs), tps, block.Header.BlockHeight)
 
 	return Bs.txRWSetMap, nil, nil
 }
