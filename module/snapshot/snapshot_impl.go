@@ -294,14 +294,13 @@ func (s *SnapshotImpl) GetKey(txExecSeq int, contractName string, key []byte) ([
 	//if txExecSeq > snapshotSize || txExecSeq < 0 {
 	//	txExecSeq = snapshotSize //nolint: ineffassign, staticcheck
 	//}
-	//finalKey := constructKey(contractName, key)
-	//if sv, ok := s.writeTable.getByLock(finalKey); ok {
-	//	return sv.value, nil
-	//}
-	//if sv, ok := s.readTable.getByLock(finalKey); ok {
-	//	return sv.value, nil
-	//}
-	// refactor：直接从db中读
+	finalKey := constructKey(contractName, key)
+	if sv, ok := s.writeTable.getByLock(finalKey); ok { // refactor：blockstm 没有向writeTable填充过写集，所以这里肯定读取不到，这个GetKey()接口对blocktstm来说直接当成从db读取的接口
+		return sv.value, nil
+	}
+	if sv, ok := s.readTable.getByLock(finalKey); ok {
+		return sv.value, nil
+	}
 
 	iter := s.preSnapshot
 	for iter != nil {

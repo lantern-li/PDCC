@@ -115,7 +115,7 @@ function try_incarnate(txn_idx)
 	num_active_tasks.decrement()
 	return ⊥
 */
-// try_incarnate tries to incarnate a transaction index to execute.
+
 func (s *Scheduler) try_incarnate(txn_idx TxnIndex) TxnVersion {
 	// if txn_idx < BLOCK.size() then
 	if int(txn_idx) < s.block_size {
@@ -254,7 +254,7 @@ func (s *Scheduler) SetReadyStatus(txnIdx TxnIndex) {
 	entry := &s.txn_status[txnIdx]
 	entry.Lock()
 	// status must be ABORTING
-	entry.incarnation++ // comment：再这里实现的incarnation++
+	entry.incarnation++ // comment：在这里实现的incarnation++
 	entry.status = StatusReadyToExecute
 	entry.Unlock()
 }

@@ -51,7 +51,7 @@ func (mv *MVMemory) apply_write_set(txn_index TxnIndex, incarnation_number Incar
 		tp.tm.Put(int(txn_index), newPair)
 		tp.rw.Unlock()
 	}
-}
+} // todo：写测试
 
 /*
 function rcu_update_written_locations(txn_index, new_locations)

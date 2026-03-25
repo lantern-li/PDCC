@@ -110,7 +110,7 @@ func (t *Thread) TryExecute(version TxnVersion) (TxnVersion, TaskKind) {
 			if !t.scheduler.AddDependency(version.Index, blockingIdx) {
 				continue
 			}
-			return InvalidTxnVersion, TaskKindExecution
+			return InvalidTxnVersion, TaskKindExecution // comment：交易成功被AddDependency后，execution_idx没有减少。等依赖被解决后，会被设置SetReadyStatus，并且尝试回拨execution_idx
 		}
 		wroteNewLocation := t.mvMemory.record(version, readSet, writeSet, txSimContext)
 		return t.scheduler.FinishExecution(version, wroteNewLocation)
