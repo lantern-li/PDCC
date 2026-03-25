@@ -288,7 +288,6 @@ require (
 )
 
 replace (
-	chainmaker.org/chainmaker/vm-wasmer/v2 => ../vm-wasmer
 	github.com/RedisBloom/redisbloom-go => chainmaker.org/third_party/redisbloom-go v1.0.0
 	github.com/bits-and-blooms/bitset => chainmaker.org/third_party/bitset v0.0.0-20250827033140-c958f2649ebe
 	github.com/bits-and-blooms/bloom/v3 => chainmaker.org/third_party/bloom/v3 v3.0.0-20250827033434-e72bb2fe7ae6
