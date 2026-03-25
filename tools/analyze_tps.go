@@ -141,6 +141,12 @@ func parseOcc2LogFile(logPath string) ([]TPSData, error) {
 	return data, nil
 }
 
+// parseBlockSTMLogFile 从日志文件中解析TPS数据（BlockSTM调度器）
+// 日志格式: BlockSTM schedule completed, total time=XXms, total txs=XXX, TPS=XXX.XX, blockheight=XXX
+func parseBlockSTMLogFile(logPath string) ([]TPSData, error) {
+	return parseWriaLogFileTps(logPath)
+}
+
 // parseAriaLogFile 从日志文件中解析TPS数据（Aria调度器）
 // 日志格式: Aria schedule completed after X rounds, total time=XXms, total txs=XXX, TPS=XXX.XX, blockheight=XXX
 func parseAriaLogFile(logPath string) ([]TPSData, error) {
@@ -382,7 +388,7 @@ func createBarChart(data []TPSData, schedulerName string) *charts.Bar {
 
 func main() {
 	// 命令行参数
-	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2, reorder, graph 或 aria")
+	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2, reorder, graph, aria 或 blockstm")
 	flag.Parse()
 
 	// 日志文件路径
@@ -414,6 +420,10 @@ func main() {
 		schedulerName = "Aria"
 		fmt.Printf("正在解析日志文件 (Aria): %s\n", logPath)
 		data, err = parseAriaLogFile(logPath)
+	case "blockstm":
+		schedulerName = "BlockSTM"
+		fmt.Printf("正在解析日志文件 (BlockSTM): %s\n", logPath)
+		data, err = parseBlockSTMLogFile(logPath)
 	default:
 		schedulerName = "WRIA"
 		fmt.Printf("正在解析日志文件 (WRIA): %s\n", logPath)
