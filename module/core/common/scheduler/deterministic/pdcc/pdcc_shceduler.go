@@ -3,7 +3,7 @@ Copyright (C) BABEC. All rights reserved.
 
 SPDX-License-Identifier: Apache-2.0
 */
-// todo:读写冲突判断似乎是用return contractName + string(key) 之前之所以没错是因为压测是同一个合约，没体现出问题
+// comment:读写冲突判断应该用return contractName + string(key)。之前之所以没错是因为压测是同一个合约，没体现出问题。先不管，因为后期要上EDCC了
 package wria
 
 import (
@@ -72,13 +72,11 @@ func NewWriaScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, st
 	}
 
 	scheduler := &WriaScheduler{
-		//lock:        sync.Mutex{}, 无需处理，零值已经是合法 Mutex。
 		log:         log,
 		chainConf:   chainConf,
 		storeHelper: storeHelper,
 		txRWSetMap:  make(map[string]*commonPb.TxRWSet), // 初始化 txRWSetMap
-		//txRWSetMapLock 不需要初始化，
-		batchSize: batchSize, // 设置批处理大小
+		batchSize:   batchSize,
 		// snapshotCache sync.Map 不需要初始化
 	}
 
@@ -176,7 +174,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		})
 
 		// 4. 版本标记阶段：先并发地将每笔交易的写集进行版本标记。 comment：因为得重排序，所以只能在重排序之后对写集进行版本标记。
-		writeSetMergingStart := time.Now() // todo：这里的优化，似乎没必要对每个交易都起一个协程，因为起协程也是需要成本的。可以对该批交易分组，每组并发处理，而组内串行的对每笔交易进行版本标记。
+		writeSetMergingStart := time.Now() // todo：这里的优化，似乎没必要对每个交易都起一个协程，因为起协程也是需要成本的。可以对该批交易分组，每组并发处理，而组内串行的对每笔交易进行版本标记。或者直接串行的进行版本标记
 		var versionWG sync.WaitGroup
 		for txIndex, execInfo := range execInfos {
 			versionWG.Add(1)
