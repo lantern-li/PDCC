@@ -375,12 +375,12 @@ func isRAWConflictWithDeps(txIndex int, readSet []*commonPb.TxRead, masterWS map
 		// versionedWrites 已按 Version 升序
 		// 找出所有版本号小于当前交易的写操作（即前序交易）
 		for _, vw := range versionedWrites {
-			if vw.Version < uint64(txIndex) {
+			if vw.Version < uint64(txIndex) { // todo 这里的代码优化。
 				// 找到一个产生RAW冲突的前序交易
 				txIdx := int(vw.Version)
 				if !conflictMap[txIdx] {
 					conflictMap[txIdx] = true
-					conflictingTxs = append(conflictingTxs, txIdx) //注意这里要记录所有的冲突，后面rechecking要用。不能因为一个冲突就返回了。
+					conflictingTxs = append(conflictingTxs, txIdx) // comment：注意这里要记录所有的冲突，后面rechecking要用。不能因为一个冲突就返回了。
 				}
 			}
 		}

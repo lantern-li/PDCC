@@ -35,7 +35,7 @@ type BlockScheduler struct {
 	txRWSetMap     map[string]*commonPb.TxRWSet  // key: string(txId), value: *commonPb.TxRWSet  todo chainmaker用这个落库。
 	txRWSetMapLock sync.Mutex                    // lock for txRWSetMap concurrent access todo 这个似乎没用上
 
-	threadsNum int // 线程数量 comment：每个 thread 可以执行 execute 任务，也可以执行 validate 任务
+	threadsNum int // 线程数量 comment：每个 thread 可以执行 execute 任务，也可以执行 validate 任务。 同一时刻，有的线程在执行 execute 任务
 }
 
 // NewBlockStmScheduler creates a new BlockStm transaction scheduler
