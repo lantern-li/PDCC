@@ -5,7 +5,19 @@ import (
 	"testing"
 
 	commonPb "chainmaker.org/chainmaker/pb-go/v2/common"
+	"chainmaker.org/chainmaker/protocol/v2/mock"
+	"github.com/golang/mock/gomock"
 )
+
+func newTestSnapshot(t *testing.T) *mock.MockSnapshot {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	snapshot := mock.NewMockSnapshot(ctrl)
+	snapshot.EXPECT().ApplyWritesToWriteTable(gomock.Any()).AnyTimes()
+	return snapshot
+}
 
 // helper：快速构造 txExecInfo
 func makeExecInfo(index int, writes ...[2]string) txExecInfo {
@@ -335,7 +347,7 @@ func TestCheckConflicts_NoConflict(t *testing.T) {
 
 	table, aborted := reserveWrite(infos)
 	readTable := reserveRead(infos)
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	if aborted[0].Load() {
 		t.Error("tx0 should not be aborted")
@@ -362,7 +374,7 @@ func TestCheckConflicts_RAW_Only_NoAbort(t *testing.T) {
 		t.Fatal("no tx should be aborted after reserveWrite (different write keys)")
 	}
 
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	if aborted[0].Load() {
 		t.Error("tx0 should not be aborted")
@@ -386,7 +398,7 @@ func TestCheckConflicts_WAR_And_RAW_Abort(t *testing.T) {
 	table, aborted := reserveWrite(infos)
 	readTable := reserveRead(infos)
 
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	if aborted[0].Load() {
 		t.Error("tx0 should not be aborted")
@@ -408,7 +420,7 @@ func TestCheckConflicts_WAR_Only_NoAbort(t *testing.T) {
 	table, aborted := reserveWrite(infos)
 	readTable := reserveRead(infos)
 
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	if aborted[0].Load() {
 		t.Error("tx0 should not be aborted")
@@ -434,7 +446,7 @@ func TestCheckConflicts_WAW_AlreadyAbortedSkipped(t *testing.T) {
 		t.Fatal("tx1 should be aborted after reserveWrite")
 	}
 
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	// tx0 仍然不被 abort
 	if aborted[0].Load() {
@@ -455,7 +467,7 @@ func TestCheckConflicts_RAW_SelfWrite_NoAbort(t *testing.T) {
 
 	table, aborted := reserveWrite(infos)
 	readTable := reserveRead(infos)
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	// tx0 的读集 k1 的预留持有者就是 tx0 自己，res.txIndex (0) 不 < idx (0)
 	if aborted[0].Load() {
@@ -476,7 +488,7 @@ func TestCheckConflicts_RAW_Chain_NoAbort(t *testing.T) {
 
 	table, aborted := reserveWrite(infos)
 	readTable := reserveRead(infos)
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	if aborted[0].Load() {
 		t.Error("tx0 should not be aborted")
@@ -503,7 +515,7 @@ func TestCheckConflicts_WAR_RAW_Chain(t *testing.T) {
 
 	table, aborted := reserveWrite(infos)
 	readTable := reserveRead(infos)
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	if aborted[0].Load() {
 		t.Error("tx0 should not be aborted")
@@ -526,7 +538,7 @@ func TestCheckConflicts_RAW_ReadUnwrittenKey(t *testing.T) {
 
 	table, aborted := reserveWrite(infos)
 	readTable := reserveRead(infos)
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	if aborted[0].Load() {
 		t.Error("tx0 should not be aborted")
@@ -547,7 +559,7 @@ func TestCheckConflicts_RAW_LaterWriterNoAbort(t *testing.T) {
 
 	table, aborted := reserveWrite(infos)
 	readTable := reserveRead(infos)
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	if aborted[0].Load() {
 		t.Error("tx0 should not be aborted (later tx1 wrote k1, not earlier)")
@@ -572,7 +584,7 @@ func TestCheckConflicts_Mixed_WAW_WAR_RAW(t *testing.T) {
 
 	table, aborted := reserveWrite(infos)
 	readTable := reserveRead(infos)
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	if aborted[0].Load() {
 		t.Error("tx0 should not be aborted")
@@ -816,7 +828,7 @@ func TestCheckConflicts_ConcurrencyStress_RAW_Only_NoAbort(t *testing.T) {
 
 	table, aborted := reserveWrite(infos)
 	readTable := reserveRead(infos)
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	if aborted[0].Load() {
 		t.Fatal("tx0 should not be aborted")
@@ -848,7 +860,7 @@ func TestCheckConflicts_ConcurrencyStress_WAR_RAW_Abort(t *testing.T) {
 
 	table, aborted := reserveWrite(infos)
 	readTable := reserveRead(infos)
-	checkConflicts(infos, table, readTable, aborted, nil)
+	checkConflicts(infos, table, readTable, aborted, newTestSnapshot(t))
 
 	if aborted[0].Load() {
 		t.Fatal("tx0 should not be aborted")
