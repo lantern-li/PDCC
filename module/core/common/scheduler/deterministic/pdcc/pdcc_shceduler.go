@@ -173,30 +173,24 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			return fmt.Sprintf("[DeterministicReorderStage]: total cost=%v", time.Since(deterministicReorderStart)) // todo 测试耗时占比。 结果：耗时在ns级。
 		})
 
-		// 4. 版本标记阶段：先并发地将每笔交易的写集进行版本标记。 comment：因为得重排序，所以只能在重排序之后对写集进行版本标记。
-		writeSetMergingStart := time.Now() // todo：这里的优化，似乎没必要对每个交易都起一个协程，因为起协程也是需要成本的。可以对该批交易分组，每组并发处理，而组内串行的对每笔交易进行版本标记。或者直接串行的进行版本标记
-		var versionWG sync.WaitGroup
-		for txIndex, execInfo := range execInfos {
-			versionWG.Add(1)
-			go func(idx int, info txExecInfo) {
-				defer versionWG.Done()
+		// 4. 版本标记阶段：对每笔交易的写集进行版本标记（需在重排序之后进行版本标记）。
+		// 这里的处理是轻任务（遍历写集并附加版本），使用串行方式通常更高效且更稳定。
+		writeSetMergingStart := time.Now()
+		for txIndex := range execInfos {
+			txRWSet := execInfos[txIndex].txRWSet
+			txWrites := txRWSet.TxWrites
 
-				txRWSet := info.txRWSet
-				versionedWrites := make([]*commonPb.VersionedTxWrite, 0, len(txRWSet.TxWrites))
-
-				for _, w := range txRWSet.TxWrites {
-					versionedWrites = append(versionedWrites, &commonPb.VersionedTxWrite{
-						Write:   w,
-						Version: uint64(idx),
-					})
+			versionedWrites := make([]*commonPb.VersionedTxWrite, len(txWrites))
+			for i, w := range txWrites { // 这里不用append，直接按索引写入。更高效的写法。
+				versionedWrites[i] = &commonPb.VersionedTxWrite{
+					Write:   w,
+					Version: uint64(txIndex),
 				}
-
-				execInfos[idx].txWriteSetWithVersion = versionedWrites
-			}(txIndex, execInfo)
+			}
+			execInfos[txIndex].txWriteSetWithVersion = versionedWrites
 		}
-		versionWG.Wait()
 
-		// 4.写集合并阶段：将每笔交易的写集WS(TXi)进行合并，生成写集多版本总表MasterWS。
+		// 5.写集合并阶段：将每笔交易的写集WS(TXi)进行合并，生成写集多版本总表MasterWS。
 		type MasterWriteSet map[string][]*commonPb.VersionedTxWrite // string：string(Write.Key)
 		masterWS := make(MasterWriteSet)
 
@@ -211,7 +205,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			return fmt.Sprintf("[writeSetMergingStage]: total cost=%v", time.Since(writeSetMergingStart))
 		})
 
-		// 5.冲突检测阶段、提交阶段、再检查阶段
+		// 6.冲突检测阶段、提交阶段、再检查阶段
 		//冲突检测RAW：依据MasterWS，对每笔交易的读集进行冲突检测，检测通过则立即启动协程应用写集，检测不通过则标记abort并记录冲突依赖。
 		//提交：对于通过了RAW检测的交易，立即启动协程将其写集应用到snapshot cache中（不阻塞）。
 		//再检查：当所有交易都完成了RAW检测后，立即触发再检查阶段。针对所有被abort的交易，串行地进行检查，
