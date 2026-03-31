@@ -417,7 +417,7 @@ func (v *DeterministicBlockVerifierImpl) verifyBlockWithoutDag(block *commonpb.B
 	//	v.verifyPerTxRWSetConsistency(txRWSetMap, txRWSetMap1, "Determinism check (rwset)")
 	//}
 
-	//// 可串行化验证：按调度输出的交易顺序，用串行调度器重新执行一遍，比较最终世界状态是否一致
+	//// 可串行化验证：按调度输出的交易顺序，用串行调度器重新执行一遍，比较是否等价
 	//if err == nil && len(newBlock.Txs) > 0 {
 	//	v.verifySerializability(newBlock, lastBlock, txRWSetMap)
 	//}
