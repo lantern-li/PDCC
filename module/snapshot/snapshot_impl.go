@@ -777,6 +777,9 @@ func (s *SnapshotImpl) ApplyWritesToWriteTable(writes []*commonPb.TxWrite) {
 		s.log.Warn("Snapshot is sealed, cannot apply writes to writeTable")
 		return
 	}
+	// ApplyWritesToWriteTable 内部已实现智能并发：
+	// - 写入数 < 50：串行处理（避免 goroutine 开销）
+	// - 写入数 >= 50：8 个 worker 并发处理
 
 	writeCount := len(writes)
 
