@@ -55,9 +55,7 @@ type WriaScheduler struct {
 // NewWriaScheduler creates a new WRIA transaction scheduler
 func NewWriaScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, storeHelper conf.StoreHelper, ac protocol.AccessControlProvider) protocol.TxScheduler {
 	log := logger.GetLoggerByChain(logger.MODULE_CORE, chainConf.ChainConfig().ChainId)
-	log.DebugDynamic(func() string {
-		return "use the deterministic WRIA scheduler"
-	})
+	log.Infof("use the deterministic PDCC scheduler")
 
 	// 从配置文件读取 batch_size，如果未配置则使用默认值（CPU核心数 * 10）
 	batchSize := int(chainConf.ChainConfig().Scheduler.GetBatchSize())
