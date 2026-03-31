@@ -57,7 +57,7 @@ func NewWriaScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, st
 
 	// 从配置文件读取 batch_size，如果未配置则使用默认值（CPU核心数 * 10）
 	batchSize := int(chainConf.ChainConfig().Scheduler.GetBatchSize())
-	if batchSize <= 0 {
+	if batchSize == 0 {
 		batchSize = runtime.NumCPU() * DefaultBatchSizeMultiplier
 		log.Infof("BatchSize not configured, using default value: %d (NumCPU=%d * %d)",
 			batchSize, runtime.NumCPU(), DefaultBatchSizeMultiplier)
