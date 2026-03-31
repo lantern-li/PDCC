@@ -263,6 +263,128 @@ func parseReorderLogFile(logPath string) ([]TPSData, error) {
 	return data, nil
 }
 
+// PhaseTimeData 存储9个阶段的耗时数据
+type PhaseTimeData struct {
+	Phase1Selection      float64 // ms
+	Phase2Execution      float64
+	Phase3Reordering     float64
+	Phase4VersionTagging float64
+	Phase5Merging        float64
+	Phase6ConflictDetect float64
+	Phase7Revalidation   float64
+	Phase8Commit         float64
+	Phase9TxReset        float64
+}
+
+// parseDurationMs 将 Go duration 字符串解析为毫秒
+func parseDurationMs(s string) float64 {
+	// 支持 ns, µs, ms, s
+	if len(s) == 0 {
+		return 0
+	}
+	if s[len(s)-2:] == "ms" {
+		v, _ := strconv.ParseFloat(s[:len(s)-2], 64)
+		return v
+	}
+	if len(s) >= 3 && s[len(s)-3:] == "µs" {
+		v, _ := strconv.ParseFloat(s[:len(s)-3], 64)
+		return v / 1000
+	}
+	if len(s) >= 2 && s[len(s)-2:] == "ns" {
+		v, _ := strconv.ParseFloat(s[:len(s)-2], 64)
+		return v / 1e6
+	}
+	if s[len(s)-1:] == "s" {
+		v, _ := strconv.ParseFloat(s[:len(s)-1], 64)
+		return v * 1000
+	}
+	return 0
+}
+
+// parseWriaPhaseTime 从日志文件中解析9个阶段的耗时数据
+func parseWriaPhaseTime(logPath string) ([]PhaseTimeData, error) {
+	file, err := os.Open(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("无法打开日志文件: %w", err)
+	}
+	defer file.Close()
+
+	pattern := regexp.MustCompile(
+		`phase1\(selection\)=([\d.]+(?:ns|µs|ms|s)) ` +
+			`phase2\(execution\)=([\d.]+(?:ns|µs|ms|s)) ` +
+			`phase3\(reordering\)=([\d.]+(?:ns|µs|ms|s)) ` +
+			`phase4\(versionTagging\)=([\d.]+(?:ns|µs|ms|s)) ` +
+			`phase5\(merging\)=([\d.]+(?:ns|µs|ms|s)) ` +
+			`phase6\(conflictDetection\)=([\d.]+(?:ns|µs|ms|s)) ` +
+			`phase7\(revalidation\)=([\d.]+(?:ns|µs|ms|s)) ` +
+			`phase8\(commit\)=([\d.]+(?:ns|µs|ms|s)) ` +
+			`phase9\(txReset\)=([\d.]+(?:ns|µs|ms|s))`,
+	)
+
+	var data []PhaseTimeData
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		m := pattern.FindStringSubmatch(scanner.Text())
+		if len(m) == 10 {
+			data = append(data, PhaseTimeData{
+				Phase1Selection:      parseDurationMs(m[1]),
+				Phase2Execution:      parseDurationMs(m[2]),
+				Phase3Reordering:     parseDurationMs(m[3]),
+				Phase4VersionTagging: parseDurationMs(m[4]),
+				Phase5Merging:        parseDurationMs(m[5]),
+				Phase6ConflictDetect: parseDurationMs(m[6]),
+				Phase7Revalidation:   parseDurationMs(m[7]),
+				Phase8Commit:         parseDurationMs(m[8]),
+				Phase9TxReset:        parseDurationMs(m[9]),
+			})
+		}
+	}
+	return data, scanner.Err()
+}
+
+// createPhasePieChart 创建9个阶段平均耗时饼图
+func createPhasePieChart(data []PhaseTimeData) *charts.Pie {
+	if len(data) == 0 {
+		return nil
+	}
+
+	names := []string{
+		"1.Selection", "2.Execution", "3.Reordering", "4.VersionTagging",
+		"5.Merging", "6.ConflictDetection", "7.Revalidation", "8.Commit", "9.TxReset",
+	}
+	sums := make([]float64, 9)
+	for _, d := range data {
+		sums[0] += d.Phase1Selection
+		sums[1] += d.Phase2Execution
+		sums[2] += d.Phase3Reordering
+		sums[3] += d.Phase4VersionTagging
+		sums[4] += d.Phase5Merging
+		sums[5] += d.Phase6ConflictDetect
+		sums[6] += d.Phase7Revalidation
+		sums[7] += d.Phase8Commit
+		sums[8] += d.Phase9TxReset
+	}
+	n := float64(len(data))
+	items := make([]opts.PieData, 9)
+	for i := range names {
+		avg := sums[i] / n
+		items[i] = opts.PieData{Name: fmt.Sprintf("%s(%.3fms)", names[i], avg), Value: avg}
+	}
+
+	pie := charts.NewPie()
+	pie.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{
+			Title:    "PDCC 各阶段平均耗时分布",
+			Subtitle: fmt.Sprintf("基于 %d 个区块的统计", len(data)),
+		}),
+		charts.WithTooltipOpts(opts.Tooltip{Formatter: "{b}: {d}%"}),
+		charts.WithLegendOpts(opts.Legend{Orient: "vertical", Right: "5%", Top: "20%"}),
+	)
+	pie.AddSeries("阶段耗时", items).
+		SetSeriesOptions(charts.WithLabelOpts(opts.Label{Show: opts.Bool(true), Formatter: "{b}"}))
+	return pie
+}
+
 // calculateStats 计算统计信息
 func calculateStats(data []TPSData) {
 	if len(data) == 0 {
@@ -388,46 +510,74 @@ func createBarChart(data []TPSData, schedulerName string) *charts.Bar {
 
 func main() {
 	// 命令行参数
-	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2, reorder, graph, aria 或 blockstm")
+	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2, reorder, graph, aria, blockstm 或 wriaPieChart")
 	flag.Parse()
 
-	// 日志文件路径
-	logPath := filepath.Join("build", "release", "chainmaker-v2.3.8-wx-org.chainmaker.org", "log", "system.log")
-
+	logFile := filepath.Join("..", "build", "release", "chainmaker-v2.3.8-wx-org.chainmaker.org", "log", "system.log")
 	var schedulerName string
 	var data []TPSData
 	var err error
+
+	// wriaPieChart 单独处理：只解析阶段耗时并绘制饼图
+	if *schedulerType == "wriaPieChart" {
+		fmt.Printf("正在解析阶段耗时 (WRIA PieChart): %s\n", logFile)
+		phaseData, err2 := parseWriaPhaseTime(logFile)
+		if err2 != nil {
+			fmt.Printf("错误: %v\n", err2)
+			os.Exit(1)
+		}
+		if len(phaseData) == 0 {
+			fmt.Println("警告: 未找到阶段耗时数据")
+			os.Exit(1)
+		}
+		fmt.Printf("成功解析 %d 条阶段耗时记录\n", len(phaseData))
+		page := components.NewPage()
+		page.AddCharts(createPhasePieChart(phaseData))
+		outputPath := filepath.Join("piechart.html")
+		f, err3 := os.Create(outputPath)
+		if err3 != nil {
+			fmt.Printf("创建输出文件失败: %v\n", err3)
+			os.Exit(1)
+		}
+		defer f.Close()
+		if err3 = page.Render(f); err3 != nil {
+			fmt.Printf("渲染图表失败: %v\n", err3)
+			os.Exit(1)
+		}
+		fmt.Printf("图表已保存至: %s\n", outputPath)
+		return
+	}
 
 	// 根据调度器类型选择不同的解析函数
 	switch *schedulerType {
 	case "occ1":
 		schedulerName = "OCC1"
-		fmt.Printf("正在解析日志文件 (OCC1): %s\n", logPath)
-		data, err = parseOcc1LogFile(logPath)
+		fmt.Printf("正在解析日志文件 (OCC1): %s\n", logFile)
+		data, err = parseOcc1LogFile(logFile)
 	case "occ2":
 		schedulerName = "OCC2"
-		fmt.Printf("正在解析日志文件 (OCC2): %s\n", logPath)
-		data, err = parseOcc2LogFile(logPath)
+		fmt.Printf("正在解析日志文件 (OCC2): %s\n", logFile)
+		data, err = parseOcc2LogFile(logFile)
 	case "reorder":
 		schedulerName = "Reorder"
-		fmt.Printf("正在解析日志文件 (Reorder): %s\n", logPath)
-		data, err = parseReorderLogFile(logPath)
+		fmt.Printf("正在解析日志文件 (Reorder): %s\n", logFile)
+		data, err = parseReorderLogFile(logFile)
 	case "graph":
 		schedulerName = "Graph"
-		fmt.Printf("正在解析日志文件 (Graph): %s\n", logPath)
-		data, err = parseGraphLogFile(logPath)
+		fmt.Printf("正在解析日志文件 (Graph): %s\n", logFile)
+		data, err = parseGraphLogFile(logFile)
 	case "aria":
 		schedulerName = "Aria"
-		fmt.Printf("正在解析日志文件 (Aria): %s\n", logPath)
-		data, err = parseAriaLogFile(logPath)
+		fmt.Printf("正在解析日志文件 (Aria): %s\n", logFile)
+		data, err = parseAriaLogFile(logFile)
 	case "blockstm":
 		schedulerName = "BlockSTM"
-		fmt.Printf("正在解析日志文件 (BlockSTM): %s\n", logPath)
-		data, err = parseBlockSTMLogFile(logPath)
+		fmt.Printf("正在解析日志文件 (BlockSTM): %s\n", logFile)
+		data, err = parseBlockSTMLogFile(logFile)
 	default:
 		schedulerName = "WRIA"
-		fmt.Printf("正在解析日志文件 (WRIA): %s\n", logPath)
-		data, err = parseWriaLogFileTps(logPath)
+		fmt.Printf("正在解析日志文件 (WRIA): %s\n", logFile)
+		data, err = parseWriaLogFileTps(logFile)
 	}
 
 	if err != nil {
@@ -453,7 +603,7 @@ func main() {
 	)
 
 	// 保存HTML文件
-	outputPath := filepath.Join("tools", "tps_performance_analysis.html")
+	outputPath := filepath.Join("tps_performance_analysis.html")
 	f, err := os.Create(outputPath)
 	if err != nil {
 		fmt.Printf("创建输出文件失败: %v\n", err)

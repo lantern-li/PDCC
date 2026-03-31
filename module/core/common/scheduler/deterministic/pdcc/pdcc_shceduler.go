@@ -99,6 +99,11 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 	timeoutDuration := time.Duration(ScheduleTimeout) * time.Second
 	roundNum := 0
 
+	var (
+		phase1Time, phase2Time, phase3Time, phase4Time, phase5Time time.Duration
+		phase6Time, phase7Time, phase8Time, phase9Time             time.Duration
+	)
+
 	for len(txBatch) > 0 {
 		roundNum++
 
@@ -109,6 +114,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		}
 
 		//1. Deterministic Selection：依据BatchSize从当前txBatch中选取前BatchSize个序号最小交易进行调度，txBatch为剩余交易池
+		t := time.Now()
 		batchSize := ws.batchSize
 		if batchSize > len(txBatch) {
 			batchSize = len(txBatch)
@@ -116,8 +122,10 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		selectedTxs := make([]*commonPb.Transaction, batchSize)
 		copy(selectedTxs, txBatch[:batchSize]) // copy后，selectedTxs是新的底层数组
 		txBatch = txBatch[batchSize:]
+		phase1Time += time.Since(t)
 
 		// 2. Execution：将selectedTxs并发地在当前相同的snapshot上执行。
+		t = time.Now()
 		var wg sync.WaitGroup
 		execInfos := make([]txExecInfo, len(selectedTxs))
 		for i, tx := range selectedTxs {
@@ -140,9 +148,11 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			}(i, tx)
 		}
 		wg.Wait()
+		phase2Time += time.Since(t)
 
 		// 3. Deterministic Reordering：依据每笔交易读写集的数量，进行重排序。每笔交易读写集的数量越多，越靠前。
 		// 使用 sort.SliceStable 保证稳定排序（相同 rwSetCount 时保持原始顺序）
+		t = time.Now()
 		sort.SliceStable(execInfos, func(i, j int) bool {
 			// 首先按 rwSetCount 降序排序（数量多的靠前）
 			if execInfos[i].rwSetCount != execInfos[j].rwSetCount {
@@ -151,9 +161,11 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			// rwSetCount 相同时，按原始索引升序排序（保证确定性）
 			return execInfos[i].originalIndex < execInfos[j].originalIndex
 		})
+		phase3Time += time.Since(t)
 
 		// 4. Version Tagging：对每笔交易的写集进行版本标记（需在重排序之后进行版本标记）。
 		// 这里的处理是轻任务（遍历写集并附加版本），使用串行方式通常更高效且更稳定。
+		t = time.Now()
 		for txIndex := range execInfos {
 			txRWSet := execInfos[txIndex].txRWSet
 			txWrites := txRWSet.TxWrites
@@ -167,8 +179,10 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			}
 			execInfos[txIndex].txWriteSetWithVersion = versionedWrites
 		}
+		phase4Time += time.Since(t)
 
 		// 5.Write-Set Merging：将每笔交易的写集WS(TXi)进行合并，生成写集多版本总表MasterWS。
+		t = time.Now()
 		type MasterWriteSet map[string][]*commonPb.VersionedTxWrite // string：string(Write.Key)
 		masterWS := make(MasterWriteSet)
 
@@ -179,9 +193,11 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 				masterWS[key] = append(masterWS[key], vw) // comment：注意这里versionedWrites 已按 Version 升序
 			}
 		}
+		phase5Time += time.Since(t)
 
 		// 6. Conflict Detection：依据MasterWS，对每笔交易的读集进行冲突检测，检测不通过则标记abort并记录冲突依赖。todo：这里先串行吧
 		// abort 标记：初始均为 false。 true 表示该交易需要被abort
+		t = time.Now()
 		abortFlags := make([]bool, len(execInfos))
 		// 冲突依赖记录：记录每个被abort交易依赖的前序交易索引列表
 		// conflictDeps[i] 表示交易i被abort是因为依赖了哪些前序交易
@@ -194,11 +210,15 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 				conflictDeps[txIndex] = conflictingTxs
 			}
 		}
+		phase6Time += time.Since(t)
 
 		// 7. Re-validation：检查记录的冲突依赖前序交易是否都被abort了，如果是则挽救该交易；只要有一个前序交易没被abort，则继续abort。
+		t = time.Now()
 		ws.rechecking(execInfos, abortFlags, conflictDeps)
+		phase7Time += time.Since(t)
 
 		// 8. Commit：再统一应用写集到 snapshot cache
+		t = time.Now()
 		for txIndex, execInfo := range execInfos {
 			if abortFlags[txIndex] {
 				continue
@@ -209,8 +229,10 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		_ = ws.applySnapshotCacheToSnapshot(snapshot)
 		// 清空 snapshotCache
 		ws.clearSnapshotCache()
+		phase8Time += time.Since(t)
 
 		// 9. Transaction Reset：将上一批中最终被abort的交易放回剩余交易池txBatch，从剩余交易池中选取前BatchSize个交易进行下一轮调度
+		t = time.Now()
 		abortedTxs := make([]*commonPb.Transaction, 0)
 		committedTxs := 0
 		for i := range execInfos {
@@ -226,6 +248,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		if len(abortedTxs) > 0 {
 			txBatch = append(abortedTxs, txBatch...)
 		}
+		phase9Time += time.Since(t)
 	}
 	// todo:以区块为单位进行batchsize动态调整
 
@@ -233,6 +256,8 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 	tps := float64(len(block.Txs)) / totalTime.Seconds()
 	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v, total txs=%d, TPS=%.2f, blockheight=%d",
 		roundNum, totalTime, len(block.Txs), tps, block.Header.BlockHeight)
+	ws.log.Infof("WRIA phase time: phase1(selection)=%v phase2(execution)=%v phase3(reordering)=%v phase4(versionTagging)=%v phase5(merging)=%v phase6(conflictDetection)=%v phase7(revalidation)=%v phase8(commit)=%v phase9(txReset)=%v",
+		phase1Time, phase2Time, phase3Time, phase4Time, phase5Time, phase6Time, phase7Time, phase8Time, phase9Time)
 
 	return ws.txRWSetMap, nil, nil
 }
