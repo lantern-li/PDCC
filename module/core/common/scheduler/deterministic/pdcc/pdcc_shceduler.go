@@ -41,14 +41,13 @@ type txExecInfo struct {
 
 // WriaScheduler A deterministic parallel scheduler
 type WriaScheduler struct {
-	lock           sync.Mutex
-	log            protocol.Logger
-	chainConf      protocol.ChainConf
-	storeHelper    conf.StoreHelper
-	vmHelper       *deterministic.CommonVMHelper // Shared VM execution helper
-	txRWSetMap     map[string]*commonPb.TxRWSet  // key: string(txId), value: *commonPb.TxRWSet  todo chainmaker的这个也要改
-	txRWSetMapLock sync.Mutex                    // lock for txRWSetMap concurrent access
-	batchSize      int                           // 批处理大小，从配置文件读取或使用默认值
+	lock        sync.Mutex
+	log         protocol.Logger
+	chainConf   protocol.ChainConf
+	storeHelper conf.StoreHelper
+	vmHelper    *deterministic.CommonVMHelper // Shared VM execution helper
+	txRWSetMap  map[string]*commonPb.TxRWSet  // key: string(txId), value: *commonPb.TxRWSet  todo chainmaker的这个也要改
+	batchSize   int                           // 批处理大小，从配置文件读取或使用默认值
 }
 
 // NewWriaScheduler creates a new WRIA transaction scheduler
