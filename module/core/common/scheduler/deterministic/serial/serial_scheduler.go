@@ -43,9 +43,7 @@ type SerialScheduler struct {
 // NewSerialScheduler building a serial transaction scheduler
 func NewSerialScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, ac protocol.AccessControlProvider, metricContractInvokeCounter *prometheus.CounterVec) *SerialScheduler {
 	log := logger.GetLoggerByChain(logger.MODULE_CORE, chainConf.ChainConfig().ChainId)
-	log.DebugDynamic(func() string {
-		return "use the deterministic serial scheduler"
-	})
+	log.Infof("use the deterministic serial scheduler")
 	scheduler := &SerialScheduler{
 		lock:                        sync.Mutex{},
 		exitC:                       make(chan bool),
