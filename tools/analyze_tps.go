@@ -147,6 +147,42 @@ func parseBlockSTMLogFile(logPath string) ([]TPSData, error) {
 	return parseWriaLogFileTps(logPath)
 }
 
+// parseSerialLogFile 从日志文件中解析TPS数据（Serial调度器）
+// 日志格式: [Serial] schedule tx batch finished, blockheight XXX, success XXX, ..., tps XXX.XXX
+func parseSerialLogFile(logPath string) ([]TPSData, error) {
+	file, err := os.Open(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("无法打开日志文件: %w", err)
+	}
+	defer file.Close()
+
+	pattern := regexp.MustCompile(`\[Serial\] schedule tx batch finished, blockheight (\d+), success (\d+),.*tps ([\d.]+)`)
+
+	var data []TPSData
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		matches := pattern.FindStringSubmatch(line)
+		if len(matches) == 4 {
+			blockHeight, _ := strconv.Atoi(matches[1])
+			totalTxs, _ := strconv.Atoi(matches[2])
+			tps, _ := strconv.ParseFloat(matches[3], 64)
+			data = append(data, TPSData{
+				BlockHeight: blockHeight,
+				TotalTxs:    totalTxs,
+				TPS:         tps,
+			})
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("读取文件错误: %w", err)
+	}
+
+	return data, nil
+}
+
 // parseAriaLogFile 从日志文件中解析TPS数据（Aria调度器）
 // 日志格式: Aria schedule completed after X rounds, total time=XXms, total txs=XXX, TPS=XXX.XX, blockheight=XXX
 func parseAriaLogFile(logPath string) ([]TPSData, error) {
@@ -510,7 +546,7 @@ func createBarChart(data []TPSData, schedulerName string) *charts.Bar {
 
 func main() {
 	// 命令行参数
-	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2, reorder, graph, aria, blockstm 或 wriaPieChart")
+	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2, reorder, graph, aria, blockstm, serial 或 wriaPieChart")
 	flag.Parse()
 
 	logFile := filepath.Join("..", "build", "release", "chainmaker-v2.3.8-wx-org.chainmaker.org", "log", "system.log")
@@ -574,6 +610,10 @@ func main() {
 		schedulerName = "BlockSTM"
 		fmt.Printf("正在解析日志文件 (BlockSTM): %s\n", logFile)
 		data, err = parseBlockSTMLogFile(logFile)
+	case "serial":
+		schedulerName = "Serial"
+		fmt.Printf("正在解析日志文件 (Serial): %s\n", logFile)
+		data, err = parseSerialLogFile(logFile)
 	default:
 		schedulerName = "WRIA"
 		fmt.Printf("正在解析日志文件 (WRIA): %s\n", logFile)

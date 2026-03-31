@@ -184,8 +184,8 @@ func (ts *SerialScheduler) schedule(block *commonPb.Block, txBatch []*commonPb.T
 	block.Txs = snapshot.GetTxTable()
 
 	timeCostB := time.Since(startTime)
-	ts.log.Infof("schedule tx batch finished, success %d, txs execution cost %v, "+
-		"dag building cost %v, total used %v, tps %v", len(block.Txs), timeCostA,
+	ts.log.Infof("[Serial] schedule tx batch finished, blockheight %d, success %d, txs execution cost %v, "+
+		"dag building cost %v, total used %v, tps %v", block.Header.BlockHeight, len(block.Txs), timeCostA,
 		timeCostB-timeCostA, timeCostB, float64(len(block.Txs))/(float64(timeCostB)/1e9))
 
 	txRWSetMap := schedulerUtils.GetTxRWSetTable(snapshot, block, ts.log)
