@@ -46,7 +46,6 @@ type WriaScheduler struct {
 	chainConf      protocol.ChainConf
 	storeHelper    conf.StoreHelper
 	vmHelper       *deterministic.CommonVMHelper // Shared VM execution helper
-	snapshotCache  sync.Map                      // key: string(Write.Key), value: *commonPb.VersionedTxWrite
 	txRWSetMap     map[string]*commonPb.TxRWSet  // key: string(txId), value: *commonPb.TxRWSet  todo chainmaker的这个也要改
 	txRWSetMapLock sync.Mutex                    // lock for txRWSetMap concurrent access
 	batchSize      int                           // 批处理大小，从配置文件读取或使用默认值
@@ -74,7 +73,6 @@ func NewWriaScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, st
 		storeHelper: storeHelper,
 		txRWSetMap:  make(map[string]*commonPb.TxRWSet), // 初始化 txRWSetMap
 		batchSize:   batchSize,
-		// snapshotCache sync.Map 不需要初始化
 	}
 
 	scheduler.vmHelper = deterministic.NewCommonVMHelper(log, chainConf, vmMgr, ac)
@@ -217,18 +215,26 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		ws.rechecking(execInfos, abortFlags, conflictDeps)
 		phase7Time += time.Since(t)
 
-		// 8. Commit：再统一应用写集到 snapshot cache
+		// 8. Commit：和 graph scheduler 一样，合并写集后一次性应用到 snapshot.writeTable
 		t = time.Now()
+		mergedWrites := make(map[string]*commonPb.TxWrite) // key -> 最终要应用的 TxWrite
 		for txIndex, execInfo := range execInfos {
 			if abortFlags[txIndex] {
 				continue
 			}
-			ws.applyWSToSnapshotCache(execInfo.txRWSet, execInfo.txWriteSetWithVersion)
+			ws.txRWSetMap[execInfo.txRWSet.TxId] = execInfo.txRWSet
+			for _, w := range execInfo.txRWSet.TxWrites {
+				// txIndex 按升序遍历，后覆盖即保留序号最大的写
+				mergedWrites[string(w.Key)] = w
+			}
 		}
-		// 将 ws.snapshotCache 中的写集直接应用到 snapshot.writeTable 中， 这样下一批交易执行时，可以直接从 snapshot.writeTable 中读到
-		_ = ws.applySnapshotCacheToSnapshot(snapshot)
-		// 清空 snapshotCache
-		ws.clearSnapshotCache()
+		if len(mergedWrites) > 0 {
+			writes := make([]*commonPb.TxWrite, 0, len(mergedWrites))
+			for _, w := range mergedWrites {
+				writes = append(writes, w)
+			}
+			snapshot.ApplyWritesToWriteTable(writes)
+		}
 		phase8Time += time.Since(t)
 
 		// 9. Transaction Reset：将上一批中最终被abort的交易放回剩余交易池txBatch，从剩余交易池中选取前BatchSize个交易进行下一轮调度
@@ -369,63 +375,7 @@ func (ws *WriaScheduler) recheckTransaction(txIndex int, conflictingTxs []int, a
 	return true
 }
 
-func (ws *WriaScheduler) applyWSToSnapshotCache(txRWSet *commonPb.TxRWSet, txWritesWithVersion []*commonPb.VersionedTxWrite) {
-	ws.txRWSetMap[txRWSet.TxId] = txRWSet
-
-	for _, vw := range txWritesWithVersion {
-		key := string(vw.Write.Key)
-		ws.snapshotCache.Store(key, vw)
-	}
-}
-
-// clearSnapshotCache 清空 snapshot cache
-// 通常在一个批次调度完成后调用
-func (ws *WriaScheduler) clearSnapshotCache() {
-	ws.snapshotCache.Range(func(key, value interface{}) bool {
-		ws.snapshotCache.Delete(key)
-		return true
-	})
-	ws.log.Debug("Snapshot cache cleared")
-}
-
-// applySnapshotCacheToSnapshot 将 snapshotCache 中的写集应用到 snapshot.writeTable
-// 这样下一批交易执行时，可以直接从 snapshot.writeTable 中读取，而不用从 DB 中读取
-// 返回应用的写操作数量
-func (ws *WriaScheduler) applySnapshotCacheToSnapshot(snap protocol.Snapshot) int {
-	// 先获取 cache 大小，预分配 slice 容量
-	cacheSize := ws.getSnapshotCacheSize()
-	if cacheSize == 0 {
-		return 0
-	}
-
-	// 收集 snapshotCache 中的所有写操作
-	writes := make([]*commonPb.TxWrite, 0, cacheSize)
-	ws.snapshotCache.Range(func(key, value interface{}) bool {
-		versionedWrite, ok := value.(*commonPb.VersionedTxWrite)
-		if !ok {
-			ws.log.Warnf("Invalid value type in snapshotCache for key=%v", key)
-			return true // 继续遍历
-		}
-		// 提取 TxWrite（不需要版本信息）
-		writes = append(writes, versionedWrite.Write)
-		return true
-	})
-
-	// 批量应用到 snapshot.writeTable
-	snap.ApplyWritesToWriteTable(writes)
-
-	return len(writes)
-}
-
-// getSnapshotCacheSize 获取 cache 中的条目数量
-func (ws *WriaScheduler) getSnapshotCacheSize() int {
-	count := 0
-	ws.snapshotCache.Range(func(key, value interface{}) bool {
-		count++
-		return true
-	})
-	return count
-}
+// commit 阶段已直接合并写集并应用到 snapshot.writeTable，无需 snapshot cache
 
 // SimulateWithDag simulates the execution of transactions using the DAG in the block.
 func (ws *WriaScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.Snapshot) (map[string]*commonPb.TxRWSet, map[string]*commonPb.Result, error) {
