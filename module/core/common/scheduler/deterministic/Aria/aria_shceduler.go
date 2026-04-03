@@ -56,7 +56,7 @@ func NewAriaScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, st
 		chainConf:   chainConf,
 		storeHelper: storeHelper,
 		txRWSetMap:  make(map[string]*commonPb.TxRWSet), // 初始化 txRWSetMap
-		batchSize:   200,                                // comment：Aria的批大小是固定的，这里固定为200
+		batchSize:   100,                                // comment：Aria的批大小是固定的，这里固定为100
 		// snapshotCache sync.Map 不需要初始化
 	}
 
