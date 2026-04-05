@@ -299,6 +299,63 @@ func parseReorderLogFile(logPath string) ([]TPSData, error) {
 	return data, nil
 }
 
+// RoundNumData 存储区块高度与轮次数据
+type RoundNumData struct {
+	BlockHeight int
+	RoundNum    int
+}
+
+// parseWriaRoundNum 从日志文件中解析 WRIA 的 blockheight 和 roundNum
+func parseWriaRoundNum(logPath string) ([]RoundNumData, error) {
+	file, err := os.Open(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("无法打开日志文件: %w", err)
+	}
+	defer file.Close()
+
+	pattern := regexp.MustCompile(`WRIA schedule completed after (\d+) rounds,.*blockheight=(\d+)`)
+
+	var data []RoundNumData
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		m := pattern.FindStringSubmatch(scanner.Text())
+		if len(m) == 3 {
+			roundNum, _ := strconv.Atoi(m[1])
+			blockHeight, _ := strconv.Atoi(m[2])
+			data = append(data, RoundNumData{BlockHeight: blockHeight, RoundNum: roundNum})
+		}
+	}
+	return data, scanner.Err()
+}
+
+// createRoundNumLineChart 创建 blockheight vs roundNum 折线图
+func createRoundNumLineChart(data []RoundNumData) *charts.Line {
+	line := charts.NewLine()
+	line.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{
+			Title:    "WRIA 调度器: Block Height vs Round Number",
+			Subtitle: "区块高度与执行轮次的关系",
+		}),
+		charts.WithTooltipOpts(opts.Tooltip{}),
+		charts.WithLegendOpts(opts.Legend{}),
+		charts.WithDataZoomOpts(opts.DataZoom{Type: "slider", Start: 0, End: 100}),
+	)
+
+	xAxis := make([]string, len(data))
+	items := make([]opts.LineData, len(data))
+	for i, d := range data {
+		xAxis[i] = fmt.Sprintf("%d", d.BlockHeight)
+		items[i] = opts.LineData{Value: d.RoundNum}
+	}
+
+	line.SetXAxis(xAxis).
+		AddSeries("RoundNum", items).
+		SetSeriesOptions(
+			charts.WithMarkLineNameTypeItemOpts(opts.MarkLineNameTypeItem{Name: "平均值", Type: "average"}),
+		)
+	return line
+}
+
 // PhaseTimeData 存储9个阶段的耗时数据
 type PhaseTimeData struct {
 	Phase1Selection      float64 // ms
@@ -546,13 +603,43 @@ func createBarChart(data []TPSData, schedulerName string) *charts.Bar {
 
 func main() {
 	// 命令行参数
-	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2, reorder, graph, aria, blockstm, serial 或 wriaPieChart")
+	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2, reorder, graph, aria, blockstm, serial, wriaPieChart 或 wriaRoundNum")
 	flag.Parse()
 
 	logFile := filepath.Join("..", "build", "release", "chainmaker-v2.3.8-wx-org.chainmaker.org", "log", "system.log")
 	var schedulerName string
 	var data []TPSData
 	var err error
+
+	// wriaRoundNum 单独处理：绘制区块高度与 roundNum 关系图
+	if *schedulerType == "wriaRoundNum" {
+		fmt.Printf("正在解析 WRIA roundNum 数据: %s\n", logFile)
+		roundData, err2 := parseWriaRoundNum(logFile)
+		if err2 != nil {
+			fmt.Printf("错误: %v\n", err2)
+			os.Exit(1)
+		}
+		if len(roundData) == 0 {
+			fmt.Println("警告: 未找到 roundNum 数据")
+			os.Exit(1)
+		}
+		fmt.Printf("成功解析 %d 条记录\n", len(roundData))
+		page := components.NewPage()
+		page.AddCharts(createRoundNumLineChart(roundData))
+		outputPath := filepath.Join("wria_roundnum.html")
+		f, err3 := os.Create(outputPath)
+		if err3 != nil {
+			fmt.Printf("创建输出文件失败: %v\n", err3)
+			os.Exit(1)
+		}
+		defer f.Close()
+		if err3 = page.Render(f); err3 != nil {
+			fmt.Printf("渲染图表失败: %v\n", err3)
+			os.Exit(1)
+		}
+		fmt.Printf("图表已保存至: %s\n", outputPath)
+		return
+	}
 
 	// wriaPieChart 单独处理：只解析阶段耗时并绘制饼图
 	if *schedulerType == "wriaPieChart" {

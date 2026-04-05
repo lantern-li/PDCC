@@ -214,7 +214,7 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		ws.rechecking(execInfos, abortFlags, conflictDeps)
 		phase7Time += time.Since(t)
 
-		// 8. Commit：和 graph scheduler 一样，合并写集后一次性应用到 snapshot.writeTable
+		// 8. Commit：合并写集后一次性应用到 snapshot.writeTable
 		t = time.Now()
 		mergedWrites := make(map[string]*commonPb.TxWrite) // key -> 最终要应用的 TxWrite
 		for txIndex, execInfo := range execInfos {
