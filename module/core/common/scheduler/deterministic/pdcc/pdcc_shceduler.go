@@ -24,8 +24,15 @@ import (
 const (
 	ScheduleTimeout        = 10
 	ScheduleWithDagTimeout = 20
-	// DefaultBatchSizeMultiplier 默认批处理大小倍数（相对于CPU核心数）
-	DefaultBatchSizeMultiplier = 10
+
+	// batchSize 动态调整参数（按“本次区块”的表现来调“下一个区块”的 batchSize）
+	// 说明：只有当本次区块 tx 数足够大时，差值才具有代表性；否则跳过调整以避免抖动。
+	batchAdjustMinTxCount   = 990
+	HighBatchSizeMultiplier = 10
+	LowBatchSizeMultiplier  = 1
+
+	batchAdjustHighToLowDiff = 18
+	batchAdjustLowToHighDiff = 10
 )
 
 // txExecInfo 存储交易执行的相关信息
@@ -48,6 +55,9 @@ type WriaScheduler struct {
 	vmHelper    *deterministic.CommonVMHelper // Shared VM execution helper
 	txRWSetMap  map[string]*commonPb.TxRWSet  // key: string(txId), value: *commonPb.TxRWSet  todo chainmaker的这个也要改
 	batchSize   int                           // 批处理大小，从配置文件读取或使用默认值
+
+	highBatchSize int // 高并发 batchSize
+	lowBatchSize  int // 低并发 batchSize
 }
 
 // NewWriaScheduler creates a new WRIA transaction scheduler
@@ -56,22 +66,16 @@ func NewWriaScheduler(vmMgr protocol.VmManager, chainConf protocol.ChainConf, st
 	log.Infof("use the deterministic PDCC scheduler")
 
 	// 从配置文件读取 batch_size，如果未配置则使用默认值（CPU核心数 * 10）
-	batchSize := int(chainConf.ChainConfig().Scheduler.GetBatchSize())
-	if batchSize == 0 {
-		batchSize = runtime.NumCPU() * DefaultBatchSizeMultiplier
-		log.Infof("BatchSize not configured, using default value: %d (NumCPU=%d * %d)",
-			batchSize, runtime.NumCPU(), DefaultBatchSizeMultiplier)
-	} else {
-		batchSize = runtime.NumCPU() * batchSize
-		log.Infof("BatchSize configured from chain config: %d", batchSize)
-	}
+	_ = int(chainConf.ChainConfig().Scheduler.GetBatchSize())
 
 	scheduler := &WriaScheduler{
-		log:         log,
-		chainConf:   chainConf,
-		storeHelper: storeHelper,
-		txRWSetMap:  make(map[string]*commonPb.TxRWSet), // 初始化 txRWSetMap
-		batchSize:   batchSize,
+		log:           log,
+		chainConf:     chainConf,
+		storeHelper:   storeHelper,
+		txRWSetMap:    make(map[string]*commonPb.TxRWSet),         // 初始化 txRWSetMap
+		batchSize:     runtime.NumCPU() * HighBatchSizeMultiplier, //comment:启动时默认的batchSize
+		highBatchSize: runtime.NumCPU() * HighBatchSizeMultiplier,
+		lowBatchSize:  runtime.NumCPU() * LowBatchSizeMultiplier,
 	}
 
 	scheduler.vmHelper = deterministic.NewCommonVMHelper(log, chainConf, vmMgr, ac)
@@ -255,7 +259,8 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		}
 		phase9Time += time.Since(t)
 	}
-	// todo:以区块为单位进行batchsize动态调整
+	// 以区块为单位进行batchsize动态调整
+	ws.adjustBatchSize(len(block.Txs), roundNum)
 
 	totalTime := time.Since(startTime)
 	tps := float64(len(block.Txs)) / totalTime.Seconds()
@@ -375,6 +380,46 @@ func (ws *WriaScheduler) recheckTransaction(txIndex int, conflictingTxs []int, a
 }
 
 // commit 阶段已直接合并写集并应用到 snapshot.writeTable，无需 snapshot cache
+
+// adjustBatchSize 根据本次区块的实际回滚轮次动态调整 batchSize（用于下一个区块）。
+// 基准轮次 = ceil(blockTxCount / batchSize)（无冲突时的理论最小轮次）
+// 差值 = 实际轮次 - 基准轮次
+// 规则：
+//   - 当前 batchSize=high：diff >= batchAdjustHighToLowDiff 时降到 low
+//   - 当前 batchSize=low：diff < batchAdjustLowToHighDiff 时恢复到 high（滞回避免抖动）
+func (ws *WriaScheduler) adjustBatchSize(blockTxCount, actualRoundNum int) {
+
+	// 用“本次区块”的数据来决定“下一个区块”用什么 batchSize
+	if blockTxCount < batchAdjustMinTxCount {
+		ws.log.DebugDynamic(func() string {
+			return fmt.Sprintf("WRIA batchSize adjust skipped (txCount=%d, minTx=%d)", blockTxCount, batchAdjustMinTxCount)
+		})
+		return
+	}
+
+	baseRound := (blockTxCount + ws.batchSize - 1) / ws.batchSize // todo：确认向上取整
+
+	diff := actualRoundNum - baseRound
+
+	newBatchSize := ws.batchSize
+	if ws.batchSize == ws.highBatchSize {
+		if diff >= batchAdjustHighToLowDiff {
+			newBatchSize = ws.lowBatchSize
+		}
+	} else if ws.batchSize == ws.lowBatchSize {
+		if diff < batchAdjustLowToHighDiff {
+			newBatchSize = ws.highBatchSize
+		}
+	}
+
+	if newBatchSize != ws.batchSize {
+		ws.log.DebugDynamic(func() string {
+			return fmt.Sprintf("WRIA batchSize adjusted: %d -> %d (txCount=%d, batchUsed=%d, rounds=%d, baseRounds=%d, diff=%d)",
+				ws.batchSize, newBatchSize, blockTxCount, ws.batchSize, actualRoundNum, baseRound, diff)
+		})
+		ws.batchSize = newBatchSize
+	}
+}
 
 // SimulateWithDag simulates the execution of transactions using the DAG in the block.
 func (ws *WriaScheduler) SimulateWithDag(block *commonPb.Block, snapshot protocol.Snapshot) (map[string]*commonPb.TxRWSet, map[string]*commonPb.Result, error) {
