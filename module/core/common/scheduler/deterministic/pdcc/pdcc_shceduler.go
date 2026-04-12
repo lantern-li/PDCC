@@ -214,9 +214,9 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		phase6Time += time.Since(t)
 
 		// 7. Re-validation：检查记录的冲突依赖前序交易是否都被abort了，如果是则挽救该交易；只要有一个前序交易没被abort，则继续abort。
-		t = time.Now()
-		ws.rechecking(execInfos, abortFlags, conflictDeps)
-		phase7Time += time.Since(t)
+		//t = time.Now()
+		//ws.rechecking(execInfos, abortFlags, conflictDeps)
+		//phase7Time += time.Since(t)
 
 		// 8. Commit：合并写集后一次性应用到 snapshot.writeTable
 		t = time.Now()
