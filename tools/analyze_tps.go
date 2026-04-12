@@ -8,16 +8,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/components"
 	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
-/*
-使用方式：
-go run tools/analyze_tps.go -type graph
-*/
 // TPSData 存储解析出的TPS数据
 type TPSData struct {
 	BlockHeight int
@@ -358,6 +355,7 @@ func createRoundNumLineChart(data []RoundNumData) *charts.Line {
 
 // PhaseTimeData 存储9个阶段的耗时数据
 type PhaseTimeData struct {
+	BlockHeight          int
 	Phase1Selection      float64 // ms
 	Phase2Execution      float64
 	Phase3Reordering     float64
@@ -413,13 +411,20 @@ func parseWriaPhaseTime(logPath string) ([]PhaseTimeData, error) {
 			`phase8\(commit\)=([\d.]+(?:ns|µs|ms|s)) ` +
 			`phase9\(txReset\)=([\d.]+(?:ns|µs|ms|s))`,
 	)
+	blockHeightPattern := regexp.MustCompile(`blockheight=(\d+)`)
 
 	var data []PhaseTimeData
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		m := pattern.FindStringSubmatch(scanner.Text())
+		line := scanner.Text()
+		m := pattern.FindStringSubmatch(line)
 		if len(m) == 10 {
+			blockHeight := 0
+			if bm := blockHeightPattern.FindStringSubmatch(line); len(bm) == 2 {
+				blockHeight, _ = strconv.Atoi(bm[1])
+			}
 			data = append(data, PhaseTimeData{
+				BlockHeight:          blockHeight,
 				Phase1Selection:      parseDurationMs(m[1]),
 				Phase2Execution:      parseDurationMs(m[2]),
 				Phase3Reordering:     parseDurationMs(m[3]),
@@ -435,47 +440,176 @@ func parseWriaPhaseTime(logPath string) ([]PhaseTimeData, error) {
 	return data, scanner.Err()
 }
 
-// createPhasePieChart 创建9个阶段平均耗时饼图
-func createPhasePieChart(data []PhaseTimeData) *charts.Pie {
-	if len(data) == 0 {
-		return nil
+// createInteractivePieChartHTML 生成带联动的交互式HTML：上方饼图根据下方TPS折线图的DataZoom区间动态更新
+func createInteractivePieChartHTML(phaseData []PhaseTimeData, tpsData []TPSData, outputPath string) error {
+	// 序列化 phaseData 为 JS 数组
+	var phaseBuf strings.Builder
+	phaseBuf.WriteString("[")
+	for i, d := range phaseData {
+		label := fmt.Sprintf("%d", d.BlockHeight)
+		if d.BlockHeight == 0 {
+			label = fmt.Sprintf("%d", i+1)
+		}
+		if i > 0 {
+			phaseBuf.WriteString(",")
+		}
+		fmt.Fprintf(&phaseBuf, `{"idx":%d,"label":"%s","p1":%f,"p2":%f,"p3":%f,"p4":%f,"p5":%f,"p6":%f,"p7":%f,"p8":%f,"p9":%f}`,
+			i, label,
+			d.Phase1Selection, d.Phase2Execution, d.Phase3Reordering,
+			d.Phase4VersionTagging, d.Phase5Merging, d.Phase6ConflictDetect,
+			d.Phase7Revalidation, d.Phase8Commit, d.Phase9TxReset)
 	}
+	phaseBuf.WriteString("]")
+	phaseJS := phaseBuf.String()
 
-	names := []string{
-		"1.Selection", "2.Execution", "3.Reordering", "4.VersionTagging",
-		"5.Merging", "6.ConflictDetection", "7.Revalidation", "8.Commit", "9.TxReset",
+	// 序列化 tpsData 为 JS 数组
+	var tpsBuf strings.Builder
+	tpsBuf.WriteString("[")
+	for i, d := range tpsData {
+		if i > 0 {
+			tpsBuf.WriteString(",")
+		}
+		fmt.Fprintf(&tpsBuf, `{"blockHeight":%d,"tps":%f}`, d.BlockHeight, d.TPS)
 	}
-	sums := make([]float64, 9)
-	for _, d := range data {
-		sums[0] += d.Phase1Selection
-		sums[1] += d.Phase2Execution
-		sums[2] += d.Phase3Reordering
-		sums[3] += d.Phase4VersionTagging
-		sums[4] += d.Phase5Merging
-		sums[5] += d.Phase6ConflictDetect
-		sums[6] += d.Phase7Revalidation
-		sums[7] += d.Phase8Commit
-		sums[8] += d.Phase9TxReset
-	}
-	n := float64(len(data))
-	items := make([]opts.PieData, 9)
-	for i := range names {
-		avg := sums[i] / n
-		items[i] = opts.PieData{Name: fmt.Sprintf("%s(%.3fms)", names[i], avg), Value: avg}
-	}
+	tpsBuf.WriteString("]")
+	tpsJS := tpsBuf.String()
 
-	pie := charts.NewPie()
-	pie.SetGlobalOptions(
-		charts.WithTitleOpts(opts.Title{
-			Title:    "PDCC 各阶段平均耗时分布",
-			Subtitle: fmt.Sprintf("基于 %d 个区块的统计", len(data)),
-		}),
-		charts.WithTooltipOpts(opts.Tooltip{Formatter: "{b}: {d}%"}),
-		charts.WithLegendOpts(opts.Legend{Orient: "vertical", Right: "5%", Top: "20%"}),
-	)
-	pie.AddSeries("阶段耗时", items).
-		SetSeriesOptions(charts.WithLabelOpts(opts.Label{Show: opts.Bool(true), Formatter: "{b}"}))
-	return pie
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WRIA 阶段耗时分析</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+body { margin: 0; padding: 16px; background: #fff; font-family: sans-serif; }
+h2 { text-align: center; margin-bottom: 4px; }
+#info { text-align: center; color: #666; margin-bottom: 12px; font-size: 13px; }
+#pieChart { width: 100%%; height: 420px; }
+#lineChart { width: 100%%; height: 320px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<h2>PDCC 各阶段平均耗时分布</h2>
+<div id="info">拖动下方折线图的滑块选择区间，饼图将自动更新</div>
+<div id="pieChart"></div>
+<div id="lineChart"></div>
+<script>
+var phaseData = %s;
+var tpsData = %s;
+var phaseNames = ["1.Selection","2.Execution","3.Reordering","4.VersionTagging","5.Merging","6.ConflictDetection","7.Revalidation","8.Commit","9.TxReset"];
+var phaseKeys = ["p1","p2","p3","p4","p5","p6","p7","p8","p9"];
+
+var pieChart = echarts.init(document.getElementById('pieChart'));
+var lineChart = echarts.init(document.getElementById('lineChart'));
+
+function calcPieData(startIdx, endIdx) {
+    var sums = [0,0,0,0,0,0,0,0,0];
+    var count = 0;
+    for (var i = startIdx; i <= endIdx && i < phaseData.length; i++) {
+        for (var j = 0; j < 9; j++) {
+            sums[j] += phaseData[i][phaseKeys[j]];
+        }
+        count++;
+    }
+    if (count === 0) return [];
+    return phaseNames.map(function(name, j) {
+        var avg = sums[j] / count;
+        return { name: name + '(' + avg.toFixed(3) + 'ms)', value: avg };
+    });
+}
+
+function updatePie(startPct, endPct) {
+    var total = phaseData.length;
+    var startIdx = Math.round(startPct / 100 * total);
+    var endIdx = Math.round(endPct / 100 * total) - 1;
+    if (startIdx < 0) startIdx = 0;
+    if (endIdx >= total) endIdx = total - 1;
+    if (startIdx > endIdx) return;
+    var count = endIdx - startIdx + 1;
+    var items = calcPieData(startIdx, endIdx);
+    pieChart.setOption({
+        title: [{
+            text: 'PDCC 各阶段平均耗时分布',
+            subtext: '基于区块索引 ' + startIdx + ' ~ ' + endIdx + ' 共 ' + count + ' 个区块',
+            left: 'center'
+        }],
+        series: [{ data: items }]
+    });
+}
+
+// 初始化饼图
+pieChart.setOption({
+    tooltip: { formatter: '{b}: {d}%%' },
+    legend: { orient: 'vertical', right: '5%%', top: '20%%' },
+    series: [{
+        type: 'pie',
+        radius: '60%%',
+        center: ['40%%', '55%%'],
+        data: calcPieData(0, phaseData.length - 1),
+        label: { formatter: '{b}' }
+    }]
+});
+
+// 初始化折线图
+var tpsXAxis = tpsData.map(function(d) { return d.blockHeight > 0 ? String(d.blockHeight) : ''; });
+var tpsValues = tpsData.map(function(d) { return d.tps; });
+
+lineChart.setOption({
+    title: [{ text: 'WRIA TPS 折线图', left: 'center' }],
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: tpsXAxis, name: 'Block Height' },
+    yAxis: { type: 'value', name: 'TPS' },
+    dataZoom: [
+        { type: 'slider', start: 0, end: 100, bottom: 10 },
+        { type: 'inside', start: 0, end: 100 }
+    ],
+    series: [{
+        name: 'TPS',
+        type: 'line',
+        data: tpsValues,
+        smooth: true,
+        markLine: { data: [{ type: 'average', name: '平均值' }] }
+    }]
+});
+
+// 联动：折线图 DataZoom 变化时更新饼图
+lineChart.on('datazoom', function(params) {
+    var start = 0, end = 100;
+    if (params.batch) {
+        start = params.batch[0].start;
+        end = params.batch[0].end;
+    } else {
+        start = params.start !== undefined ? params.start : start;
+        end = params.end !== undefined ? params.end : end;
+    }
+    // TPS 和 phaseData 按索引对齐，用 TPS 的区间比例映射到 phaseData
+    var tpsTotal = tpsData.length;
+    var phaseTotal = phaseData.length;
+    var tpsStart = Math.round(start / 100 * tpsTotal);
+    var tpsEnd = Math.round(end / 100 * tpsTotal) - 1;
+    // 将 TPS 区间映射到 phaseData 区间（按比例）
+    var phaseStart = Math.round(tpsStart / tpsTotal * phaseTotal);
+    var phaseEnd = Math.round((tpsEnd + 1) / tpsTotal * phaseTotal) - 1;
+    if (phaseStart < 0) phaseStart = 0;
+    if (phaseEnd >= phaseTotal) phaseEnd = phaseTotal - 1;
+    updatePie(start, end);
+});
+
+window.addEventListener('resize', function() {
+    pieChart.resize();
+    lineChart.resize();
+});
+</script>
+</body>
+</html>`, phaseJS, tpsJS)
+
+	f, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("创建输出文件失败: %w", err)
+	}
+	defer f.Close()
+	_, err = f.WriteString(html)
+	return err
 }
 
 // calculateStats 计算统计信息
@@ -641,7 +775,7 @@ func main() {
 		return
 	}
 
-	// wriaPieChart 单独处理：只解析阶段耗时并绘制饼图
+	// wriaPieChart 单独处理：绘制阶段耗时饼图 + TPS折线图，支持滑动区间选择
 	if *schedulerType == "wriaPieChart" {
 		fmt.Printf("正在解析阶段耗时 (WRIA PieChart): %s\n", logFile)
 		phaseData, err2 := parseWriaPhaseTime(logFile)
@@ -653,18 +787,16 @@ func main() {
 			fmt.Println("警告: 未找到阶段耗时数据")
 			os.Exit(1)
 		}
-		fmt.Printf("成功解析 %d 条阶段耗时记录\n", len(phaseData))
-		page := components.NewPage()
-		page.AddCharts(createPhasePieChart(phaseData))
-		outputPath := filepath.Join("piechart.html")
-		f, err3 := os.Create(outputPath)
+		fmt.Printf("正在解析 WRIA TPS 数据: %s\n", logFile)
+		tpsData, err3 := parseWriaLogFileTps(logFile)
 		if err3 != nil {
-			fmt.Printf("创建输出文件失败: %v\n", err3)
+			fmt.Printf("错误: %v\n", err3)
 			os.Exit(1)
 		}
-		defer f.Close()
-		if err3 = page.Render(f); err3 != nil {
-			fmt.Printf("渲染图表失败: %v\n", err3)
+		fmt.Printf("成功解析 %d 条阶段耗时记录, %d 条TPS记录\n", len(phaseData), len(tpsData))
+		outputPath := filepath.Join("piechart.html")
+		if err4 := createInteractivePieChartHTML(phaseData, tpsData, outputPath); err4 != nil {
+			fmt.Printf("生成HTML失败: %v\n", err4)
 			os.Exit(1)
 		}
 		fmt.Printf("图表已保存至: %s\n", outputPath)
