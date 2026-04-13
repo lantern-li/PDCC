@@ -260,14 +260,16 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 		phase9Time += time.Since(t)
 	}
 	// 以区块为单位进行batchsize动态调整
+	t10 := time.Now()
 	ws.adjustBatchSize(len(block.Txs), roundNum)
+	phase10Time := time.Since(t10)
 
 	totalTime := time.Since(startTime)
 	tps := float64(len(block.Txs)) / totalTime.Seconds()
 	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v, total txs=%d, TPS=%.2f, blockheight=%d",
 		roundNum, totalTime, len(block.Txs), tps, block.Header.BlockHeight)
-	ws.log.Infof("WRIA phase time: phase1(selection)=%v phase2(execution)=%v phase3(reordering)=%v phase4(versionTagging)=%v phase5(merging)=%v phase6(conflictDetection)=%v phase7(revalidation)=%v phase8(commit)=%v phase9(txReset)=%v",
-		phase1Time, phase2Time, phase3Time, phase4Time, phase5Time, phase6Time, phase7Time, phase8Time, phase9Time)
+	ws.log.Infof("WRIA phase time: phase1(selection)=%v phase2(execution)=%v phase3(reordering)=%v phase4(versionTagging)=%v phase5(merging)=%v phase6(conflictDetection)=%v phase7(revalidation)=%v phase8(commit)=%v phase9(txReset)=%v phase10(batchSizeAdjust)=%v",
+		phase1Time, phase2Time, phase3Time, phase4Time, phase5Time, phase6Time, phase7Time, phase8Time, phase9Time, phase10Time)
 
 	return ws.txRWSetMap, nil, nil
 }

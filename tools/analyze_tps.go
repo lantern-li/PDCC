@@ -355,16 +355,17 @@ func createRoundNumLineChart(data []RoundNumData) *charts.Line {
 
 // PhaseTimeData 存储9个阶段的耗时数据
 type PhaseTimeData struct {
-	BlockHeight          int
-	Phase1Selection      float64 // ms
-	Phase2Execution      float64
-	Phase3Reordering     float64
-	Phase4VersionTagging float64
-	Phase5Merging        float64
-	Phase6ConflictDetect float64
-	Phase7Revalidation   float64
-	Phase8Commit         float64
-	Phase9TxReset        float64
+	BlockHeight            int
+	Phase1Selection        float64 // ms
+	Phase2Execution        float64
+	Phase3Reordering       float64
+	Phase4VersionTagging   float64
+	Phase5Merging          float64
+	Phase6ConflictDetect   float64
+	Phase7Revalidation     float64
+	Phase8Commit           float64
+	Phase9TxReset          float64
+	Phase10BatchSizeAdjust float64
 }
 
 // parseDurationMs 将 Go duration 字符串解析为毫秒
@@ -409,7 +410,8 @@ func parseWriaPhaseTime(logPath string) ([]PhaseTimeData, error) {
 			`phase6\(conflictDetection\)=([\d.]+(?:ns|µs|ms|s)) ` +
 			`phase7\(revalidation\)=([\d.]+(?:ns|µs|ms|s)) ` +
 			`phase8\(commit\)=([\d.]+(?:ns|µs|ms|s)) ` +
-			`phase9\(txReset\)=([\d.]+(?:ns|µs|ms|s))`,
+			`phase9\(txReset\)=([\d.]+(?:ns|µs|ms|s))` +
+			`(?:\s+phase10\(batchSizeAdjust\)=([\d.]+(?:ns|µs|ms|s)))?`,
 	)
 	blockHeightPattern := regexp.MustCompile(`blockheight=(\d+)`)
 
@@ -418,22 +420,27 @@ func parseWriaPhaseTime(logPath string) ([]PhaseTimeData, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		m := pattern.FindStringSubmatch(line)
-		if len(m) == 10 {
+		if len(m) >= 10 {
 			blockHeight := 0
 			if bm := blockHeightPattern.FindStringSubmatch(line); len(bm) == 2 {
 				blockHeight, _ = strconv.Atoi(bm[1])
 			}
+			phase10 := 0.0
+			if len(m) == 11 && m[10] != "" {
+				phase10 = parseDurationMs(m[10])
+			}
 			data = append(data, PhaseTimeData{
-				BlockHeight:          blockHeight,
-				Phase1Selection:      parseDurationMs(m[1]),
-				Phase2Execution:      parseDurationMs(m[2]),
-				Phase3Reordering:     parseDurationMs(m[3]),
-				Phase4VersionTagging: parseDurationMs(m[4]),
-				Phase5Merging:        parseDurationMs(m[5]),
-				Phase6ConflictDetect: parseDurationMs(m[6]),
-				Phase7Revalidation:   parseDurationMs(m[7]),
-				Phase8Commit:         parseDurationMs(m[8]),
-				Phase9TxReset:        parseDurationMs(m[9]),
+				BlockHeight:            blockHeight,
+				Phase1Selection:        parseDurationMs(m[1]),
+				Phase2Execution:        parseDurationMs(m[2]),
+				Phase3Reordering:       parseDurationMs(m[3]),
+				Phase4VersionTagging:   parseDurationMs(m[4]),
+				Phase5Merging:          parseDurationMs(m[5]),
+				Phase6ConflictDetect:   parseDurationMs(m[6]),
+				Phase7Revalidation:     parseDurationMs(m[7]),
+				Phase8Commit:           parseDurationMs(m[8]),
+				Phase9TxReset:          parseDurationMs(m[9]),
+				Phase10BatchSizeAdjust: phase10,
 			})
 		}
 	}
@@ -453,11 +460,11 @@ func createInteractivePieChartHTML(phaseData []PhaseTimeData, tpsData []TPSData,
 		if i > 0 {
 			phaseBuf.WriteString(",")
 		}
-		fmt.Fprintf(&phaseBuf, `{"idx":%d,"label":"%s","p1":%f,"p2":%f,"p3":%f,"p4":%f,"p5":%f,"p6":%f,"p7":%f,"p8":%f,"p9":%f}`,
+		fmt.Fprintf(&phaseBuf, `{"idx":%d,"label":"%s","p1":%f,"p2":%f,"p3":%f,"p4":%f,"p5":%f,"p6":%f,"p7":%f,"p8":%f,"p9":%f,"p10":%f}`,
 			i, label,
 			d.Phase1Selection, d.Phase2Execution, d.Phase3Reordering,
 			d.Phase4VersionTagging, d.Phase5Merging, d.Phase6ConflictDetect,
-			d.Phase7Revalidation, d.Phase8Commit, d.Phase9TxReset)
+			d.Phase7Revalidation, d.Phase8Commit, d.Phase9TxReset, d.Phase10BatchSizeAdjust)
 	}
 	phaseBuf.WriteString("]")
 	phaseJS := phaseBuf.String()
@@ -496,17 +503,17 @@ h2 { text-align: center; margin-bottom: 4px; }
 <script>
 var phaseData = %s;
 var tpsData = %s;
-var phaseNames = ["1.Selection","2.Execution","3.Reordering","4.VersionTagging","5.Merging","6.ConflictDetection","7.Revalidation","8.Commit","9.TxReset"];
-var phaseKeys = ["p1","p2","p3","p4","p5","p6","p7","p8","p9"];
+var phaseNames = ["1.Selection","2.Execution","3.Reordering","4.VersionTagging","5.Merging","6.ConflictDetection","7.Revalidation","8.Commit","9.TxReset","10.BatchSizeAdjust"];
+var phaseKeys = ["p1","p2","p3","p4","p5","p6","p7","p8","p9","p10"];
 
 var pieChart = echarts.init(document.getElementById('pieChart'));
 var lineChart = echarts.init(document.getElementById('lineChart'));
 
 function calcPieData(startIdx, endIdx) {
-    var sums = [0,0,0,0,0,0,0,0,0];
+    var sums = [0,0,0,0,0,0,0,0,0,0];
     var count = 0;
     for (var i = startIdx; i <= endIdx && i < phaseData.length; i++) {
-        for (var j = 0; j < 9; j++) {
+        for (var j = 0; j < 10; j++) {
             sums[j] += phaseData[i][phaseKeys[j]];
         }
         count++;
