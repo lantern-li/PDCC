@@ -153,24 +153,11 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 
 		// 3. Deterministic Reordering：依据每笔交易读写集的数量，进行重排序。每笔交易读写集的数量越多，越靠前。
 		// 使用 sort.SliceStable 保证稳定排序（相同 rwSetCount 时保持原始顺序）
-		//t = time.Now()
-		//sort.SliceStable(execInfos, func(i, j int) bool {
-		//	// 首先按 rwSetCount 降序排序（数量多的靠前）
-		//	if execInfos[i].rwSetCount != execInfos[j].rwSetCount {
-		//		return execInfos[i].rwSetCount > execInfos[j].rwSetCount
-		//	}
-		//	// rwSetCount 相同时，按原始索引升序排序（保证确定性）
-		//	return execInfos[i].originalIndex < execInfos[j].originalIndex
-		//})
-		//phase3Time += time.Since(t)
-
-		// 3. Deterministic Reordering：依据每笔交易读写集的数量，进行重排序。每笔交易读写集的数量越少，越靠前。
-		// 使用 sort.SliceStable 保证稳定排序（相同 rwSetCount 时保持原始顺序）
 		t = time.Now()
 		sort.SliceStable(execInfos, func(i, j int) bool {
-			// 首先按 rwSetCount 升序排序（数量少的靠前）
+			// 首先按 rwSetCount 降序排序（数量多的靠前）
 			if execInfos[i].rwSetCount != execInfos[j].rwSetCount {
-				return execInfos[i].rwSetCount < execInfos[j].rwSetCount
+				return execInfos[i].rwSetCount > execInfos[j].rwSetCount
 			}
 			// rwSetCount 相同时，按原始索引升序排序（保证确定性）
 			return execInfos[i].originalIndex < execInfos[j].originalIndex
