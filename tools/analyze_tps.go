@@ -28,6 +28,12 @@ type DagCostData struct {
 	DagBuildingCostMs float64
 }
 
+// PdccMetadataData 存储 WRIA/PDCC phase10(roundCommitStats) 数据
+type PdccMetadataData struct {
+	BlockHeight            int
+	RoundCommitStatsCostMs float64
+}
+
 // parseWriaLogFileTps 从日志文件中解析TPS数据（确定性调度器，如WRIA）
 func parseWriaLogFileTps(logPath string) ([]TPSData, error) {
 	file, err := os.Open(logPath)
@@ -434,6 +440,52 @@ func parseDurationMs(s string) float64 {
 	return 0
 }
 
+// parsePdccMetadataPhase10 从日志文件中解析 blockheight 与 phase10(roundCommitStats) 耗时（ms）
+// 通过 "WRIA schedule completed ... blockheight=XXX" 与紧随其后的 "WRIA phase time ... phase10(roundCommitStats)=YYY" 配对。
+func parsePdccMetadataPhase10(logPath string) ([]PdccMetadataData, error) {
+	file, err := os.Open(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("无法打开日志文件: %w", err)
+	}
+	defer file.Close()
+
+	completedPattern := regexp.MustCompile(`WRIA schedule completed after \d+ rounds,.*blockheight=(\d+)`)
+	phase10Pattern := regexp.MustCompile(`phase10\(roundCommitStats\)=([\d.]+(?:ns|µs|ms|s))`)
+
+	var (
+		data            []PdccMetadataData
+		lastBlockHeight int
+		hasBlockHeight  bool
+	)
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if m := completedPattern.FindStringSubmatch(line); len(m) == 2 {
+			lastBlockHeight, _ = strconv.Atoi(m[1])
+			hasBlockHeight = true
+			continue
+		}
+
+		if m := phase10Pattern.FindStringSubmatch(line); len(m) == 2 {
+			if !hasBlockHeight {
+				continue
+			}
+			hasBlockHeight = false
+			data = append(data, PdccMetadataData{
+				BlockHeight:            lastBlockHeight,
+				RoundCommitStatsCostMs: parseDurationMs(m[1]),
+			})
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("读取文件错误: %w", err)
+	}
+	return data, nil
+}
+
 // parseWriaPhaseTime 从日志文件中解析9个阶段的耗时数据
 func parseWriaPhaseTime(logPath string) ([]PhaseTimeData, error) {
 	file, err := os.Open(logPath)
@@ -816,9 +868,38 @@ func createOcc1DagCostLineChart(data []DagCostData) *charts.Line {
 	return line
 }
 
+// createPdccMetadataPhase10LineChart 创建 phase10(roundCommitStats) 折线图
+func createPdccMetadataPhase10LineChart(data []PdccMetadataData) *charts.Line {
+	line := charts.NewLine()
+	line.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{
+			Title:    "PDCC Metadata: Block Height vs phase10(roundCommitStats)",
+			Subtitle: "区块高度与 roundCommitStats 耗时(ms) 的关系",
+		}),
+		charts.WithTooltipOpts(opts.Tooltip{}),
+		charts.WithLegendOpts(opts.Legend{}),
+		charts.WithDataZoomOpts(opts.DataZoom{Type: "slider", Start: 0, End: 100}),
+		charts.WithYAxisOpts(opts.YAxis{Name: "phase10(roundCommitStats) (ms)"}),
+	)
+
+	xAxis := make([]string, len(data))
+	items := make([]opts.LineData, len(data))
+	for i, d := range data {
+		xAxis[i] = fmt.Sprintf("%d", d.BlockHeight)
+		items[i] = opts.LineData{Value: d.RoundCommitStatsCostMs}
+	}
+
+	line.SetXAxis(xAxis).
+		AddSeries("phase10(roundCommitStats)", items).
+		SetSeriesOptions(
+			charts.WithMarkLineNameTypeItemOpts(opts.MarkLineNameTypeItem{Name: "平均值", Type: "average"}),
+		)
+	return line
+}
+
 func main() {
 	// 命令行参数
-	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ1dag, occ2, reorder, graph, aria, blockstm, serial, wriaPieChart 或 wriaRoundNum")
+	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ1dag, occ2, reorder, graph, aria, blockstm, serial, wriaPieChart, wriaRoundNum 或 pdccmetadata")
 	flag.Parse()
 
 	logFile := filepath.Join("..", "build", "release", "chainmaker-v2.3.8-wx-org.chainmaker.org", "log", "system.log")
@@ -900,6 +981,36 @@ func main() {
 		page := components.NewPage()
 		page.AddCharts(createOcc1DagCostLineChart(dagData))
 		outputPath := filepath.Join("occ1_dag_building_cost_analysis.html")
+		f, err3 := os.Create(outputPath)
+		if err3 != nil {
+			fmt.Printf("创建输出文件失败: %v\n", err3)
+			os.Exit(1)
+		}
+		defer f.Close()
+		if err3 = page.Render(f); err3 != nil {
+			fmt.Printf("渲染图表失败: %v\n", err3)
+			os.Exit(1)
+		}
+		fmt.Printf("图表已保存至: %s\n", outputPath)
+		return
+	}
+
+	// pdccmetadata 单独处理：绘制 blockheight vs phase10(roundCommitStats) 折线图
+	if *schedulerType == "pdccmetadata" {
+		fmt.Printf("正在解析 PDCC metadata (phase10 roundCommitStats): %s\n", logFile)
+		metaData, err2 := parsePdccMetadataPhase10(logFile)
+		if err2 != nil {
+			fmt.Printf("错误: %v\n", err2)
+			os.Exit(1)
+		}
+		if len(metaData) == 0 {
+			fmt.Println("警告: 未找到 PDCC metadata 数据 (phase10 roundCommitStats)")
+			os.Exit(1)
+		}
+		fmt.Printf("成功解析 %d 条 phase10(roundCommitStats) 记录\n", len(metaData))
+		page := components.NewPage()
+		page.AddCharts(createPdccMetadataPhase10LineChart(metaData))
+		outputPath := filepath.Join("pdcc_metadata_phase10_roundCommitStats.html")
 		f, err3 := os.Create(outputPath)
 		if err3 != nil {
 			fmt.Printf("创建输出文件失败: %v\n", err3)

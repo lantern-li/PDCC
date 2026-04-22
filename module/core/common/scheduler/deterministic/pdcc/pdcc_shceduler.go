@@ -102,8 +102,11 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 	var (
 		phase1Time, phase2Time, phase3Time, phase4Time time.Duration
 		phase5Time, phase6Time, phase7Time, phase8Time time.Duration
-		phase9Time                                     time.Duration
+		phase9Time, phase10Time                        time.Duration
 	)
+
+	// 每轮提交交易数量（按 round 递增 append）
+	roundCommittedTxs := make([]int, 0, 16)
 
 	for len(txBatch) > 0 {
 		roundNum++
@@ -237,7 +240,9 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			} else {
 				execInfos[i].tx.Result = execInfos[i].txSimContext.GetTxResult()
 				block.Txs = append(block.Txs, execInfos[i].tx) // comment：可串行顺序
-				committedTxs++                                 // comment：非确定性调度中可以作为调度信息
+				t10 := time.Now()
+				committedTxs++ // comment：非确定性调度中可以作为调度信息
+				phase10Time += time.Since(t10)
 			}
 		}
 		// 将被 abort 的交易放回 txBatch 头部（prepend）
@@ -245,6 +250,11 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 			txBatch = append(abortedTxs, txBatch...)
 		}
 		phase8Time += time.Since(t)
+
+		// 记录本轮最终提交交易数（在 rechecking 后结果已确定）
+		t10 := time.Now()
+		roundCommittedTxs = append(roundCommittedTxs, committedTxs)
+		phase10Time += time.Since(t10)
 	}
 	// 以区块为单位进行batchsize动态调整
 	t9 := time.Now()
@@ -255,8 +265,8 @@ func (ws *WriaScheduler) Schedule(block *commonPb.Block, txBatch []*commonPb.Tra
 	tps := float64(len(block.Txs)) / totalTime.Seconds()
 	ws.log.Infof("WRIA schedule completed after %d rounds, total time=%v, total txs=%d, TPS=%.2f, blockheight=%d",
 		roundNum, totalTime, len(block.Txs), tps, block.Header.BlockHeight)
-	ws.log.Infof("WRIA phase time: phase1(selection)=%v phase2(execution)=%v phase3(versionTagging)=%v phase4(merging)=%v phase5(conflictDetection)=%v phase6(revalidation)=%v phase7(commit)=%v phase8(txReset)=%v phase9(batchSizeAdjust)=%v",
-		phase1Time, phase2Time, phase3Time, phase4Time, phase5Time, phase6Time, phase7Time, phase8Time, phase9Time)
+	ws.log.Infof("WRIA phase time: phase1(selection)=%v phase2(execution)=%v phase3(versionTagging)=%v phase4(merging)=%v phase5(conflictDetection)=%v phase6(revalidation)=%v phase7(commit)=%v phase8(txReset)=%v phase9(batchSizeAdjust)=%v phase10(roundCommitStats)=%v",
+		phase1Time, phase2Time, phase3Time, phase4Time, phase5Time, phase6Time, phase7Time, phase8Time, phase9Time, phase10Time)
 
 	return ws.txRWSetMap, nil, nil
 }
