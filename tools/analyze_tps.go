@@ -22,6 +22,12 @@ type TPSData struct {
 	TPS         float64
 }
 
+// DagCostData 存储 OCC1 DAG 构建耗时数据
+type DagCostData struct {
+	BlockHeight       int
+	DagBuildingCostMs float64
+}
+
 // parseWriaLogFileTps 从日志文件中解析TPS数据（确定性调度器，如WRIA）
 func parseWriaLogFileTps(logPath string) ([]TPSData, error) {
 	file, err := os.Open(logPath)
@@ -88,6 +94,42 @@ func parseOcc1LogFile(logPath string) ([]TPSData, error) {
 				BlockHeight: blockHeight,
 				TotalTxs:    totalTxs,
 				TPS:         tps,
+			})
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("读取文件错误: %w", err)
+	}
+
+	return data, nil
+}
+
+// parseOcc1DagCostLogFile 从 OCC1 日志文件中解析 DAG 构建耗时数据
+// 日志格式: schedule tx batch finished, block 1, success 1000, txs execution cost 10ms, dag building cost 2ms, total used 12ms, tps 83333
+func parseOcc1DagCostLogFile(logPath string) ([]DagCostData, error) {
+	file, err := os.Open(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("无法打开日志文件: %w", err)
+	}
+	defer file.Close()
+
+	pattern := regexp.MustCompile(`schedule tx batch finished, block (\d+), success \d+, txs execution cost [^,]+, dag building cost ([\d.]+(?:ns|µs|ms|s)),`)
+
+	var data []DagCostData
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		matches := pattern.FindStringSubmatch(line)
+
+		if len(matches) == 3 {
+			blockHeight, _ := strconv.Atoi(matches[1])
+			dagCostMs := parseDurationMs(matches[2])
+
+			data = append(data, DagCostData{
+				BlockHeight:       blockHeight,
+				DagBuildingCostMs: dagCostMs,
 			})
 		}
 	}
@@ -735,9 +777,48 @@ func createBarChart(data []TPSData, schedulerName string) *charts.Bar {
 	return bar
 }
 
+// createOcc1DagCostLineChart 创建 OCC1 DAG 构建耗时折线图
+func createOcc1DagCostLineChart(data []DagCostData) *charts.Line {
+	line := charts.NewLine()
+	line.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{
+			Title:    "OCC1 DAG Building Cost 分析: Block Height vs Cost",
+			Subtitle: "区块高度与 DAG 构建耗时(ms) 的关系",
+		}),
+		charts.WithTooltipOpts(opts.Tooltip{}),
+		charts.WithLegendOpts(opts.Legend{}),
+		charts.WithDataZoomOpts(opts.DataZoom{
+			Type:  "slider",
+			Start: 0,
+			End:   100,
+		}),
+		charts.WithYAxisOpts(opts.YAxis{
+			Name: "DAG Building Cost (ms)",
+		}),
+	)
+
+	xAxis := make([]string, len(data))
+	costItems := make([]opts.LineData, len(data))
+	for i, d := range data {
+		xAxis[i] = fmt.Sprintf("%d", d.BlockHeight)
+		costItems[i] = opts.LineData{Value: d.DagBuildingCostMs}
+	}
+
+	line.SetXAxis(xAxis).
+		AddSeries("DAG Building Cost(ms)", costItems).
+		SetSeriesOptions(
+			charts.WithMarkLineNameTypeItemOpts(opts.MarkLineNameTypeItem{
+				Name: "平均值",
+				Type: "average",
+			}),
+		)
+
+	return line
+}
+
 func main() {
 	// 命令行参数
-	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ2, reorder, graph, aria, blockstm, serial, wriaPieChart 或 wriaRoundNum")
+	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ1dag, occ2, reorder, graph, aria, blockstm, serial, wriaPieChart 或 wriaRoundNum")
 	flag.Parse()
 
 	logFile := filepath.Join("..", "build", "release", "chainmaker-v2.3.8-wx-org.chainmaker.org", "log", "system.log")
@@ -797,6 +878,36 @@ func main() {
 		outputPath := filepath.Join("piechart.html")
 		if err4 := createInteractivePieChartHTML(phaseData, tpsData, outputPath); err4 != nil {
 			fmt.Printf("生成HTML失败: %v\n", err4)
+			os.Exit(1)
+		}
+		fmt.Printf("图表已保存至: %s\n", outputPath)
+		return
+	}
+
+	// occ1dag 单独处理：绘制区块高度与 DAG 构建耗时关系图
+	if *schedulerType == "occ1dag" {
+		fmt.Printf("正在解析 OCC1 DAG 构建耗时数据: %s\n", logFile)
+		dagData, err2 := parseOcc1DagCostLogFile(logFile)
+		if err2 != nil {
+			fmt.Printf("错误: %v\n", err2)
+			os.Exit(1)
+		}
+		if len(dagData) == 0 {
+			fmt.Println("警告: 未找到 OCC1 DAG 构建耗时数据")
+			os.Exit(1)
+		}
+		fmt.Printf("成功解析 %d 条 DAG 构建耗时记录\n", len(dagData))
+		page := components.NewPage()
+		page.AddCharts(createOcc1DagCostLineChart(dagData))
+		outputPath := filepath.Join("occ1_dag_building_cost_analysis.html")
+		f, err3 := os.Create(outputPath)
+		if err3 != nil {
+			fmt.Printf("创建输出文件失败: %v\n", err3)
+			os.Exit(1)
+		}
+		defer f.Close()
+		if err3 = page.Render(f); err3 != nil {
+			fmt.Printf("渲染图表失败: %v\n", err3)
 			os.Exit(1)
 		}
 		fmt.Printf("图表已保存至: %s\n", outputPath)
