@@ -1,0 +1,6 @@
+.idea
+bin
+*.log
+*.log.*
+cover.out
+test

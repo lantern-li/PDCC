@@ -1,0 +1,14 @@
+.idea
+bin
+*.log
+*.html
+*.log.*
+cover.out
+vm_mgr/vendor
+test/testdata/org1
+test/testdata/tmp
+test/org1
+ut
+test/result
+
+.vscode

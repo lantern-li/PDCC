@@ -1,0 +1,6 @@
+.idea
+bin
+log
+testtmp
+default.*
+cover.out
