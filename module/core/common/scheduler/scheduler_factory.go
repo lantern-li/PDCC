@@ -12,8 +12,6 @@ import (
 	"sync"
 
 	aria "chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/Aria"
-	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/blockstm"
-	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/graph"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"chainmaker.org/chainmaker/common/v2/monitor"
@@ -23,7 +21,6 @@ import (
 	"chainmaker.org/chainmaker/protocol/v2"
 
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/pdcc"
-	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/reorder"
 	"chainmaker.org/chainmaker-go/module/core/common/scheduler/deterministic/serial"
 	"chainmaker.org/chainmaker-go/module/core/provider/conf"
 )
@@ -75,16 +72,10 @@ func (sf TxSchedulerFactory) NewTxScheduler(vmMgr protocol.VmManager, chainConf 
 	case config.ProcessType_EXECUTE_AFTER_PROPOSE:
 		if scheduler.AlgorithmType == config.AlgorithmType_SERIAL {
 			return serial.NewSerialScheduler(vmMgr, chainConf, ac, metricContractInvokeCounter)
-		} else if scheduler.AlgorithmType == config.AlgorithmType_REORDER {
-			return reorder.NewReorderTxScheduler(vmMgr, chainConf, storeHelper, ac)
 		} else if scheduler.AlgorithmType == config.AlgorithmType_WRIA {
 			return wria.NewWriaScheduler(vmMgr, chainConf, storeHelper, ac)
-		} else if scheduler.AlgorithmType == config.AlgorithmType_GRAPH {
-			return graph.NewGraphScheduler(vmMgr, chainConf, storeHelper, ac)
 		} else if scheduler.AlgorithmType == config.AlgorithmType_ARIA {
 			return aria.NewAriaScheduler(vmMgr, chainConf, storeHelper, ac)
-		} else if scheduler.AlgorithmType == config.AlgorithmType_BLOCKSTM {
-			return blockstm.NewBlockStmScheduler(vmMgr, chainConf, storeHelper, ac)
 		}
 	}
 	panic(fmt.Sprintf("invaild scheduler config  %+v", scheduler))

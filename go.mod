@@ -3,7 +3,7 @@ module chainmaker.org/chainmaker-go
 go 1.18
 
 require (
-	chainmaker.org/chainmaker/pb-go/v2 v2.3.8-0.20260311065141-43294772e6cb
+	chainmaker.org/chainmaker/pb-go/v2 v2.3.8-0.20260311065141-43294772e6cb //开源
 	code.cloudfoundry.org/bytefmt v0.0.0-20211005130812-5bb3c17173e5
 	github.com/Rican7/retry v0.1.0
 	github.com/Workiva/go-datastructures v1.0.53
@@ -33,8 +33,6 @@ require (
 	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.56.2
 )
-
-require github.com/emirpasic/gods v1.18.1
 
 require (
 	chainmaker.org/chainmaker/libp2p-pubsub v1.1.5 // indirect
@@ -252,7 +250,7 @@ require (
 
 require (
 	chainmaker.org/chainmaker/chainconf/v2 v2.3.5
-	chainmaker.org/chainmaker/common/v2 v2.3.9-0.20251107092029-a26539df8b03
+	chainmaker.org/chainmaker/common/v2 v2.3.9-0.20251107092029-a26539df8b03 // 开源
 	chainmaker.org/chainmaker/consensus-dpos/v2 v2.3.5
 	chainmaker.org/chainmaker/consensus-maxbft/v2 v2.3.5
 	chainmaker.org/chainmaker/consensus-raft/v2 v2.3.5
