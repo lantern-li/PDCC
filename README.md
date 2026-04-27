@@ -3,11 +3,6 @@
 
 ChainMaker aims to use standardized and modularized components to build a blockchain infrastructure that can be utilized to construct various blockchain systems for a wide-range of applications,  advancing blockchain developing from the “pre-industrial” era to the “industrial” era of automated assembly.
 
-# Quick Start
-Please visit the following links to get started with ChainMaker.
-- [长安链 · ChainMaker Docs](https://docs.chainmaker.org.cn/ "长安链 · ChainMaker Docs")
-- [长安链 · ChainMaker Community](https://www.chainmaker.org.cn/ "长安链 · ChainMaker Community")
-
 # Build (Vendor)
 
 This repository vendors its Go dependencies under `vendor/` for reproducible/offline builds.
@@ -17,6 +12,21 @@ make chainmaker-vendor
 ```
 
 The binary will be generated at `bin/chainmaker`.
+
+# Run Chainmaker
+## 1. Build executable binaries
+```bash
+make chainmaker-vendor
+cp bin/chainmaker build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/bin/
+```
+## 2. Modify configuration
+```bash
+vim build/release
+/chainmaker-v2.3.8-wx-org.chainmaker.org/config/wx-org.chainmak
+er.org/chainconfig/bc1.yml
+```
+Find the `scheduler settings` and update the parameters based on the desired execution mechanism.
+
 
 # License
 
