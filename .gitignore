@@ -9,15 +9,15 @@ module/store/store
 .idea
 **/*.exe
 **/*.log
-release
-/bin
+/release
 *.log.*
 /config-sql/
 **/crypto-config/
+!build/crypto-config/
+!build/crypto-config/**
 /testdata
 */main
 test/*/main
-build
 pkg
 tools
 tools/cmc/cmc
@@ -30,7 +30,7 @@ main/chainmaker
 cover.out
 test/send_proposal_request_ci/data/
 test/send_proposal_request_ci/chainmaker
-/tools/chainmaker-cryptogen/
+/tools/chainmaker-cryptogen
 commit_id
 
 # cmc testdata crypto-config stuff
