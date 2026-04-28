@@ -73,7 +73,11 @@ netstat -lptn | grep 1230
 ## 4. Send transaction loads to conduct pressure testing.
 The program for clients to send transactions is available at:
 https://github.com/lantern-li/sdk-go-client
-
+**Note**
+During the test, you can monitor the real-time status of ChainMaker by running the following command to track the TPS (Transactions Per Second):
+```bash
+tail -f /build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/log/system.log | grep -i tps
+```
 ## 5. Performance Statistics
 After the benchmark completes, you can use the analysis tools provided by the authors. Detailed instructions are available in tools/README.md.
 ```bash
