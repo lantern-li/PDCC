@@ -21,9 +21,7 @@ cp bin/chainmaker build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/bin/
 ```
 ## 2. Modify configuration
 ```bash
-vim build/release
-/chainmaker-v2.3.8-wx-org.chainmaker.org/config/wx-org.chainmak
-er.org/chainconfig/bc1.yml
+vim build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/config/wx-org.chainmaker.org/chainconfig/bc1.yml
 ```
 When modifying the execution mechanism of ChainMaker, please locate the `scheduler` field in the `bc1.yml` configuration file.
 
