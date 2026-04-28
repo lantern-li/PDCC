@@ -13,7 +13,7 @@ make chainmaker-vendor
 
 The binary will be generated at `bin/chainmaker`.
 
-# Run Chainmaker
+# Start Chainmaker
 ## 1. Build executable binaries
 ```bash
 make chainmaker-vendor
@@ -25,8 +25,61 @@ vim build/release
 /chainmaker-v2.3.8-wx-org.chainmaker.org/config/wx-org.chainmak
 er.org/chainconfig/bc1.yml
 ```
-Find the `scheduler settings` and update the parameters based on the desired execution mechanism.
+When modifying the execution mechanism of ChainMaker, please locate the `scheduler` field in the `bc1.yml` configuration file.
 
+Choose any of the following mechanisms based on your requirements. When modifying, ensure that you only change the `process_type` and `algorithm_type` parameters. Keep all other settings unchanged.
+### 2.1 PDCC Mechanism
+To run ChainMaker with the PDCC mechanism, use the following configuration:
+```yaml
+scheduler:
+  process_type: 1
+  algorithm_type: 3
+```
+### 2.2 OCC Mechanism (Optimistic Concurrency Control)
+To run ChainMaker with the OCC mechanism, use the following configuration:
+```yaml
+scheduler:
+  process_type: 0
+  algorithm_type: 0
+```
+### 2.3 Aria Mechanism
+To run ChainMaker with the Aria mechanism, use the following configuration:
+```yaml
+scheduler:
+  process_type: 1
+  algorithm_type: 6
+```
+### 2.4 Serial Mechanism
+To run ChainMaker with the Serial mechanism, use the following configuration:
+```yaml
+scheduler:
+  process_type: 1
+  algorithm_type: 1
+```
+## 3. Run Chainmaker
+Start the ChainMaker node.
+```bash
+ cd scripts/
+./cluster_quick_start.sh normal
+```
+Check whether the process exists.
+```bash
+ps -ef|grep chainmaker | grep -v grep
+```
+Check whether the port is listening.
+```bash
+netstat -lptn | grep 1230
+```
+## 4. Send transaction loads to conduct pressure testing.
+The program for clients to send transactions is available at:
+https://github.com/lantern-li/sdk-go-client
+
+## 5. Performance Statistics
+After the pressure test completes, you can use the following tools provided by the authors for analysis.
+```bash
+cd tools/
+go run analyze_tps.go -type XXX
+```
 
 # License
 
