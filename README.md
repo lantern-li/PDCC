@@ -57,7 +57,7 @@ scheduler:
   algorithm_type: 1
 ```
 ## 3. Run Chainmaker
-Start the ChainMaker node.
+Once you have selected your configuration, you can start the ChainMaker node.
 ```bash
  cd scripts/
 ./cluster_quick_start.sh normal
@@ -75,11 +75,18 @@ The program for clients to send transactions is available at:
 https://github.com/lantern-li/sdk-go-client
 
 ## 5. Performance Statistics
-After the pressure test completes, you can use the following tools provided by the authors for analysis.
+After the benchmark completes, you can use the analysis tools provided by the authors. Detailed instructions are available in tools/README.md.
 ```bash
 cd tools/
 go run analyze_tps.go -type XXX
 ```
+## 6. Stop Chainmaker and Clean Up
+Once the testing is complete, use the following commands to stop ChainMaker and clean up relevant data and log files.
+```bash
+cd scripts
+./cluster_quick_stop.sh clean
+```
+
 
 # License
 
