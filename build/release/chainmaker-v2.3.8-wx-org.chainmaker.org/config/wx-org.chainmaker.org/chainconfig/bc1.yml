@@ -139,10 +139,7 @@ scheduler:
   # Scheduling algorithm:
   # 0: RANDOM - 非确定性随机并行执行
   # 1: SERIAL - 串行确定性执行
-  # 2: REORDER - 重排序确定性执行
-  # 3: WRIA - WRIA确定性执行
-  # 4: Block-STM
-  # 5: GRAPH - 图调度
+  # 3: PDCC - WRIA确定性执行
   # 6: ARIA
   algorithm_type: 3
   # Set to a multiple of the number of CPU cores. Default: 0

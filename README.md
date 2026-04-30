@@ -3,8 +3,12 @@
 
 ChainMaker aims to use standardized and modularized components to build a blockchain infrastructure that can be utilized to construct various blockchain systems for a wide-range of applications,  advancing blockchain developing from the “pre-industrial” era to the “industrial” era of automated assembly.
 
-# Build (Vendor)
+# Supplemental Material
+Detailed supporting materials for PDCC's experimental evaluation are available in the `ExperimentalRecord/ folder`.
 
+To reproduce the experimental results presented in this study, please refer to the following guidelines.
+
+# Build (Vendor)
 This repository vendors its Go dependencies under `vendor/` for reproducible/offline builds.
 
 ```bash
