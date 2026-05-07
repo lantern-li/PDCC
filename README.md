@@ -20,6 +20,7 @@ The binary will be generated at `bin/chainmaker`.
 # Start Chainmaker
 ## 1. Build executable binaries
 ```bash
+cd PDCC/
 make chainmaker-vendor
 cp bin/chainmaker build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/bin/
 ```
