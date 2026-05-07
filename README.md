@@ -4,7 +4,7 @@
 ChainMaker aims to use standardized and modularized components to build a blockchain infrastructure that can be utilized to construct various blockchain systems for a wide-range of applications,  advancing blockchain developing from the “pre-industrial” era to the “industrial” era of automated assembly.
 
 # Supplemental Material
-Detailed supporting materials for PDCC's experimental evaluation are available in the `ExperimentalRecord/ folder`.
+Detailed supporting materials for PDCC's experimental evaluation are available in the `ExperimentalRecord/` folder.
 
 To reproduce the experimental results presented in this study, please refer to the following guidelines.
 
@@ -93,7 +93,7 @@ Once the testing is complete, use the following commands to stop ChainMaker and 
 cd scripts
 ./cluster_quick_stop.sh clean
 ```
-
+# todo in somewhere wira means pdcc
 
 # License
 
