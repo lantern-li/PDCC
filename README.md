@@ -101,6 +101,8 @@ Supported `-type` values:
 - `wriaRoundNum`: parse PDCC blockheight vs roundNum, and output a line chart
 - `pdccmetadata`: parse PDCC `phase10(roundCommitStats)` cost, and output a line chart
 
+After that, please open the generated HTML file in your browser to view the interactive charts.
+
 ## 6. Stop Chainmaker and Clean Up
 Once the testing is complete, use the following commands to stop ChainMaker and clean up relevant data and log files.
 ```bash
