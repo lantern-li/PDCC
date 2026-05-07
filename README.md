@@ -86,13 +86,13 @@ tail -f /build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/log/system.log | 
 ## 5. Performance Statistics
 After the benchmark completes, you can use the analysis tools provided by the authors. Detailed instructions are available in tools/README.md.
 ```bash
-cd tools/
+cd PDCC/tools/
 go run analyze_tps.go -type XXX
 ```
 ## 6. Stop Chainmaker and Clean Up
 Once the testing is complete, use the following commands to stop ChainMaker and clean up relevant data and log files.
 ```bash
-cd scripts
+cd PDCC/scripts
 ./cluster_quick_stop.sh clean
 ```
 # todo in somewhere wira means pdcc
