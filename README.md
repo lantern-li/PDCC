@@ -62,7 +62,7 @@ scheduler:
 ## 3. Run Chainmaker
 Once you have selected your configuration, you can start the ChainMaker node.
 ```bash
- cd scripts/
+ cd PDCC/scripts/
 ./cluster_quick_start.sh normal
 ```
 Check whether the process exists.
