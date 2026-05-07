@@ -85,10 +85,22 @@ tail -f build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/log/system.log | g
 ```
 ## 5. Performance Statistics
 After the benchmark completes, you can use the analysis tools provided by the authors. Detailed instructions are available in tools/README.md.
+## Quick Start
 ```bash
 cd PDCC/tools/
 go run analyze_tps.go -type XXX
 ```
+Supported `-type` values:
+- `wria`: parse PDCC TPS, output line chart 
+- `occ1`: parse OCC1 TPS, output line chart 
+- `occ2`: parse OCC2 TPS, output line chart
+- `aria`: parse Aria TPS, output line chart
+- `serial`: parse Serial TPS, output line chart
+- `occ1dag`: parse OCC1 DAG building cost (ms) and output a line chart
+- `wriaPieChart`: parse PDCC 9-phase timing + TPS, and output an HTML with a “range-linked pie chart”
+- `wriaRoundNum`: parse PDCC blockheight vs roundNum, and output a line chart
+- `pdccmetadata`: parse PDCC `phase10(roundCommitStats)` cost, and output a line chart
+
 ## 6. Stop Chainmaker and Clean Up
 Once the testing is complete, use the following commands to stop ChainMaker and clean up relevant data and log files.
 ```bash

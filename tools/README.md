@@ -32,15 +32,15 @@ Flags:
 
 Supported `-type` values (kept in sync with the code):
 
-- `wria`: parse WRIA TPS, output line chart + bar chart
+- `wria`: parse PDCC TPS, output line chart + bar chart
 - `occ1`: parse OCC1 TPS, output line chart + bar chart
 - `occ2`: parse OCC2 TPS, output line chart + bar chart
 - `aria`: parse Aria TPS, output line chart + bar chart
 - `serial`: parse Serial TPS, output line chart + bar chart
 - `occ1dag`: parse OCC1 DAG building cost (ms) and output a line chart
-- `wriaPieChart`: parse WRIA 9-phase timing + TPS, and output an HTML with a “range-linked pie chart”
-- `wriaRoundNum`: parse WRIA blockheight vs roundNum, and output a line chart
-- `pdccmetadata`: parse WRIA/PDCC `phase10(roundCommitStats)` cost, and output a line chart
+- `wriaPieChart`: parse PDCC 9-phase timing + TPS, and output an HTML with a “range-linked pie chart”
+- `wriaRoundNum`: parse PDCC blockheight vs roundNum, and output a line chart
+- `pdccmetadata`: parse PDCC `phase10(roundCommitStats)` cost, and output a line chart
 
 ### Output files
 
