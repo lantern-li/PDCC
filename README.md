@@ -104,10 +104,23 @@ Supported `-type` values:
 
 After that, please open the generated HTML file in your browser to view the interactive charts.
 
+**Note:** If you wish to conduct the next test case(e.g., a different skew or a different workload), it is strongly recommended to restart the chain before proceeding, as follows:
+```bash
+cd PDCC/scripts
+./cluster_quick_stop.sh clean
+./cluster_quick_start.sh normal
+## Then you can send the next test case.
+```
+
+**Note:** This open-source version of ChainMaker does not currently support hot-swapping of concurrency control algorithms. If you wish to switch the concurrency control mechanism, you must first execute the following command to stop the chain, and then return to **Step 2: Modify configuration**.
+```bash
+cd PDCC/scripts
+./cluster_quick_stop.sh clean
+```
+
 ## 6. Stop Chainmaker and Clean Up
 Once the testing is complete, use the following commands to stop ChainMaker and clean up relevant data and log files.
 
-**Note:** This open-source version of ChainMaker does not currently support hot-swapping of concurrency control algorithms. If you wish to switch the concurrency control mechanism, you must first execute the following command to stop the chain, and then return to **Step 2: Modify configuration**.
 ```bash
 cd PDCC/scripts
 ./cluster_quick_stop.sh clean
