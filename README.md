@@ -109,7 +109,6 @@ Once the testing is complete, use the following commands to stop ChainMaker and 
 cd PDCC/scripts
 ./cluster_quick_stop.sh clean
 ```
-# todo in somewhere wira means pdcc
 
 # License
 
