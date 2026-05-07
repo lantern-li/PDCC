@@ -81,7 +81,7 @@ https://github.com/lantern-li/sdk-go-client
 During the test, you can monitor the real-time status of ChainMaker by running the following command to track the TPS (Transactions Per Second):
 ```bash
 cd PDCC/
-tail -f /build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/log/system.log | grep -i tps
+tail -f build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/log/system.log | grep -i tps
 ```
 ## 5. Performance Statistics
 After the benchmark completes, you can use the analysis tools provided by the authors. Detailed instructions are available in tools/README.md.
