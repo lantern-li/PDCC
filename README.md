@@ -109,7 +109,7 @@ After that, please open the generated HTML file in your browser to view the inte
 cd PDCC/scripts
 ./cluster_quick_stop.sh clean
 ./cluster_quick_start.sh normal
-## Then you can send the next test case.
+## Then you can send the next test case using sdk-go-client.
 ```
 
 **Note:** This open-source version of ChainMaker does not currently support hot-swapping of concurrency control algorithms. If you wish to switch the concurrency control mechanism, you must first execute the following command to stop the chain, and then return to **Step 2: Modify configuration**.
