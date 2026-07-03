@@ -32,29 +32,29 @@ vim build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/config/wx-org.chainmak
 When modifying the execution mechanism of ChainMaker, please locate the `scheduler` field in the `bc1.yml` configuration file.
 
 Choose any of the following mechanisms based on your requirements. When modifying, ensure that you only change the `process_type` and `algorithm_type` parameters. Keep all other settings unchanged.
-### 2.1 PDCC Mechanism
-To run ChainMaker with the PDCC mechanism, use the following configuration:
+### 2.1 PDCC Protocol
+To run ChainMaker with the PDCC Protocol, use the following configuration:
 ```yaml
 scheduler:
   process_type: 1
   algorithm_type: 3
 ```
-### 2.2 OCC Mechanism (Optimistic Concurrency Control)
-To run ChainMaker with the OCC mechanism, use the following configuration:
+### 2.2 CM-Exe \& CM-Rep
+To run native non-deterministic concurrency control protocols of ChainMaker, use the following configuration:
 ```yaml
 scheduler:
   process_type: 0
   algorithm_type: 0
 ```
-### 2.3 Aria Mechanism
-To run ChainMaker with the Aria mechanism, use the following configuration:
+### 2.3 Aria Protocol
+To run ChainMaker with the Aria Protocol, use the following configuration:
 ```yaml
 scheduler:
   process_type: 1
   algorithm_type: 6
 ```
-### 2.4 Serial Mechanism
-To run ChainMaker with the Serial mechanism, use the following configuration:
+### 2.4 Serial
+To run ChainMaker with the serial execution, use the following configuration:
 ```yaml
 scheduler:
   process_type: 1
@@ -74,9 +74,9 @@ Check whether the port is listening.
 ```bash
 netstat -lptn | grep 1230
 ```
-## 4. Send transaction loads to conduct pressure testing.
+## 4. Send transaction workloads to conduct pressure testing.
 The program for clients to send transactions is available at:
-https://github.com/lantern-li/sdk-go-client
+https://anonymous.4open.science/r/sdk-go-client/README.md
 
 **Note**
 During the test, you can monitor the real-time status of ChainMaker by running the following command to track the TPS (Transactions Per Second):
@@ -93,8 +93,8 @@ go run analyze_tps.go -type XXX
 ```
 Supported `-type` values:
 - `wria`: parse PDCC TPS, output line chart 
-- `occ1`: parse OCC1 TPS, output line chart 
-- `occ2`: parse OCC2 TPS, output line chart
+- `occ1`: parse CM-Exe TPS, output line chart 
+- `occ2`: parse CM-Rep TPS, output line chart
 - `aria`: parse Aria TPS, output line chart
 - `serial`: parse Serial TPS, output line chart
 - `occ1dag`: parse OCC1 DAG building cost (ms) and output a line chart
@@ -112,7 +112,7 @@ cd PDCC/scripts
 ## Then you can send the next test case using sdk-go-client.
 ```
 
-**Note:** This open-source version of ChainMaker does not currently support hot-swapping of concurrency control algorithms. If you wish to switch the concurrency control mechanism, you must first execute the following command to stop the chain, and then return to **Step 2: Modify configuration**.
+**Note:** This open-source version of ChainMaker does not currently support hot-swapping of concurrency control protocols. If you wish to switch the concurrency control protocol, you must first execute the following command to stop the chain, and then return to **Step 2: Modify configuration**.
 ```bash
 cd PDCC/scripts
 ./cluster_quick_stop.sh clean
