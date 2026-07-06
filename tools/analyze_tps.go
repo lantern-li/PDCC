@@ -899,7 +899,7 @@ func createPdccMetadataPhase10LineChart(data []PdccMetadataData) *charts.Line {
 
 func main() {
 	// 命令行参数
-	schedulerType := flag.String("type", "wria", "调度器类型: wria, occ1, occ1dag, occ2, reorder, graph, aria, blockstm, serial, wriaPieChart, wriaRoundNum 或 pdccmetadata")
+	schedulerType := flag.String("type", "pdcc", "调度器类型: pdcc, cm-exe, occ1dag, cm-rep, reorder, graph, aria, blockstm, serial, pdccPieChart, pdccRoundNum 或 pdccmetadata")
 	flag.Parse()
 
 	logFile := filepath.Join("..", "build", "release", "chainmaker-v2.3.8-wx-org.chainmaker.org", "log", "system.log")
@@ -907,8 +907,8 @@ func main() {
 	var data []TPSData
 	var err error
 
-	// wriaRoundNum 单独处理：绘制区块高度与 roundNum 关系图
-	if *schedulerType == "wriaRoundNum" {
+	// pdccRoundNum 单独处理：绘制区块高度与 roundNum 关系图
+	if *schedulerType == "pdccRoundNum" {
 		fmt.Printf("正在解析 WRIA roundNum 数据: %s\n", logFile)
 		roundData, err2 := parseWriaRoundNum(logFile)
 		if err2 != nil {
@@ -937,8 +937,8 @@ func main() {
 		return
 	}
 
-	// wriaPieChart 单独处理：绘制阶段耗时饼图 + TPS折线图，支持滑动区间选择
-	if *schedulerType == "wriaPieChart" {
+	// pdccPieChart 单独处理：绘制阶段耗时饼图 + TPS折线图，支持滑动区间选择
+	if *schedulerType == "pdccPieChart" {
 		fmt.Printf("正在解析阶段耗时 (WRIA PieChart): %s\n", logFile)
 		phaseData, err2 := parseWriaPhaseTime(logFile)
 		if err2 != nil {
@@ -1027,13 +1027,13 @@ func main() {
 
 	// 根据调度器类型选择不同的解析函数
 	switch *schedulerType {
-	case "occ1":
-		schedulerName = "OCC1"
-		fmt.Printf("正在解析日志文件 (OCC1): %s\n", logFile)
+	case "cm-exe":
+		schedulerName = "CM-Exe"
+		fmt.Printf("正在解析日志文件 (CM-Exe): %s\n", logFile)
 		data, err = parseOcc1LogFile(logFile)
-	case "occ2":
-		schedulerName = "OCC2"
-		fmt.Printf("正在解析日志文件 (OCC2): %s\n", logFile)
+	case "cm-rep":
+		schedulerName = "CM-Rep"
+		fmt.Printf("正在解析日志文件 (CM-Rep): %s\n", logFile)
 		data, err = parseOcc2LogFile(logFile)
 	case "reorder":
 		schedulerName = "Reorder"
@@ -1055,10 +1055,13 @@ func main() {
 		schedulerName = "Serial"
 		fmt.Printf("正在解析日志文件 (Serial): %s\n", logFile)
 		data, err = parseSerialLogFile(logFile)
-	default:
-		schedulerName = "WRIA"
-		fmt.Printf("正在解析日志文件 (WRIA): %s\n", logFile)
+	case "pdcc":
+		schedulerName = "PDCC"
+		fmt.Printf("正在解析日志文件 (PDCC): %s\n", logFile)
 		data, err = parseWriaLogFileTps(logFile)
+	default:
+		fmt.Printf("错误: 不支持的调度器类型: %s\n", *schedulerType)
+		os.Exit(1)
 	}
 
 	if err != nil {

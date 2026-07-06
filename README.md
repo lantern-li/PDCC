@@ -31,7 +31,7 @@ vim build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/config/wx-org.chainmak
 ```
 When modifying the execution mechanism of ChainMaker, please locate the `scheduler` field in the `bc1.yml` configuration file.
 
-Choose any of the following mechanisms based on your requirements. When modifying, ensure that you only change the `process_type` and `algorithm_type` parameters. Keep all other settings unchanged.
+Choose any of the following protocols based on your requirements. When modifying, ensure that you only change the `process_type` and `algorithm_type` parameters. Keep all other settings unchanged.
 ### 2.1 PDCC Protocol
 To run ChainMaker with the PDCC Protocol, use the following configuration:
 ```yaml
@@ -85,22 +85,20 @@ cd PDCC/
 tail -f build/release/chainmaker-v2.3.8-wx-org.chainmaker.org/log/system.log | grep -i tps
 ```
 ## 5. Performance Statistics
-After the benchmark completes, you can use the analysis tools provided by the authors. Detailed instructions are available in tools/README.md.
+After the benchmark completes, you can use the analysis tools provided by the authors.
 ## Quick Start
 ```bash
 cd PDCC/tools/
 go run analyze_tps.go -type XXX
 ```
 Supported `-type` values:
-- `wria`: parse PDCC TPS, output line chart 
-- `occ1`: parse CM-Exe TPS, output line chart 
-- `occ2`: parse CM-Rep TPS, output line chart
+- `pdcc`: parse PDCC TPS, output line chart 
+- `cm-exe`: parse CM-Exe TPS, output line chart 
+- `cm-rep`: parse CM-Rep TPS, output line chart
 - `aria`: parse Aria TPS, output line chart
 - `serial`: parse Serial TPS, output line chart
-- `occ1dag`: parse OCC1 DAG building cost (ms) and output a line chart
-- `wriaPieChart`: parse PDCC 9-phase timing + TPS, and output an HTML with a “range-linked pie chart”
-- `wriaRoundNum`: parse PDCC blockheight vs roundNum, and output a line chart
-- `pdccmetadata`: parse PDCC `phase10(roundCommitStats)` cost, and output a line chart
+- `pdccPieChart`: parse PDCC 9-phase timing + TPS, and output an HTML with a “range-linked pie chart”
+- `pdccRoundNum`: parse PDCC blockheight vs roundNum, and output a line chart
 
 After that, please open the generated HTML file in your browser to view the interactive charts.
 

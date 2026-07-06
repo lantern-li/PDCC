@@ -23,33 +23,33 @@ The tool reads the following log path by default (hard-coded in the code):
 Run in the `tools/` directory:
 
 ```bash
-go run ./analyze_tps.go -type wria
+go run ./analyze_tps.go -type pdcc
 ```
 
 Flags:
 
-- `-type`: scheduler/analysis type (default: `wria`)
+- `-type`: scheduler/analysis type
 
 Supported `-type` values (kept in sync with the code):
 
-- `wria`: parse PDCC TPS, output line chart + bar chart
-- `occ1`: parse OCC1 TPS, output line chart + bar chart
-- `occ2`: parse OCC2 TPS, output line chart + bar chart
+- `pdcc`: parse PDCC TPS, output line chart + bar chart
+- `cm-exe`: parse CM-Exe TPS, output line chart + bar chart
+- `cm-rep`: parse CM-Rep TPS, output line chart + bar chart
 - `aria`: parse Aria TPS, output line chart + bar chart
 - `serial`: parse Serial TPS, output line chart + bar chart
 - `occ1dag`: parse OCC1 DAG building cost (ms) and output a line chart
-- `wriaPieChart`: parse PDCC 9-phase timing + TPS, and output an HTML with a “range-linked pie chart”
-- `wriaRoundNum`: parse PDCC blockheight vs roundNum, and output a line chart
+- `pdccPieChart`: parse PDCC 9-phase timing + TPS, and output an HTML with a “range-linked pie chart”
+- `pdccRoundNum`: parse PDCC blockheight vs roundNum, and output a line chart
 - `pdccmetadata`: parse PDCC `phase10(roundCommitStats)` cost, and output a line chart
 
 ### Output files
 
 Different `-type` values generate different HTML files (written to the current working directory, usually `tools/`):
 
-- `wria/occ1/occ2/reorder/graph/aria/blockstm/serial`: `tps_performance_analysis.html`
+- `pdcc/cm-exe/cm-rep/reorder/graph/aria/blockstm/serial`: `tps_performance_analysis.html`
 - `occ1dag`: `occ1_dag_building_cost_analysis.html`
-- `wriaPieChart`: `piechart.html`
-- `wriaRoundNum`: `wria_roundnum.html`
+- `pdccPieChart`: `piechart.html`
+- `pdccRoundNum`: `wria_roundnum.html`
 - `pdccmetadata`: `pdcc_metadata_phase10_roundCommitStats.html`
 
 Open the generated HTML in a browser to view the interactive charts.
