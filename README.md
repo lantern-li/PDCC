@@ -102,7 +102,7 @@ Supported `-type` values:
 
 After that, please open the generated HTML file in your browser to view the interactive charts.
 
-**Note:** If you wish to conduct the next test case(e.g., a different skew or a different workload), it is strongly recommended to restart the chain before proceeding, as follows:
+**Note:** If you wish to conduct the next test case(e.g., a different skew or a different workload), it is recommended to restart the chain before proceeding, as follows:
 ```bash
 cd PDCC/scripts
 ./cluster_quick_stop.sh clean
