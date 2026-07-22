@@ -5,6 +5,7 @@ ChainMaker aims to use standardized and modularized components to build a blockc
 
 # Supplemental Material
 Detailed supporting materials for PDCC's experimental evaluation are available in the `ExperimentalRecord/` folder.
+The source code of PDCC resides in `module/core/common/scheduler/deterministic/pdcc/` folder
 
 To reproduce the experimental results presented in this study, please refer to the following guidelines.
 
